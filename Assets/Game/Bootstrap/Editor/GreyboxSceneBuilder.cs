@@ -37,6 +37,25 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>玩家出生点。</summary>
         private static readonly Vector3 PlayerSpawn = Vector3.zero;
 
+        /// <summary>角色身高（米）。灰盒阶段用于确定身体与头部的位置。</summary>
+        private const float PlayerHeight = 1.8f;
+
+        /// <summary>角色身体半径。</summary>
+        private const float PlayerRadius = 0.4f;
+
+        /// <summary>相机俯角（度）。</summary>
+        /// <remarks>
+        /// 62 度对应参考实现的接近正俯视的视角：能清晰读出地面平面布局与掩体关系，
+        /// 同时保留少量立体感用于判断高低差。45 度过于接近第三人称，不是本项目的目标视角。
+        /// </remarks>
+        private const float CameraPitchDegrees = 62f;
+
+        /// <summary>相机到目标的距离。</summary>
+        private const float CameraDistance = 24f;
+
+        /// <summary>相机视野（垂直角度）。</summary>
+        private const float CameraFieldOfView = 55f;
+
         [MenuItem("RaidDemo/生成灰盒测试场景")]
         public static void BuildScene()
         {
@@ -149,21 +168,57 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>创建玩家对象，挂载表现层组件。</summary>
+        /// <summary>
+        /// 创建玩家对象。
+        /// </summary>
+        /// <remarks>
+        /// <para>玩家的根节点被刻意放在地面高度（y 等于 0），身体与头部作为子节点向上堆叠。
+        /// 这样做的原因是：Unity 内置的胶囊图元高度为 2 且原点位于几何中心，
+        /// 若直接把胶囊当作角色根节点，会有一半体积位于地面以下，表现为角色陷入地里。</para>
+        ///
+        /// <para>把根节点固定在脚底，可以让移动逻辑（模拟层输出的位置）与表现层
+        /// 保持一致的语义：位置就是角色站立的地面点，不需要任何额外的高度补偿。
+        /// 后续替换为正式模型时，只需保证模型的脚底对齐根节点即可。</para>
+        /// </remarks>
         private static void CreatePlayer()
         {
-            var player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            player.name = "Player";
-            player.transform.position = PlayerSpawn + new Vector3(0f, 1f, 0f);
+            var player = new GameObject("Player");
+            player.transform.position = PlayerSpawn;
 
-            SetMaterialColor(player, new Color(0.25f, 0.6f, 0.95f));
+            // 碰撞体放在根节点并居中于身体，使碰撞范围与视觉体积一致。
+            var collider = player.AddComponent<CapsuleCollider>();
+            collider.height = PlayerHeight;
+            collider.radius = PlayerRadius;
+            collider.center = new Vector3(0f, PlayerHeight * 0.5f, 0f);
 
-            // 用于指示朝向：在角色前方放一个小方块，方便在画面中判断转向是否正确。
+            // 身体：圆柱体，高度略低于总身高，把头部占用的空间留出来。
+            var bodyHeight = PlayerHeight - (PlayerRadius * 2f);
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            body.name = "Body";
+            body.transform.SetParent(player.transform, worldPositionStays: false);
+            body.transform.localPosition = new Vector3(0f, PlayerRadius + (bodyHeight * 0.5f), 0f);
+            body.transform.localScale = new Vector3(PlayerRadius * 2f, bodyHeight * 0.5f, PlayerRadius * 2f);
+            Object.DestroyImmediate(body.GetComponent<Collider>());
+            SetMaterialColor(body, new Color(0.25f, 0.6f, 0.95f));
+
+            // 头部：球体，放在身体顶端。
+            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            head.name = "Head";
+            head.transform.SetParent(player.transform, worldPositionStays: false);
+            head.transform.localPosition = new Vector3(0f, PlayerHeight - PlayerRadius, 0f);
+            head.transform.localScale = Vector3.one * (PlayerRadius * 2f);
+            Object.DestroyImmediate(head.GetComponent<Collider>());
+            SetMaterialColor(head, new Color(0.85f, 0.72f, 0.2f));
+
+            // 朝向指示：在角色前方（本地 +Z）放一个小方块。
+            // 斜俯视下角色本身近似圆形，若不放置指示物将无法判断朝向是否正确。
             var nose = GameObject.CreatePrimitive(PrimitiveType.Cube);
             nose.name = "FacingIndicator";
             nose.transform.SetParent(player.transform, worldPositionStays: false);
-            nose.transform.localPosition = new Vector3(0f, 0.2f, 0.55f);
-            nose.transform.localScale = new Vector3(0.25f, 0.25f, 0.5f);
-            SetMaterialColor(nose, new Color(0.95f, 0.85f, 0.2f));
+            nose.transform.localPosition = new Vector3(0f, 0.25f, PlayerRadius + 0.3f);
+            nose.transform.localScale = new Vector3(0.2f, 0.15f, 0.5f);
+            Object.DestroyImmediate(nose.GetComponent<Collider>());
+            SetMaterialColor(nose, new Color(0.95f, 0.35f, 0.2f));
 
             player.AddComponent<RaidDemo.Presentation.PlayerMotor>();
         }
@@ -209,7 +264,7 @@ namespace RaidDemo.Bootstrap.Editor
             cameraObject.tag = "MainCamera";
 
             var camera = cameraObject.AddComponent<Camera>();
-            camera.fieldOfView = 50f;
+            camera.fieldOfView = CameraFieldOfView;
             camera.nearClipPlane = 0.3f;
             camera.farClipPlane = 300f;
             camera.clearFlags = CameraClearFlags.SolidColor;
@@ -222,11 +277,10 @@ namespace RaidDemo.Bootstrap.Editor
             // 直接设置 Transform 是不够的：TopDownCameraController 会在 LateUpdate 中
             // 按自己的参数重算位置，若两者不一致，进游戏瞬间画面会跳一下。
             var serialized = new SerializedObject(controller);
-            serialized.FindProperty("m_PitchDegrees").floatValue = 45f;
-            serialized.FindProperty("m_Distance").floatValue = 14f;
-            serialized.FindProperty("m_WorldOffset").vector3Value = new Vector3(0f, 1.5f, 0f);
-            serialized.FindProperty("m_SmoothTime").floatValue = 0.12f;
-            serialized.FindProperty("m_LookAheadDistance").floatValue = 2.5f;
+            serialized.FindProperty("m_PitchDegrees").floatValue = CameraPitchDegrees;
+            serialized.FindProperty("m_Distance").floatValue = CameraDistance;
+            serialized.FindProperty("m_WorldOffset").vector3Value = new Vector3(0f, 1f, 0f);
+            serialized.FindProperty("m_SmoothTime").floatValue = 0.1f;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             controller.SnapToTarget();

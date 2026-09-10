@@ -91,6 +91,7 @@ namespace RaidDemo.Bootstrap
             if (m_InputCollector != null && m_PlayerMotor != null)
             {
                 m_InputCollector.SetOriginPosition(m_PlayerMotor.SimulatedPosition);
+                m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
             }
         }
 

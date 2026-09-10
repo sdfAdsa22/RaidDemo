@@ -36,9 +36,6 @@ namespace RaidDemo.Presentation
         /// </summary>
         [SerializeField] private float m_SmoothTime = 0.12f;
 
-        /// <summary>沿目标朝向前方的前瞻距离，用于让视野偏向玩家面朝的方向。</summary>
-        [SerializeField] private float m_LookAheadDistance = 2.5f;
-
         private Vector3 m_Velocity;
 
         /// <summary>设置跟随目标。</summary>
@@ -97,12 +94,6 @@ namespace RaidDemo.Presentation
             var forward = new Vector3(0f, -Mathf.Sin(pitchRadians), Mathf.Cos(pitchRadians));
 
             var focus = m_Target.position + m_WorldOffset;
-            if (m_LookAheadDistance > 0f)
-            {
-                // 目标的前方对应其本地 Z 轴。相机朝前偏移可以让面朝方向获得更多视野。
-                focus += m_Target.forward * m_LookAheadDistance;
-            }
-
             return focus - (forward * m_Distance);
         }
     }

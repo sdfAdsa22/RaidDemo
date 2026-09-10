@@ -41,8 +41,21 @@ namespace RaidDemo.Input
         /// <summary>本组件所属玩家的编号。单机固定为 0，联机时由服务端分配。</summary>
         [SerializeField] private int m_PlayerId;
 
+        /// <summary>
+        /// 瞄准死区半径（米）。
+        /// </summary>
+        /// <remarks>
+        /// 当鼠标投影点与角色的距离小于该值时，方向向量会因过短而剧烈抖动，
+        /// 表现为"鼠标移到角色身上时角色乱转"。此时保持上一次的朝向更符合直觉。
+        /// 取 0.5 米是经验值：足够吸住抖动，又不至于让玩家感到瞄准迟钝。
+        /// </remarks>
+        [SerializeField] private float m_AimDeadZoneRadius = 0.5f;
+
         /// <summary>当前角色所在位置，用于计算瞄准方向。由场景启动流程每帧更新。</summary>
         private Vector2 m_OriginPosition;
+
+        /// <summary>角色所处的地面高度。用于把鼠标投影到角色所在的水平面而非固定的 y 等于 0 平面。</summary>
+        private float m_OriginHeight;
 
         private InputAction m_MoveAction;
         private InputAction m_SprintAction;
@@ -83,6 +96,19 @@ namespace RaidDemo.Input
         public void SetOriginPosition(Vector2 position)
         {
             m_OriginPosition = position;
+        }
+
+        /// <summary>
+        /// 设置角色所处的地面高度。
+        /// </summary>
+        /// <remarks>
+        /// 把鼠标投影到角色所在平面而不是固定的世界零平面，
+        /// 是为了让瞄准方向在角色位于不同高度的地形上时依然准确。
+        /// 灰盒阶段所有地面同高，但接口提前留好，后续加入高低差时无需改动。
+        /// </remarks>
+        public void SetOriginHeight(float height)
+        {
+            m_OriginHeight = height;
         }
 
         private void Awake()
@@ -154,13 +180,14 @@ namespace RaidDemo.Input
             }
 
             var screenPoint = mouse.position.ReadValue();
-            var world = ScreenToWorldOnPlane(cam, screenPoint);
-            var delta = world - m_OriginPosition;
+            var world = ScreenToWorldOnPlane(cam, screenPoint, m_OriginHeight);
 
-            // 距离过近时方向不稳定（鼠标与角色几乎重合），此时保持原朝向更自然。
-            return delta.sqrMagnitude < 0.0001f
-                ? Vector2F.Zero
-                : new Vector2F(delta.x, delta.y).Normalized;
+            // 死区判定与方向归一化由共享层的纯函数完成，便于单元测试覆盖边界情形。
+            // 返回零向量表示"保持上一次朝向不变"。
+            return AimResolver.Resolve(
+                new Vector2F(world.x, world.y),
+                new Vector2F(m_OriginPosition.x, m_OriginPosition.y),
+                m_AimDeadZoneRadius);
         }
 
         /// <summary>
@@ -170,10 +197,10 @@ namespace RaidDemo.Input
         /// 不直接使用 ScreenToWorldPoint，是因为它需要知道目标点的深度；
         /// 这里改用一条从摄像机出发的射线与水平面求交，结果与角色所在高度无关。
         /// </remarks>
-        private static Vector2 ScreenToWorldOnPlane(Camera cam, Vector2 screenPoint)
+        private static Vector2 ScreenToWorldOnPlane(Camera cam, Vector2 screenPoint, float planeHeight)
         {
             var ray = cam.ScreenPointToRay(screenPoint);
-            var plane = new Plane(Vector3.up, Vector3.zero);
+            var plane = new Plane(Vector3.up, new Vector3(0f, planeHeight, 0f));
 
             if (plane.Raycast(ray, out var distance))
             {
