@@ -38,6 +38,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>跟随相机。</summary>
         [SerializeField] private TopDownCameraController m_CameraController;
 
+        /// <summary>瞄准准星。未指定时会在运行时自动创建。</summary>
+        [SerializeField] private AimCrosshair m_Crosshair;
+
         private EventBus m_EventBus;
         private ServiceLocator m_Services;
         private CommandRouter m_CommandRouter;
@@ -80,6 +83,13 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 编辑器在失去焦点时会自动解除光标锁定；玩家点回游戏窗口后需要重新锁上。
+            // 这里只在应用有焦点时维持锁定，避免与操作系统的焦点切换互相抢控制权。
+            if (m_InputCollector != null && Application.isFocused && Cursor.lockState != CursorLockMode.Locked)
+            {
+                m_InputCollector.SetCursorLock(true);
+            }
+
             CollectInput();
             DispatchMoveCommand();
 
@@ -93,6 +103,8 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.SetOriginPosition(m_PlayerMotor.SimulatedPosition);
                 m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
             }
+
+            UpdateCrosshair();
         }
 
         /// <summary>
@@ -141,10 +153,90 @@ namespace RaidDemo.Bootstrap
                 m_CameraController.SetTarget(m_PlayerMotor.transform, snap: true);
             }
 
+            EnsureCrosshair();
+
             if (m_InputCollector == null)
             {
                 Debug.LogWarning("[RaidDemo] 未指定输入采集组件，玩家将无法操作。", this);
             }
+            else
+            {
+                // 进入游戏即锁定并隐藏鼠标光标，由准星代替光标指示瞄准位置。
+                m_InputCollector.SetCursorLock(true);
+            }
+        }
+
+        /// <summary>
+        /// 确保准星组件存在。
+        /// </summary>
+        /// <remarks>
+        /// 准星在运行时创建而非烘焙进场景，原因是它属于纯表现层元素，
+        /// 没有需要美术调整的序列化状态，放在运行时创建可以让场景文件保持干净。
+        /// </remarks>
+        private void EnsureCrosshair()
+        {
+            if (m_Crosshair != null)
+            {
+                return;
+            }
+
+            var host = new GameObject("AimCrosshair");
+            host.transform.SetParent(transform, worldPositionStays: false);
+            m_Crosshair = host.AddComponent<AimCrosshair>();
+        }
+
+        /// <summary>
+        /// 更新准星位置。
+        /// </summary>
+        /// <remarks>
+        /// 准星位置由世界瞄准点反投影回屏幕得到，与角色朝向同源，
+        /// 因此不会出现"准星在一个地方、角色朝另一个地方"的偏差。
+        /// </remarks>
+        private void UpdateCrosshair()
+        {
+            if (m_Crosshair == null || m_InputCollector == null || m_CameraController == null)
+            {
+                return;
+            }
+
+            var worldAim = m_InputCollector.AimWorldPosition;
+            if (worldAim.IsNearlyZero)
+            {
+                m_Crosshair.Hide();
+                return;
+            }
+
+            var cam = m_CameraController.GetComponent<Camera>();
+            if (cam == null)
+            {
+                m_Crosshair.Hide();
+                return;
+            }
+
+            // 瞄准点位于角色所在高度，反投影时使用相同高度，避免透视造成的偏移。
+            var world = new Vector3(worldAim.X, m_PlayerMotor.transform.position.y, worldAim.Y);
+            var screen = cam.WorldToScreenPoint(world);
+
+            if (screen.z < 0f)
+            {
+                // 点在相机背后，此时不应绘制准星。
+                m_Crosshair.Hide();
+                return;
+            }
+
+            m_Crosshair.SetScreenPosition(new Vector2(screen.x, screen.y));
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            // 编辑器下失去焦点时释放光标，避免开发过程中无法操作其他窗口。
+            // 发行构建中窗口失去焦点并不是常见场景，保持锁定更符合预期。
+#if UNITY_EDITOR
+            if (m_InputCollector != null)
+            {
+                m_InputCollector.SetCursorLock(hasFocus);
+            }
+#endif
         }
 
         /// <summary>读取本帧输入。</summary>

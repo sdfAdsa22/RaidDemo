@@ -148,5 +148,91 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsFalse(result.IsNearlyZero, "负数死区应按 0 处理，而不是产生异常结果。");
             Assert.AreEqual(1f, result.X, 1e-4f);
         }
+
+        // ---------------------------------------------------------------
+        // 最大射程限制
+        // ---------------------------------------------------------------
+
+        [Test]
+        public void ClampToMaxRange_WithinRange_ReturnsUnchanged()
+        {
+            var aimPoint = Origin + new Vector2F(3f, 4f);   // 距离 5
+
+            var result = AimResolver.ClampToMaxRange(aimPoint, Origin, 10f);
+
+            Assert.AreEqual(aimPoint.X, result.X, 1e-4f);
+            Assert.AreEqual(aimPoint.Y, result.Y, 1e-4f);
+        }
+
+        [Test]
+        public void ClampToMaxRange_BeyondRange_PullsBackToBoundary()
+        {
+            var aimPoint = Origin + new Vector2F(100f, 0f);
+
+            var result = AimResolver.ClampToMaxRange(aimPoint, Origin, 20f);
+
+            Assert.AreEqual(20f, Vector2F.Distance(result, Origin), 1e-3f, "超出射程的瞄准点应被拉回到边界上。");
+        }
+
+        /// <summary>
+        /// 拉回边界时方向必须保持不变，只缩短距离。
+        /// </summary>
+        /// <remarks>
+        /// 若实现里用分量裁剪而不是等比例缩放，朝向会被改变，
+        /// 表现为"准星被限制后角色朝向出现偏移"。
+        /// </remarks>
+        [Test]
+        public void ClampToMaxRange_PreservesDirection()
+        {
+            var aimPoint = Origin + new Vector2F(30f, 40f);   // 方向为 3:4
+
+            var result = AimResolver.ClampToMaxRange(aimPoint, Origin, 10f);
+            var delta = result - Origin;
+
+            Assert.AreEqual(6f, delta.X, 1e-3f, "X 分量应按原比例缩放。");
+            Assert.AreEqual(8f, delta.Y, 1e-3f, "Y 分量应按原比例缩放。");
+        }
+
+        [Test]
+        public void ClampToMaxRange_NonPositiveLimit_DisablesClamping()
+        {
+            var aimPoint = Origin + new Vector2F(1000f, 0f);
+
+            var withZero = AimResolver.ClampToMaxRange(aimPoint, Origin, 0f);
+            var withNegative = AimResolver.ClampToMaxRange(aimPoint, Origin, -1f);
+
+            Assert.AreEqual(aimPoint.X, withZero.X, 1e-4f, "射程为 0 表示不限制。");
+            Assert.AreEqual(aimPoint.X, withNegative.X, 1e-4f, "负射程同样表示不限制。");
+        }
+
+        // ---------------------------------------------------------------
+        // 屏幕范围限制
+        // ---------------------------------------------------------------
+
+        [Test]
+        public void ClampToScreen_InsideBounds_ReturnsUnchanged()
+        {
+            var point = new Vector2F(500f, 300f);
+
+            var result = AimResolver.ClampToScreen(point, 1920f, 1080f);
+
+            Assert.AreEqual(point.X, result.X, 1e-3f);
+            Assert.AreEqual(point.Y, result.Y, 1e-3f);
+        }
+
+        [Test]
+        public void ClampToScreen_OutsideBounds_ClampsToEdges()
+        {
+            var beyond = new Vector2F(5000f, 5000f);
+            var negative = new Vector2F(-100f, -100f);
+
+            var clampedHigh = AimResolver.ClampToScreen(beyond, 1920f, 1080f);
+            var clampedLow = AimResolver.ClampToScreen(negative, 1920f, 1080f);
+
+            Assert.AreEqual(1919f, clampedHigh.X, 1e-3f);
+            Assert.AreEqual(1079f, clampedHigh.Y, 1e-3f);
+            Assert.AreEqual(0f, clampedLow.X, 1e-3f);
+            Assert.AreEqual(0f, clampedLow.Y, 1e-3f);
+        }
     }
 }
