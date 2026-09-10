@@ -50,8 +50,19 @@ namespace RaidDemo.Bootstrap.Editor
         /// </remarks>
         private const float CameraPitchDegrees = 62f;
 
-        /// <summary>相机到目标的距离。</summary>
-        private const float CameraDistance = 24f;
+        /// <summary>
+        /// 相机到目标的距离。
+        /// </summary>
+        /// <remarks>
+        /// 该值直接决定玩家在画面中的视觉大小。距离 24 时角色仅占屏幕高度约 6%，
+        /// 观感上"人太小、看不清在做什么"；收紧到 13 之后角色占比约 11%，
+        /// 既能看清角色与朝向，仍保留足够的战场视野。
+        ///
+        /// 调整本值时必须同步考虑地面可视范围：距离越近，可见的战场越小。
+        /// 若后续地图尺度变大，应优先调大视野角而不是把相机往后拉，
+        /// 因为拉远会重新让角色变小。
+        /// </remarks>
+        private const float CameraDistance = 13f;
 
         /// <summary>相机视野（垂直角度）。</summary>
         private const float CameraFieldOfView = 55f;
