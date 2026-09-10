@@ -1,0 +1,16 @@
+{
+    "name": "RaidDemo.Shared",
+    "rootNamespace": "RaidDemo.Shared",
+    "references": [
+        "RaidDemo.Kernel.Pure"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

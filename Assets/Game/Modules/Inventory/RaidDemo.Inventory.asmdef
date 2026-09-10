@@ -1,0 +1,20 @@
+{
+    "name": "RaidDemo.Inventory",
+    "rootNamespace": "RaidDemo.Inventory",
+    "references": [
+        "RaidDemo.Kernel.Pure",
+        "RaidDemo.Kernel.Unity",
+        "RaidDemo.Shared",
+        "RaidDemo.Data",
+        "RaidDemo.Data.Content"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

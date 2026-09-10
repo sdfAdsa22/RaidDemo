@@ -1,0 +1,22 @@
+{
+    "name": "RaidDemo.AI",
+    "rootNamespace": "RaidDemo.AI",
+    "references": [
+        "RaidDemo.Kernel.Pure",
+        "RaidDemo.Kernel.Unity",
+        "RaidDemo.Shared",
+        "RaidDemo.Data",
+        "RaidDemo.Data.Content",
+        "RaidDemo.Combat",
+        "Unity.AI.Navigation"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

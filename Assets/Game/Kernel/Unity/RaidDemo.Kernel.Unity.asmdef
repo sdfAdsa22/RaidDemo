@@ -1,0 +1,16 @@
+{
+    "name": "RaidDemo.Kernel.Unity",
+    "rootNamespace": "RaidDemo.Kernel",
+    "references": [
+        "RaidDemo.Kernel.Pure"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

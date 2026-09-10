@@ -16,3 +16,4 @@
 | [ADR-001](Decisions/ADR-001-服务端权威架构与Netcode选型.md) | 采用服务端权威架构与 Netcode for GameObjects | 已采纳 |
 | [ADR-002](Decisions/ADR-002-采用Addressables实现资源热更新.md) | 采用 Addressables 实现资源热更新 | 已采纳 |
 | [ADR-003](Decisions/ADR-003-采用HybridCLR实现代码热更新.md) | 采用 HybridCLR 实现代码热更新 | 已采纳 |
+| [ADR-004](Decisions/ADR-004-程序集划分方案.md) | 程序集划分方案（13 个程序集，四层结构） | 已采纳 |

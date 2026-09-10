@@ -1,0 +1,26 @@
+{
+    "name": "RaidDemo.UI",
+    "rootNamespace": "RaidDemo.UI",
+    "references": [
+        "RaidDemo.Kernel.Pure",
+        "RaidDemo.Kernel.Unity",
+        "RaidDemo.Shared",
+        "RaidDemo.Data",
+        "RaidDemo.Data.Content",
+        "RaidDemo.Inventory",
+        "RaidDemo.Combat",
+        "RaidDemo.Meta",
+        "RaidDemo.Raid",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

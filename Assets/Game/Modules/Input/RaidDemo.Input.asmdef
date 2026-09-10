@@ -1,0 +1,19 @@
+{
+    "name": "RaidDemo.Input",
+    "rootNamespace": "RaidDemo.Input",
+    "references": [
+        "RaidDemo.Kernel.Pure",
+        "RaidDemo.Kernel.Unity",
+        "RaidDemo.Shared",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
