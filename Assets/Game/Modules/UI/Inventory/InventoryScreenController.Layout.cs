@@ -47,7 +47,7 @@ namespace RaidDemo.UI
             background.raycastTarget = false;
             m_Root = rootHost;
 
-            CreateLabel(rootRect, "背包 (Tab 关闭  F 整理  R 拖拽中旋转  右键拆分 / 卸下)",
+            CreateLabel(rootRect, "背包 (Tab 关闭  F 整理  双击快速搬运  R 拖拽中旋转  右键拆分 / 卸下)",
                 new Vector2(24f, 16f), PanelWidth - 48f, 24f, 16);
 
             BuildEquipmentColumn(rootRect);

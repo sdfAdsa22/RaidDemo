@@ -18,6 +18,15 @@ namespace RaidDemo.UI
     /// </remarks>
     public sealed partial class InventoryScreenController
     {
+        /// <summary>判定双击的时间窗口（秒）。0.35 秒是常见操作系统的默认值附近，手感不紧不松。</summary>
+        private const float DoubleClickSeconds = 0.35f;
+
+        /// <summary>上一次被按下的物品，用于识别双击。为空表示上一次点击没有落在物品上。</summary>
+        private ItemInstance m_LastClickItem;
+
+        /// <summary>上一次按下的时刻（秒）。负值表示还没有过点击。</summary>
+        private float m_LastClickTime = -1f;
+
         /// <summary>处理鼠标左键按下：可能是开始拖拽，也可能是点击装备槽卸下。</summary>
         private void BeginPointerDown(Vector2 pointer)
         {
@@ -41,6 +50,22 @@ namespace RaidDemo.UI
             var item = view.Grid.GetAt(cell);
             if (item == null || !view.Grid.TryGetOrigin(item, out var origin))
             {
+                return;
+            }
+
+            // 双击 = 快速转移。这是搜刮时最常用的操作：一件件拖太慢，
+            // 而玩家在战利品箱与背包之间来回搬东西会做几十次。
+            var now = Time.unscaledTime;
+            var isDoubleClick = ReferenceEquals(item, m_LastClickItem)
+                                && (now - m_LastClickTime) <= DoubleClickSeconds;
+            m_LastClickItem = item;
+            m_LastClickTime = now;
+
+            if (isDoubleClick)
+            {
+                // 清掉记录，避免三连击被当成第二次双击又转移一次。
+                m_LastClickItem = null;
+                DispatchQuickTransfer(view, origin);
                 return;
             }
 
@@ -87,7 +112,9 @@ namespace RaidDemo.UI
             }
 
             var view = FindGridAt(pointer, out var cell);
-            if (view != null && view.Grid.TryGetOrigin(m_DragItem, out var origin))
+            // 坐标必须从**源**容器查，而不是松手时所在的容器：
+            // 物品不在目标容器里，对目标容器查询坐标一定失败，命令就发不出去了。
+            if (view != null && m_DragSource.Grid.TryGetOrigin(m_DragItem, out var origin))
             {
                 var size = SizeForDrag();
                 var grab = ClampGrabOffset(size);
@@ -96,6 +123,30 @@ namespace RaidDemo.UI
             }
 
             CancelDrag();
+        }
+
+        /// <summary>
+        /// 在背包与战利品箱之间一键搬运物品。
+        /// </summary>
+        /// <param name="sourceView">物品当前所在的容器视图。</param>
+        /// <param name="origin">物品在源容器中的左上角坐标。</param>
+        /// <remarks>
+        /// 目标容器固定取"另一个"：在战利品箱里双击就是捡进背包，在背包里双击就是放回箱子。
+        /// 这样双击的语义只依赖物品在哪，玩家不需要先想清楚要搬到哪儿去。
+        /// </remarks>
+        private void DispatchQuickTransfer(InventoryGridView sourceView, GridPoint origin)
+        {
+            var targetId = sourceView.ContainerId == m_BackpackContainerId
+                ? m_LootContainerId
+                : m_BackpackContainerId;
+
+            if (targetId == 0)
+            {
+                return;
+            }
+
+            m_Router.Dispatch(new InventoryQuickTransferIntent(
+                0, sourceView.ContainerId, targetId, origin.X, origin.Y));
         }
 
         /// <summary>右键：对堆叠执行拆分，对装备槽执行卸下。</summary>
