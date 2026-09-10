@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace RaidDemo.Tests.EditMode
 {
     /// <summary>
-    /// 工程路径规则测试：保证仓库可以被克隆到任意位置、任意盘符、任意用户名下直接运行。
+    /// 工程路径规则测试：保证仓库可以克隆到任意位置、任意盘符、任意用户名下直接运行。
     /// </summary>
     /// <remarks>
     /// <para>这个测试要解决的问题：源码或配置里只要出现一处本机绝对路径，
@@ -35,10 +35,10 @@ namespace RaidDemo.Tests.EditMode
         };
 
         [Test]
-        public void SourceFiles_DoNotContainAbsolutePaths()
+        public void Assets_DoNotContainAbsolutePaths()
         {
-            var scanned = PathRulesVerifier.CountSourceFiles(ProjectRoot, ExcludedFiles);
-            Assert.Greater(scanned, 0, $"未扫描到任何源码文件，请检查扫描路径 {PathRulesVerifier.ScanRoot} 是否正确。");
+            var scanned = PathRulesVerifier.CountScannableFiles(ProjectRoot, ExcludedFiles);
+            Assert.Greater(scanned, 0, $"未扫描到任何文件，请检查扫描路径 {PathRulesVerifier.ScanRoot} 是否正确。");
 
             var violations = PathRulesVerifier.ScanDirectory(ProjectRoot, ExcludedFiles);
             if (violations.Count == 0)
@@ -47,7 +47,7 @@ namespace RaidDemo.Tests.EditMode
             }
 
             var report = new StringBuilder();
-            report.AppendLine($"发现 {violations.Count} 处绝对路径。工程规范要求源码不含任何本机路径，");
+            report.AppendLine($"发现 {violations.Count} 处绝对路径。工程规范要求源码与配置不含任何本机路径，");
             report.AppendLine("否则他人克隆仓库后将无法直接运行。应改用：");
             report.AppendLine("  工程内资源      → AssetDatabase / Resources / Addressables");
             report.AppendLine("  存档与配置      → Application.persistentDataPath / streamingAssetsPath");
@@ -63,7 +63,7 @@ namespace RaidDemo.Tests.EditMode
         }
 
         /// <summary>
-        /// 验证扫描器本身是有效的。
+        /// 验证扫描器本身有效。
         /// </summary>
         /// <remarks>
         /// 一个从不报错的检查等于没有检查。本用例写入一份确定包含绝对路径的临时源码，
@@ -75,7 +75,7 @@ namespace RaidDemo.Tests.EditMode
             var tempDirectory = Path.Combine(ProjectRoot, PathRulesVerifier.ScanRoot, TempFolderName);
             var tempFile = Path.Combine(tempDirectory, "InjectedViolation.cs");
 
-            // 用字符拼接构造，避免本文件自身被扫描器判定为违规。
+            // 用字符拼接构造路径，避免本文件自身被扫描器判定为违规。
             var driveLetter = "D";
             var separator = (char)92;
             var injectedLine = $"private const string Bad = @\"{driveLetter}:{separator}SomeFolder{separator}file.json\";";
@@ -126,24 +126,65 @@ namespace RaidDemo.Tests.EditMode
             }
         }
 
+        /// <summary>
+        /// URL 不应被误判为盘符路径。
+        /// </summary>
+        /// <remarks>
+        /// 网址中的 https:// 含有一个冒号，若正则不加以区分会被当作盘符 s。
+        /// 这个用例锁定该行为，避免后续修改正则时引入大量误报——
+        /// 一个满屏误报的检查最终会被人忽略，等同于没有检查。
+        /// </remarks>
+        [Test]
+        public void Verifier_DoesNotFlagUrls()
+        {
+            var lines = new[]
+            {
+                "url: https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal",
+                "link: http://example.com/a/b",
+                "asset: Assets/Game/Content/item.json"
+            };
+
+            var violations = PathRulesVerifier.ScanLines("Sample.cs", lines);
+
+            Assert.IsEmpty(violations, "网址协议前缀与工程相对路径都不应被判定为绝对路径。");
+        }
+
+        /// <summary>
+        /// URL 中若确实内嵌了盘符路径，仍应被识别出来。
+        /// </summary>
+        /// <remarks>
+        /// 这条与上一条是一对：前者防止误报，后者防止漏报。
+        /// 例如 file:///c:/temp 里确实含有一个本机盘符路径，这类写法同样不可移植，必须报出来。
+        /// </remarks>
+        [Test]
+        public void Verifier_FlagsDrivePathEmbeddedInUrl()
+        {
+            var separator = (char)47;
+            var lines = new[] { $"var uri = \"file:{separator}{separator}{separator}C:{separator}temp\";" };
+
+            var violations = PathRulesVerifier.ScanLines("Sample.cs", lines);
+
+            Assert.IsNotEmpty(violations, "URL 中内嵌的盘符路径属于不可移植写法，应当被识别。");
+        }
+
         [Test]
         public void SourceFiles_DoNotExceedLineLimit()
         {
-            var root = Path.Combine(ProjectRoot, PathRulesVerifier.ScanRoot);
-            if (!Directory.Exists(root))
-            {
-                Assert.Fail($"扫描路径不存在：{PathRulesVerifier.ScanRoot}");
-            }
-
             var violations = new StringBuilder();
             var count = 0;
 
-            foreach (var file in Directory.EnumerateFiles(root, PathRulesVerifier.SourceSearchPattern, SearchOption.AllDirectories))
+            foreach (var file in PathRulesVerifier.EnumerateScannableFiles(ProjectRoot, ExcludedFiles))
             {
-                var relativePath = file.Substring(ProjectRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var relativePath = PathRulesVerifier.ToRelativePath(ProjectRoot, file);
+
+                // 只对源码检查行数；资产与配置文件不受此规则约束。
+                if (!file.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
 
                 // 测试代码天然较长，且不参与运行时维护成本，因此豁免行数限制。
-                if (relativePath.Contains("/Tests/", StringComparison.OrdinalIgnoreCase))
+                if (PathRulesVerifier.IsTestFile(relativePath))
                 {
                     continue;
                 }

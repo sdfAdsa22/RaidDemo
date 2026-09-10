@@ -35,28 +35,51 @@ namespace RaidDemo.Tests.EditMode
     }
 
     /// <summary>
-    /// 路径规则扫描器。
+    /// 路径规则扫描器：检查工程内是否存在本机绝对路径。
     /// </summary>
     /// <remarks>
     /// <para>把扫描逻辑抽成独立类型，是为了让它可以被单独验证。
-    /// 一个从不失败的检查等于没有检查，因此 <see cref="PathRulesTests"/> 中专门有一个用例
-    /// 写入一份带绝对路径的临时源码，断言扫描器确实能抓到它。</para>
+    /// 一个从不失败的检查等于没有检查，因此测试中专门有一个用例写入带绝对路径的临时源码，
+    /// 断言扫描器确实能抓到它。</para>
     ///
-    /// <para>本类型不参与游戏构建，仅存在于测试程序集。</para>
+    /// <para>本类型仅存在于测试程序集，不参与游戏构建。</para>
     /// </remarks>
     public static class PathRulesVerifier
     {
         /// <summary>相对工程根目录的扫描起点。</summary>
         public const string ScanRoot = "Assets";
 
-        /// <summary>扫描的源码扩展名。</summary>
+        /// <summary>源码文件的扫描模式。</summary>
         public const string SourceSearchPattern = "*.cs";
+
+        /// <summary>
+        /// 需要一并扫描的配置文件模式。
+        /// </summary>
+        /// <remarks>
+        /// 绝对路径不只出现在源码里：Unity 的资产文件与项目配置同样可能记录本机路径，
+        /// 而这类文件一旦被提交，克隆者往往很难看出问题出在哪。
+        /// 因此扫描范围必须覆盖它们，只查 .cs 是不完整的。
+        /// </remarks>
+        public static readonly string[] ConfigurationSearchPatterns =
+        {
+            "*.asmdef",
+            "*.json",
+            "*.asset"
+        };
+
+        /// <summary>单元测试目录的路径片段，用于豁免行数限制。</summary>
+        public const string TestPathFragment = "/Tests/";
 
         /// <summary>
         /// 匹配 Windows 盘符绝对路径，例如 C:\ 或 D:/。
         /// </summary>
+        /// <remarks>
+        /// 前置的负向后顾断言是必需的：没有它，网址中的 https:// 会被误判为
+        /// 盘符 s 加上斜杠。加上断言后，只有冒号前是行首或非字母数字字符时才视为盘符，
+        /// 既能抓到真实的盘符路径，也不会把 URL 当成违规。
+        /// </remarks>
         private static readonly Regex WindowsDrivePath = new Regex(
-            @"[A-Za-z]:[\\/]",
+            @"(?<![A-Za-z0-9])[A-Za-z]:[\\/]",
             RegexOptions.Compiled);
 
         /// <summary>
@@ -71,8 +94,8 @@ namespace RaidDemo.Tests.EditMode
         /// 扫描指定的代码片段，返回其中的违规项。
         /// </summary>
         /// <param name="filePath">用于报告的仓库相对路径。</param>
-        /// <param name="lines">按行拆分的源码内容。</param>
-        /// <returns>违规列表；无违规则为空。</returns>
+        /// <param name="lines">按行拆分的文件内容。</param>
+        /// <returns>违规列表；无违规则为空列表。</returns>
         public static List<PathViolation> ScanLines(string filePath, string[] lines)
         {
             var violations = new List<PathViolation>();
@@ -97,27 +120,52 @@ namespace RaidDemo.Tests.EditMode
         }
 
         /// <summary>
-        /// 扫描指定目录下的全部源码文件。
+        /// 枚举所有需要扫描的文件（源码与配置文件）。
         /// </summary>
-        /// <param name="projectRoot">工程根目录（Assets 的父目录）。</param>
-        /// <param name="excludedFileNames">需要跳过的文件名，例如扫描器自身的测试文件。</param>
-        /// <returns>违规列表；无违规则为空。</returns>
-        public static List<PathViolation> ScanDirectory(string projectRoot, params string[] excludedFileNames)
+        /// <param name="projectRoot">工程根目录，即 Assets 的父目录。</param>
+        /// <param name="excludedFileNames">需要跳过的文件名。</param>
+        public static List<string> EnumerateScannableFiles(string projectRoot, params string[] excludedFileNames)
         {
-            var violations = new List<PathViolation>();
+            var result = new List<string>();
             var root = Path.Combine(projectRoot, ScanRoot);
             if (!Directory.Exists(root))
             {
-                return violations;
+                return result;
             }
 
             foreach (var file in Directory.EnumerateFiles(root, SourceSearchPattern, SearchOption.AllDirectories))
             {
-                if (IsExcluded(file, excludedFileNames))
-                {
-                    continue;
-                }
+                AddIfNotExcluded(result, file, excludedFileNames);
+            }
 
+            foreach (var pattern in ConfigurationSearchPatterns)
+            {
+                foreach (var file in Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
+                {
+                    AddIfNotExcluded(result, file, excludedFileNames);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>统计待扫描文件数量，用于确认扫描确实执行了。</summary>
+        public static int CountScannableFiles(string projectRoot, params string[] excludedFileNames)
+        {
+            return EnumerateScannableFiles(projectRoot, excludedFileNames).Count;
+        }
+
+        /// <summary>
+        /// 扫描整个 Assets 目录，返回全部违规项。
+        /// </summary>
+        /// <param name="projectRoot">工程根目录。</param>
+        /// <param name="excludedFileNames">需要跳过的文件名。</param>
+        public static List<PathViolation> ScanDirectory(string projectRoot, params string[] excludedFileNames)
+        {
+            var violations = new List<PathViolation>();
+
+            foreach (var file in EnumerateScannableFiles(projectRoot, excludedFileNames))
+            {
                 var relativePath = ToRelativePath(projectRoot, file);
                 violations.AddRange(ScanLines(relativePath, File.ReadAllLines(file)));
             }
@@ -125,25 +173,36 @@ namespace RaidDemo.Tests.EditMode
             return violations;
         }
 
-        /// <summary>统计目录下的源码文件数量，用于确认扫描确实执行了。</summary>
-        public static int CountSourceFiles(string projectRoot, params string[] excludedFileNames)
+        /// <summary>把绝对路径转换为便于阅读的仓库相对路径，用于测试报告。</summary>
+        public static string ToRelativePath(string projectRoot, string absolutePath)
         {
-            var root = Path.Combine(projectRoot, ScanRoot);
-            if (!Directory.Exists(root))
+            if (absolutePath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
             {
-                return 0;
+                return absolutePath
+                    .Substring(projectRoot.Length)
+                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
 
-            var count = 0;
-            foreach (var file in Directory.EnumerateFiles(root, SourceSearchPattern, SearchOption.AllDirectories))
+            return Path.GetFileName(absolutePath);
+        }
+
+        /// <summary>判断文件是否位于测试目录中（测试代码豁免行数限制）。</summary>
+        public static bool IsTestFile(string relativePath)
+        {
+            return relativePath.IndexOf(TestPathFragment, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static void AddIfNotExcluded(List<string> target, string file, string[] excludedFileNames)
+        {
+            if (IsExcluded(file, excludedFileNames))
             {
-                if (!IsExcluded(file, excludedFileNames))
-                {
-                    count++;
-                }
+                return;
             }
 
-            return count;
+            if (!target.Contains(file))
+            {
+                target.Add(file);
+            }
         }
 
         private static bool IsExcluded(string filePath, string[] excludedFileNames)
@@ -163,18 +222,6 @@ namespace RaidDemo.Tests.EditMode
             }
 
             return false;
-        }
-
-        private static string ToRelativePath(string projectRoot, string absolutePath)
-        {
-            if (absolutePath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
-            {
-                return absolutePath
-                    .Substring(projectRoot.Length)
-                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            }
-
-            return Path.GetFileName(absolutePath);
         }
     }
 }
