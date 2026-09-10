@@ -1,0 +1,72 @@
+# =============================================================================
+# Git 属性配置
+# =============================================================================
+# 目的：统一跨平台的行尾符与文本处理方式，避免 Windows / macOS / Linux 协作时
+# 出现整文件级的换行符 diff 噪声。
+
+# 默认：由 Git 自动判断文本文件，并在检出时统一为 LF
+* text=auto
+
+# 源码与文本配置文件统一使用 LF
+*.cs      text eol=lf
+*.sh      text eol=lf
+*.md      text eol=lf
+*.json    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.xml     text eol=lf
+*.asmdef  text eol=lf
+*.gitignore text eol=lf
+*.vsconfig  text eol=lf
+*.inputactions text eol=lf
+*.uss     text eol=lf
+*.wlt     text eol=lf
+
+# Windows 专用脚本保留 CRLF
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+
+# Unity 场景、预制体、资源文件：文本格式，统一 LF
+# （Unity 默认使用 Force Text 序列化，因此这些文件可以正常做 diff）
+*.unity   text eol=lf
+*.prefab  text eol=lf
+*.asset   text eol=lf
+*.mat     text eol=lf
+*.controller text eol=lf
+*.anim    text eol=lf
+*.meta    text eol=lf
+
+# -----------------------------------------------------------------------------
+# 二进制资源：禁止行尾符转换与 diff
+# -----------------------------------------------------------------------------
+*.fbx     binary
+*.FBX     binary
+*.obj     binary
+*.blend   binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.tga     binary
+*.psd     binary
+*.wav     binary
+*.mp3     binary
+*.ogg     binary
+*.ttf     binary
+*.otf     binary
+*.dll     binary
+*.so      binary
+*.dylib   binary
+*.bundle  binary
+*.a       binary
+*.exe     binary
+
+# -----------------------------------------------------------------------------
+# Git LFS（如后续引入较大的二进制美术资源，启用此段）
+# -----------------------------------------------------------------------------
+# 启用前需先执行 git lfs install，并确认团队成员均已安装 Git LFS。
+# 本项目当前未启用，M7 引入低多边形资源后视体积决定。
+#
+# *.fbx filter=lfs diff=lfs merge=lfs -text
+# *.png filter=lfs diff=lfs merge=lfs -text
+# *.wav filter=lfs diff=lfs merge=lfs -text
