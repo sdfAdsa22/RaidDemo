@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94c467a04d36ac24fb3fbed7947cf45f, type: 3}
+  m_Name: loot.bolt.copper
+  m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.ItemDefinition
+  m_Id: loot.bolt.copper
+  m_DisplayName: "\u94DC\u87BA\u6813"
+  m_Category: 5
+  m_Rarity: 0
+  m_Width: 1
+  m_Height: 1
+  m_WeightKg: 0.02
+  m_BaseValue: 600
+  m_MaxStack: 20
+  m_CanRotate: 0
+  m_IsContainer: 0
+  m_ContainerWidth: 4
+  m_ContainerHeight: 4
+  m_Behavior: {fileID: 0}

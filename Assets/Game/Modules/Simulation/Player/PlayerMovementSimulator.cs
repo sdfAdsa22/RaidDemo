@@ -74,7 +74,13 @@ namespace RaidDemo.Simulation
             }
 
             var hasMoveInput = !moveDirection.IsNearlyZero;
-            var sprinting = wantsToSprint && !m_State.IsExhausted && m_State.Stamina > 0f && hasMoveInput;
+            // AllowSprint 是负重系统写入的能力开关：重装与超重时玩家仍可按住奔跑键，
+            // 但这里直接忽略该意图。把判定放在模拟层，客户端就无法通过伪造输入绕过惩罚。
+            var sprinting = m_Profile.AllowSprint
+                            && wantsToSprint
+                            && !m_State.IsExhausted
+                            && m_State.Stamina > 0f
+                            && hasMoveInput;
             var targetSpeed = sprinting
                 ? m_Profile.SprintSpeed * ClampInput(moveDirection)
                 : m_Profile.WalkSpeed * ClampInput(moveDirection);

@@ -1,8 +1,12 @@
+﻿using System.Collections.Generic;
 using RaidDemo.Input;
 using RaidDemo.Kernel;
 using RaidDemo.Presentation;
 using RaidDemo.Shared;
 using RaidDemo.Simulation;
+using RaidDemo.Data;
+using RaidDemo.Inventory;
+using RaidDemo.UI;
 using UnityEngine;
 
 namespace RaidDemo.Bootstrap
@@ -21,7 +25,7 @@ namespace RaidDemo.Bootstrap
     /// 但模拟与命令链路保持不变——这正是把逻辑从 MonoBehaviour 中剥离出来的价值。</para>
     /// </remarks>
     [DisallowMultipleComponent]
-    public sealed class SceneBootstrap : MonoBehaviour
+    public sealed partial class SceneBootstrap : MonoBehaviour
     {
         /// <summary>玩家初始位置。</summary>
         [SerializeField] private Vector2 m_PlayerSpawnPosition = Vector2.zero;
@@ -41,11 +45,35 @@ namespace RaidDemo.Bootstrap
         /// <summary>瞄准准星。未指定时会在运行时自动创建。</summary>
         [SerializeField] private AimCrosshair m_Crosshair;
 
+        /// <summary>物品目录。留空时背包系统仍然可用，但没有可搜刮的物品。</summary>
+        [SerializeField] private ItemCatalog m_ItemCatalog;
+
+        /// <summary>主背包的网格尺寸（列 x 行）。</summary>
+        [SerializeField] private Vector2Int m_BackpackSize = new Vector2Int(5, 5);
+
+        /// <summary>灰盒战利品箱的网格尺寸（列 x 行）。</summary>
+        [SerializeField] private Vector2Int m_LootContainerSize = new Vector2Int(6, 5);
+
+        /// <summary>承载上限（千克）。取值依据见 EncumbranceProfile.CapacityKg 的说明。</summary>
+        [SerializeField] private float m_CarryCapacityKg = 20f;
+
         private EventBus m_EventBus;
         private ServiceLocator m_Services;
         private CommandRouter m_CommandRouter;
         private PlayerMovementProfile m_MovementProfile;
         private PlayerMoveCommandHandler m_MoveHandler;
+
+        private ContainerRegistry m_ContainerRegistry;
+        private PlayerLoadout m_Loadout;
+        private EncumbranceProfile m_EncumbranceProfile;
+        private InventoryScreenController m_InventoryScreen;
+        private int m_BackpackContainerId;
+        private int m_LootContainerId;
+
+        /// <summary>上一帧的负重状态。只有它发生变化时才重新计算移动修正并广播事件。</summary>
+        private EncumbranceState m_LastEncumbranceState = EncumbranceState.Light;
+
+        private bool m_HasEncumbranceState;
 
         /// <summary>当前帧的移动意图。</summary>
         private Vector2F m_PendingMoveIntent;
@@ -61,6 +89,15 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>移动模拟器，供调试与测试读取状态。</summary>
         public PlayerMovementSimulator Movement => m_MoveHandler?.Simulator;
+
+        /// <summary>容器注册表，供调试与测试读取。</summary>
+        public ContainerRegistry Containers => m_ContainerRegistry;
+
+        /// <summary>角色携带物，供调试与测试读取。</summary>
+        public PlayerLoadout Loadout => m_Loadout;
+
+        /// <summary>背包界面，供调试与测试读取。</summary>
+        public InventoryScreenController InventoryScreen => m_InventoryScreen;
 
         /// <summary>
         /// 初始化顺序设为很早，保证其他组件的 OnEnable 能查询到已注册的服务。
@@ -83,15 +120,30 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            var inventoryOpen = m_InventoryScreen != null && m_InventoryScreen.IsOpen;
+
             // 编辑器在失去焦点时会自动解除光标锁定；玩家点回游戏窗口后需要重新锁上。
             // 这里只在应用有焦点时维持锁定，避免与操作系统的焦点切换互相抢控制权。
-            if (m_InputCollector != null && Application.isFocused && Cursor.lockState != CursorLockMode.Locked)
+            // 背包界面打开时不抢光标：那时玩家需要鼠标来拖拽物品。
+            if (!inventoryOpen
+                && m_InputCollector != null
+                && Application.isFocused
+                && Cursor.lockState != CursorLockMode.Locked)
             {
                 m_InputCollector.SetCursorLock(true);
             }
 
-            CollectInput();
-            DispatchMoveCommand();
+            if (inventoryOpen)
+            {
+                // 翻背包时角色必须立刻停住。只清意图而不停模拟，角色会按上一次的
+                // 输入继续滑行，玩家一松手就发现人物跑出掩体了。
+                m_MoveHandler.ClearIntent();
+            }
+            else
+            {
+                CollectInput();
+                DispatchMoveCommand();
+            }
 
             // 命令只更新意图，模拟推进由 Tick 完成：
             // 这样即使某帧没有输入，角色也会按上一次意图继续移动。
@@ -105,6 +157,7 @@ namespace RaidDemo.Bootstrap
             }
 
             UpdateCrosshair();
+            UpdateEncumbrance();
         }
 
         /// <summary>
@@ -140,6 +193,8 @@ namespace RaidDemo.Bootstrap
 
             m_MoveHandler = new PlayerMoveCommandHandler(simulator, m_EventBus);
             m_CommandRouter.Register(m_MoveHandler);
+
+            InitializeInventory();
 
             // 表现层需要在事件总线就绪之后重新订阅，否则 OnEnable 阶段拿不到服务。
             if (m_PlayerMotor != null)

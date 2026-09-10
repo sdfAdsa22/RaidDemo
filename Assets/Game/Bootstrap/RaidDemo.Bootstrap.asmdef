@@ -7,7 +7,11 @@
         "RaidDemo.Shared",
         "RaidDemo.Simulation",
         "RaidDemo.Input",
-        "RaidDemo.Presentation"
+        "RaidDemo.Presentation",
+        "RaidDemo.Data",
+        "RaidDemo.Data.Content",
+        "RaidDemo.Inventory",
+        "RaidDemo.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

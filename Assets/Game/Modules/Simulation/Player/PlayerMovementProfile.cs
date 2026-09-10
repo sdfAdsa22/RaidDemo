@@ -1,3 +1,5 @@
+using RaidDemo.Shared;
+
 namespace RaidDemo.Simulation
 {
     /// <summary>
@@ -30,6 +32,16 @@ namespace RaidDemo.Simulation
         /// <summary>速度高于该值时判定为奔跑。用于驱动噪音半径与表现层反馈。</summary>
         public float SprintSpeedThreshold = 4.5f;
 
+        /// <summary>
+        /// 是否允许奔跑。由负重系统写入——重装与超重状态下为 false。
+        /// </summary>
+        /// <remarks>
+        /// 这里保存的是**能力**而不是**意愿**：玩家仍然可以按住奔跑键，模拟层直接忽略该意图。
+        /// 把判断放在模拟层而不是输入层，是为了让客户端无法通过伪造输入绕过负重惩罚；
+        /// 联机时同一个判定在服务端执行，两边结果必然一致。
+        /// </remarks>
+        public bool AllowSprint = true;
+
         /// <summary>体力上限。</summary>
         public float MaxStamina = 100f;
 
@@ -61,6 +73,81 @@ namespace RaidDemo.Simulation
         /// </summary>
         public float ExhaustedRecoveryThreshold = 30f;
 
+        /// <summary>
+        /// 是否已经记录过基准值。未记录时第一次应用修正会顺带记录。
+        /// </summary>
+        private bool m_HasBaseline;
+
+        /// <summary>基准步行速度。负重修正始终基于基准值计算，避免多次叠加后越乘越小。</summary>
+        private float m_BaseWalkSpeed;
+
+        /// <summary>基准奔跑速度。</summary>
+        private float m_BaseSprintSpeed;
+
+        /// <summary>基准奔跑判定阈值。</summary>
+        private float m_BaseSprintSpeedThreshold;
+
+        /// <summary>基准体力恢复速度。</summary>
+        private float m_BaseStaminaRegenPerSecond;
+
+        /// <summary>
+        /// 记录当前数值为基准值。负重修正的所有乘法都以基准值为起点。
+        /// </summary>
+        /// <remarks>
+        /// 之所以需要基准值，是因为负重状态会随玩家拾取与丢弃而反复变化。
+        /// 若每次修正都直接乘在当前值上，一次「重装 → 轻装」的往返就会让速度永久偏低，
+        /// 而这类错误在实机上极难察觉——它看起来只是"手感越来越沉"。
+        /// </remarks>
+        public void CaptureBaseline()
+        {
+            m_BaseWalkSpeed = WalkSpeed;
+            m_BaseSprintSpeed = SprintSpeed;
+            m_BaseSprintSpeedThreshold = SprintSpeedThreshold;
+            m_BaseStaminaRegenPerSecond = StaminaRegenPerSecond;
+            m_HasBaseline = true;
+        }
+
+        /// <summary>
+        /// 应用一组移动修正（来自负重系统）。
+        /// </summary>
+        /// <param name="modifiers">
+        /// 三个倍率与一个开关。倍率基于基准值相乘，因此本方法可以安全地反复调用。
+        /// </param>
+        /// <remarks>
+        /// 本方法是**整个项目里负重与移动唯一相遇的地方**：`Simulation` 不需要知道背包存在，
+        /// `Inventory` 也不需要知道移动存在，两者只在启动层的装配代码中通过这个调用相连。
+        /// </remarks>
+        public void ApplyModifiers(in MovementModifiers modifiers)
+        {
+            if (!m_HasBaseline)
+            {
+                CaptureBaseline();
+            }
+
+            WalkSpeed = m_BaseWalkSpeed * modifiers.SpeedMultiplier;
+            SprintSpeed = m_BaseSprintSpeed * modifiers.SpeedMultiplier;
+
+            // 阈值也必须同比缩放：否则速度降到 0.4 倍时阈值仍留在原位，
+            // 会出现"速度早已达到奔跑水平、判定却认为在走路"的错位。
+            SprintSpeedThreshold = m_BaseSprintSpeedThreshold * modifiers.SpeedMultiplier;
+            StaminaRegenPerSecond = m_BaseStaminaRegenPerSecond * modifiers.StaminaRegenMultiplier;
+            AllowSprint = modifiers.CanSprint;
+        }
+
+        /// <summary>清除全部负重修正，恢复到基准数值。</summary>
+        public void ClearModifiers()
+        {
+            if (m_HasBaseline)
+            {
+                WalkSpeed = m_BaseWalkSpeed;
+                SprintSpeed = m_BaseSprintSpeed;
+                SprintSpeedThreshold = m_BaseSprintSpeedThreshold;
+                StaminaRegenPerSecond = m_BaseStaminaRegenPerSecond;
+            }
+
+            AllowSprint = true;
+        }
+
         /// <summary>把全部参数恢复为默认值。</summary>
         public void ResetToDefault()
         {
@@ -74,6 +161,8 @@ namespace RaidDemo.Simulation
             StaminaRegenPerSecond = 20f;
             ExhaustedRegenDelay = 3f;
             ExhaustedRecoveryThreshold = 30f;
+            AllowSprint = true;
+            m_HasBaseline = false;
         }
 
         /// <summary>

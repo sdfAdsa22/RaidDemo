@@ -109,6 +109,33 @@ namespace RaidDemo.Shared
 
         /// <summary>命令序号过期，已被处理过（联机时的重复包）。</summary>
         public const string StaleSequence = "stale_sequence";
+
+        /// <summary>找不到指定的容器或格子。</summary>
+        public const string InventoryNotFound = "inventory_not_found";
+
+        /// <summary>目标容器没有可用空间。</summary>
+        public const string InventoryFull = "inventory_full";
+
+        /// <summary>目标格已被占用。</summary>
+        public const string InventoryOccupied = "inventory_occupied";
+
+        /// <summary>目标格越界。</summary>
+        public const string InventoryOutOfBounds = "inventory_out_of_bounds";
+
+        /// <summary>堆叠已达上限。</summary>
+        public const string InventoryStackLimit = "inventory_stack_limit";
+
+        /// <summary>数量非法（小于等于 0 或超过持有量）。</summary>
+        public const string InventoryInvalidQuantity = "inventory_invalid_quantity";
+
+        /// <summary>装备槽不接受该分类的物品。</summary>
+        public const string InventorySlotMismatch = "inventory_slot_mismatch";
+
+        /// <summary>容器嵌套深度超过上限。</summary>
+        public const string InventoryNestingTooDeep = "inventory_nesting_too_deep";
+
+        /// <summary>物品不允许旋转，但请求了旋转。</summary>
+        public const string InventoryRotationNotAllowed = "inventory_rotation_not_allowed";
     }
 
     /// <summary>
