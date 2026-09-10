@@ -18,8 +18,16 @@ namespace RaidDemo.Data
         /// <summary>医疗用品。绷带、医疗包、注射器。</summary>
         Medical,
 
-        /// <summary>护甲与头盔。</summary>
-        Armor,
+        /// <summary>头盔。只能装备到头盔槽。</summary>
+        /// <remarks>
+        /// 头盔与躯干护甲刻意分成两个分类，而不是合并成一个"护甲"。
+        /// 分类是装备槽规则的唯一依据，合并之后规则层就分不清两者，
+        /// 会出现"钢盔穿在身上、防弹背心戴在头上"这种荒唐的换装。
+        /// </remarks>
+        Helmet,
+
+        /// <summary>躯干护甲（防弹背心、板甲衣）。只能装备到护甲槽。</summary>
+        BodyArmor,
 
         /// <summary>背包。装备后决定随身网格的容量。</summary>
         Backpack,

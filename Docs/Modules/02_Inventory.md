@@ -133,11 +133,15 @@
 | --- | --- | --- |
 | `PrimaryWeapon` | `Weapon` | 主武器，M3 的射击逻辑从此处取武器数据 |
 | `SecondaryWeapon` | `Weapon` | 副武器 |
-| `Head` | `Armor` | 头盔 |
-| `Body` | `Armor` | 护甲 |
+| `Head` | `Helmet` | 头盔 |
+| `Body` | `BodyArmor` | 躯干护甲（防弹背心） |
 | `Backpack` | `Backpack` | 背包，决定随身携带的网格容量 |
 
 规则：
+
+> **头盔与躯干护甲是两个分类，不是一个。**最初把两者合并为 `Armor`，
+> 结果钢盔能穿在躯干上、防弹背心能戴在头上。分类是装备槽规则的唯一依据，
+> 合并之后规则层就无从区分两者；拆开后槽位规则不需要任何额外字段即可表达正确语义。
 
 - 槽位只接受对应分类，类型不符返回 `SlotTypeMismatch`；替换下来的物品需要有去处，放不下则拒绝整个操作。
 - 装备中的物品同样计入总负重。
@@ -490,6 +494,7 @@ public sealed class ContainerRegistry     // containerId → 网格，命令按 
 | `InventoryFailure` 增加了 `Full` | 7.3 节漏了这一项，而 8.3 节又要求区分"格子被占"与"整体放不下"，两者必须分开 |
 | `InventoryGrid` 增加了 `CanAutoPlace`、`Split(item, count)`、`RemoveAt`、`Depth`、`HostItem` | 装备替换需要"先确认退路再动手"；不指定落点的拆分需要在界面里一键完成；后两项用于嵌套检测 |
 | `EquipmentLoadout.Equip` 增加可选参数 `returnTo` | 换装时旧装备必须有去处。原签名无法表达这件事，会导致旧装备凭空消失 |
+| `ItemCategory.Armor` 拆成 `Helmet` 与 `BodyArmor` | 4 节的槽位表原本让头盔与躯干护甲共用 `Armor`，导致两者可以互相装备。分类是槽位规则的唯一依据，必须做精确 |
 | `PlayerLoadout` 增加 `EncumbranceRatio`、`EvaluateModifiers` | 装配层每帧要用，放在这里避免调用处重复写两步流程 |
 | `MovementModifiers` 需要三参构造函数 | 测试与装配都要构造具体倍率，只给 `Default` 无法覆盖 |
 

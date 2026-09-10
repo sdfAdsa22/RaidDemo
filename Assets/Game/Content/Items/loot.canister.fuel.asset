@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.ItemDefinition
   m_Id: loot.canister.fuel
   m_DisplayName: "\u71C3\u6599\u7F50"
-  m_Category: 5
+  m_Category: 6
   m_Rarity: 2
   m_Width: 1
   m_Height: 2

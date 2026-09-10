@@ -281,6 +281,48 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
+        public void Equip_HelmetIntoBodySlot_Fails()
+        {
+            var helmet = new TestItemDefinition(
+                "armor.helmet.steel", ItemCategory.Helmet, width: 2, height: 2, weightKg: 2f);
+            var loadout = new EquipmentLoadout();
+
+            var result = loadout.Equip(m_Factory.Create(helmet), EquipmentSlot.Body);
+
+            Assert.AreEqual(InventoryFailure.SlotTypeMismatch, result.Failure,
+                "钢盔不能穿在躯干上。头盔与护甲必须是两个分类，否则两者会互相通用。");
+            Assert.IsNull(loadout.Get(EquipmentSlot.Body), "失败后护甲槽必须保持为空。");
+        }
+
+        [Test]
+        public void Equip_VestIntoHeadSlot_Fails()
+        {
+            var vest = new TestItemDefinition(
+                "armor.vest.plate", ItemCategory.BodyArmor, width: 2, height: 3, weightKg: 8.5f);
+            var loadout = new EquipmentLoadout();
+
+            var result = loadout.Equip(m_Factory.Create(vest), EquipmentSlot.Head);
+
+            Assert.AreEqual(InventoryFailure.SlotTypeMismatch, result.Failure,
+                "防弹背心不能戴在头上。");
+            Assert.IsNull(loadout.Get(EquipmentSlot.Head), "失败后头盔槽必须保持为空。");
+        }
+
+        [Test]
+        public void Equip_HelmetIntoHeadSlot_Succeeds()
+        {
+            var helmet = new TestItemDefinition(
+                "armor.helmet.steel", ItemCategory.Helmet, width: 2, height: 2, weightKg: 2f);
+            var loadout = new EquipmentLoadout();
+            var item = m_Factory.Create(helmet);
+
+            var result = loadout.Equip(item, EquipmentSlot.Head);
+
+            Assert.IsTrue(result.Success, "钢盔装进头盔槽应当成功。");
+            Assert.AreSame(item, loadout.Get(EquipmentSlot.Head), "槽位上应当是那顶钢盔。");
+        }
+
+        [Test]
         public void Equip_ReplacingItem_ReturnsOldItemToBackpack()
         {
             var loadout = new EquipmentLoadout();

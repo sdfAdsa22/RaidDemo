@@ -73,8 +73,10 @@ namespace RaidDemo.Inventory
                     return category == ItemCategory.Weapon;
 
                 case EquipmentSlot.Head:
+                    return category == ItemCategory.Helmet;
+
                 case EquipmentSlot.Body:
-                    return category == ItemCategory.Armor;
+                    return category == ItemCategory.BodyArmor;
 
                 case EquipmentSlot.Backpack:
                     return category == ItemCategory.Backpack;

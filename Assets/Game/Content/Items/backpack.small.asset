@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.ItemDefinition
   m_Id: backpack.small
   m_DisplayName: "\u5C0F\u578B\u80CC\u5305"
-  m_Category: 4
+  m_Category: 5
   m_Rarity: 0
   m_Width: 3
   m_Height: 3

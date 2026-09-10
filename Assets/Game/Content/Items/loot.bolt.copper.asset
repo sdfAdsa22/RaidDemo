@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.ItemDefinition
   m_Id: loot.bolt.copper
   m_DisplayName: "\u94DC\u87BA\u6813"
-  m_Category: 5
+  m_Category: 6
   m_Rarity: 0
   m_Width: 1
   m_Height: 1

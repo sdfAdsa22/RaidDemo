@@ -57,7 +57,7 @@ namespace RaidDemo.Tests.EditMode
             m_Ammo = new TestItemDefinition(
                 "ammo.9x19", ItemCategory.Ammo, weightKg: 0.012f, baseValue: 8, maxStack: 120);
             m_Armor = new TestItemDefinition(
-                "armor.vest.plate", ItemCategory.Armor, width: 2, height: 2, weightKg: 6.8f);
+                "armor.vest.plate", ItemCategory.BodyArmor, width: 2, height: 2, weightKg: 6.8f);
         }
 
         [Test]

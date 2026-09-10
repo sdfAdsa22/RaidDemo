@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.ItemDefinition
   m_Id: armor.vest.plate
   m_DisplayName: "\u9632\u5F39\u80CC\u5FC3"
-  m_Category: 3
+  m_Category: 4
   m_Rarity: 2
   m_Width: 2
   m_Height: 3
