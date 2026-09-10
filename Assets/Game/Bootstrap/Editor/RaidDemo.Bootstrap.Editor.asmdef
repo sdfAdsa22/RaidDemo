@@ -1,15 +1,19 @@
 {
-    "name": "RaidDemo.Bootstrap",
-    "rootNamespace": "RaidDemo.Bootstrap",
+    "name": "RaidDemo.Bootstrap.Editor",
+    "rootNamespace": "RaidDemo.Bootstrap.Editor",
     "references": [
+        "RaidDemo.Bootstrap",
         "RaidDemo.Kernel.Pure",
         "RaidDemo.Kernel.Unity",
         "RaidDemo.Shared",
         "RaidDemo.Simulation",
         "RaidDemo.Input",
-        "RaidDemo.Presentation"
+        "RaidDemo.Presentation",
+        "Unity.InputSystem"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

@@ -1,13 +1,9 @@
 {
-    "name": "RaidDemo.Bootstrap",
-    "rootNamespace": "RaidDemo.Bootstrap",
+    "name": "RaidDemo.Simulation",
+    "rootNamespace": "RaidDemo.Simulation",
     "references": [
         "RaidDemo.Kernel.Pure",
-        "RaidDemo.Kernel.Unity",
-        "RaidDemo.Shared",
-        "RaidDemo.Simulation",
-        "RaidDemo.Input",
-        "RaidDemo.Presentation"
+        "RaidDemo.Shared"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

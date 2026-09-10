@@ -20,18 +20,24 @@ namespace RaidDemo.Shared
         /// <param name="playerId">发起玩家。</param>
         /// <param name="moveDirection">移动方向，长度原则上不超过 1。</param>
         /// <param name="lookDirection">角色面向方向（单位向量），用于把朝向与移动方向解耦。</param>
+        /// <param name="wantsToSprint">
+        /// 是否请求奔跑。注意这是意图而非结果：能否真的跑起来取决于体力是否耗尽，
+        /// 该判断由模拟层完成，客户端无法绕过。
+        /// </param>
         /// <param name="sequence">命令序号。</param>
         /// <param name="timestamp">发起时刻（秒）。</param>
         public PlayerMoveIntent(
             int playerId,
             Vector2F moveDirection,
             Vector2F lookDirection,
+            bool wantsToSprint = false,
             uint sequence = 0u,
             double timestamp = 0d)
         {
             PlayerId = playerId;
             MoveDirection = moveDirection;
             LookDirection = lookDirection;
+            WantsToSprint = wantsToSprint;
             Sequence = sequence;
             Timestamp = timestamp;
         }
@@ -54,9 +60,12 @@ namespace RaidDemo.Shared
         /// <summary>面向方向。零向量表示保持当前朝向不变。</summary>
         public Vector2F LookDirection { get; }
 
+        /// <summary>是否请求奔跑。</summary>
+        public bool WantsToSprint { get; }
+
         public override string ToString()
         {
-            return $"PlayerMoveIntent(P{PlayerId}, move={MoveDirection}, look={LookDirection}, seq={Sequence})";
+            return $"PlayerMoveIntent(P{PlayerId}, move={MoveDirection}, look={LookDirection}, sprint={WantsToSprint}, seq={Sequence})";
         }
     }
 
