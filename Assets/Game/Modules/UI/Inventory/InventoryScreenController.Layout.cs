@@ -26,7 +26,9 @@ namespace RaidDemo.UI
             canvasHost.transform.SetParent(transform, worldPositionStays: false);
             var canvas = canvasHost.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 100;
+            // 必须高于准星画布的 100：两者相同时，后创建的画布会盖在上面，
+            // 而准星是启动过程中后建的，于是准星会压在背包面板上。
+            canvas.sortingOrder = 200;
 
             var scaler = canvasHost.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

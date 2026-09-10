@@ -156,7 +156,19 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
             }
 
-            UpdateCrosshair();
+            if (inventoryOpen)
+            {
+                // 翻背包时准星没有意义，而且它会盖在面板上，因此直接隐藏。
+                if (m_Crosshair != null)
+                {
+                    m_Crosshair.Hide();
+                }
+            }
+            else
+            {
+                UpdateCrosshair();
+            }
+
             UpdateEncumbrance();
         }
 
