@@ -19,9 +19,6 @@ namespace RaidDemo.Presentation
     [DisallowMultipleComponent]
     public sealed class PlayerMotor : MonoBehaviour
     {
-        /// <summary>朝向旋转的速度（度/秒）。值越大转向越干脆。</summary>
-        [SerializeField] private float m_FacingDegreesPerSecond = 900f;
-
         /// <summary>高度偏移，使角色模型底部贴合地面。</summary>
         [SerializeField] private float m_GroundOffset;
 
@@ -82,13 +79,16 @@ namespace RaidDemo.Presentation
 
             if (!evt.Facing.IsNearlyZero)
             {
-                var target = Mathf.Atan2(evt.Facing.Y, evt.Facing.X) * Mathf.Rad2Deg;
-
-                // 直接赋值会让角色在鼠标快速划过时瞬间翻转，因此按角速度插值。
-                FacingDegrees = Mathf.MoveTowardsAngle(
-                    FacingDegrees,
-                    target,
-                    m_FacingDegreesPerSecond * Time.deltaTime);
+                // 朝向直接采用模拟层的结果，不做插值。
+                //
+                // 这里曾经按角速度插值，结果出现了明显的错位：目标朝向变化后，
+                // 模型要过若干帧才转过去，而准星是即时的，两者看起来就不在一条线上。
+                // 更糟的是每帧推进量取决于 deltaTime——当编辑器失焦导致 deltaTime 极小时，
+                // 每帧只能转不到一度，模型会长时间停在错误朝向上。
+                //
+                // 俯视角下朝向是核心反馈（玩家靠它判断自己在瞄哪里），
+                // 因此宁可牺牲一点圆滑，也要保证即时准确。
+                FacingDegrees = Mathf.Atan2(evt.Facing.Y, evt.Facing.X) * Mathf.Rad2Deg;
             }
 
             ApplyTransform(instant: false);
@@ -99,9 +99,22 @@ namespace RaidDemo.Presentation
             var target = new Vector3(SimulatedPosition.x, m_GroundOffset, SimulatedPosition.y);
             transform.position = instant ? target : Vector3.Lerp(transform.position, target, 0.5f);
 
-            // 坐标轴映射说明：模拟层使用二维 XY 平面，Unity 场景使用 XZ 水平面，
-            // 因此二维 Y 对应三维 Z；绕三维 Y 轴旋转时角度取负。
-            transform.rotation = Quaternion.Euler(0f, -FacingDegrees, 0f);
+            // 坐标轴映射说明（这段映射容易搞错，特此写明推导依据）：
+            //
+            // 模拟层是二维 XY 平面：0 度指向 +X，90 度指向 +Y。
+            // Unity 场景是 XZ 水平面，相机从 -Z 方向朝 +Z 俯视，因此：
+            //   屏幕上方 = 世界 +Z，屏幕右方 = 世界 +X。
+            //
+            // 角色的占位模型朝向是本地 +Z（即模型的"鼻子"在 +Z），
+            // 要让模型指向模拟层 +X 方向，需要把本地 +Z 转到世界 +Z，即旋转 90 度；
+            // 要指向模拟层 +Y 方向，需要把本地 +Z 转到世界 +X，即旋转 0 度。
+            //
+            // 由此得到映射关系：Unity 旋转角 = 90 - 模拟角度。
+            //
+            // 历史记录：这里先后写错过两次——第一次多取了一个负号（差 180 度），
+            // 第二次误以为两个坐标系轴向一一对应而直接使用模拟角度（差 90 度）。
+            // 两次都表现为"角色朝向与准星不在一条线上"。
+            transform.rotation = Quaternion.Euler(0f, 90f - FacingDegrees, 0f);
         }
     }
 }
