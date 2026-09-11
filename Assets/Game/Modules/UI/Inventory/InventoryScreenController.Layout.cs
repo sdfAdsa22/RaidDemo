@@ -58,7 +58,16 @@ namespace RaidDemo.UI
 
             if (m_Registry.TryGetGrid(m_LootContainerId, out var loot))
             {
-                var lootTop = 56f + (backpack.Height * InventoryGridView.CellSize) + 40f;
+                // 弹药挂夹在背包与战利品箱之间：它是随身物品的一部分，
+                // 放在背包正下方符合"背包里的东西"这个心理分组。
+                var pouchTop = 56f + (backpack.Height * InventoryGridView.CellSize) + 20f;
+                if (m_Registry.TryGetGrid(m_AmmoPouchContainerId, out var pouch))
+                {
+                    m_AmmoPouchView = CreateGridView(rootRect, pouch, m_AmmoPouchContainerId, "弹药挂", new Vector2(280f, pouchTop));
+                    pouchTop += (pouch.Height * InventoryGridView.CellSize) + 22f + 24f;
+                }
+
+                var lootTop = pouchTop;
                 m_LootView = CreateGridView(rootRect, loot, m_LootContainerId, "战利品箱", new Vector2(280f, lootTop));
             }
         }
@@ -154,6 +163,7 @@ namespace RaidDemo.UI
         private void RefreshAll()
         {
             m_BackpackView?.Refresh();
+            m_AmmoPouchView?.Refresh();
             m_LootView?.Refresh();
             RefreshEquipmentSlots();
             RefreshWeightBar();

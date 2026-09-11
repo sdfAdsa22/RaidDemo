@@ -65,7 +65,7 @@ namespace RaidDemo.UI
             {
                 // 清掉记录，避免三连击被当成第二次双击又转移一次。
                 m_LastClickItem = null;
-                DispatchQuickTransfer(view, origin);
+                DispatchQuickAction(view, item, origin);
                 return;
             }
 
@@ -129,24 +129,53 @@ namespace RaidDemo.UI
         /// 在背包与战利品箱之间一键搬运物品。
         /// </summary>
         /// <param name="sourceView">物品当前所在的容器视图。</param>
+        /// <param name="item">被双击的物品。</param>
         /// <param name="origin">物品在源容器中的左上角坐标。</param>
         /// <remarks>
-        /// 目标容器固定取"另一个"：在战利品箱里双击就是捡进背包，在背包里双击就是放回箱子。
-        /// 这样双击的语义只依赖物品在哪，玩家不需要先想清楚要搬到哪儿去。
+        /// <para>界面不自己决定目标，而是交给 <see cref="QuickActionResolver"/>：
+        /// 优先级有分支与回退，写在界面里就只能靠手点验证。</para>
+        /// <para>这里只负责把决策结果翻译成命令——规则与界面保持分离。</para>
         /// </remarks>
-        private void DispatchQuickTransfer(InventoryGridView sourceView, GridPoint origin)
+        private void DispatchQuickAction(InventoryGridView sourceView, ItemInstance item, GridPoint origin)
         {
-            var targetId = sourceView.ContainerId == m_BackpackContainerId
-                ? m_LootContainerId
-                : m_BackpackContainerId;
+            var action = QuickActionResolver.Resolve(BuildQuickActionContext(), sourceView.Grid, item);
+            if (!action.IsValid)
+            {
+                return;
+            }
 
-            if (targetId == 0)
+            if (action.Kind == QuickActionKind.Equip)
+            {
+                m_Router.Dispatch(new InventoryEquipIntent(
+                    0, sourceView.ContainerId, origin.X, origin.Y, action.Slot));
+                return;
+            }
+
+            if (action.TargetContainerId == 0 || action.TargetContainerId == sourceView.ContainerId)
             {
                 return;
             }
 
             m_Router.Dispatch(new InventoryQuickTransferIntent(
-                0, sourceView.ContainerId, targetId, origin.X, origin.Y));
+                0, sourceView.ContainerId, action.TargetContainerId, origin.X, origin.Y));
+        }
+
+        /// <summary>组装快速操作决策所需的上下文。</summary>
+        private QuickActionContext BuildQuickActionContext()
+        {
+            m_QuickActionContext.Backpack = m_Loadout.Backpack;
+            m_QuickActionContext.AmmoPouch = m_Loadout.AmmoPouch;
+            m_QuickActionContext.Equipment = m_Loadout.Equipment;
+            m_QuickActionContext.BackpackContainerId = m_BackpackContainerId;
+            m_QuickActionContext.AmmoPouchContainerId = m_AmmoPouchContainerId;
+            m_QuickActionContext.LootContainerId = m_LootContainerId;
+
+            if (m_Registry.TryGetGrid(m_LootContainerId, out var loot))
+            {
+                m_QuickActionContext.Loot = loot;
+            }
+
+            return m_QuickActionContext;
         }
 
         /// <summary>右键：对堆叠执行拆分，对装备槽执行卸下。</summary>
@@ -224,6 +253,7 @@ namespace RaidDemo.UI
         private void ClearPreviews()
         {
             m_BackpackView?.ClearPreview();
+            m_AmmoPouchView?.ClearPreview();
             m_LootView?.ClearPreview();
             if (m_HoveredSlot != null)
             {
@@ -254,6 +284,11 @@ namespace RaidDemo.UI
             if (m_BackpackView != null && m_BackpackView.TryGetCellAt(pointer, out cell))
             {
                 return m_BackpackView;
+            }
+
+            if (m_AmmoPouchView != null && m_AmmoPouchView.TryGetCellAt(pointer, out cell))
+            {
+                return m_AmmoPouchView;
             }
 
             if (m_LootView != null && m_LootView.TryGetCellAt(pointer, out cell))

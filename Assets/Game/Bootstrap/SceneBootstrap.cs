@@ -54,6 +54,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>灰盒战利品箱的网格尺寸（列 x 行）。</summary>
         [SerializeField] private Vector2Int m_LootContainerSize = new Vector2Int(6, 5);
 
+        /// <summary>弹药挂的格数。固定为一行，横向排列。</summary>
+        [SerializeField] private int m_AmmoPouchCells = 5;
+
         /// <summary>承载上限（千克）。取值依据见 EncumbranceProfile.CapacityKg 的说明。</summary>
         [SerializeField] private float m_CarryCapacityKg = 20f;
 
@@ -69,6 +72,7 @@ namespace RaidDemo.Bootstrap
         private InventoryScreenController m_InventoryScreen;
         private int m_BackpackContainerId;
         private int m_LootContainerId;
+        private int m_AmmoPouchContainerId;
 
         /// <summary>上一帧的负重状态。只有它发生变化时才重新计算移动修正并广播事件。</summary>
         private EncumbranceState m_LastEncumbranceState = EncumbranceState.Light;

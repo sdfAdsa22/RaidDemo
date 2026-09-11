@@ -137,6 +137,9 @@ namespace RaidDemo.Shared
         /// <summary>物品不允许旋转，但请求了旋转。</summary>
         public const string InventoryRotationNotAllowed = "inventory_rotation_not_allowed";
 
+        /// <summary>容器不接受该分类的物品（例如弹药挂只收弹药）。</summary>
+        public const string InventoryCategoryNotAllowed = "inventory_category_not_allowed";
+
         /// <summary>主武器槽是空的。</summary>
         public const string CombatNoWeapon = "combat_no_weapon";
 

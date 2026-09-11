@@ -105,6 +105,15 @@ namespace RaidDemo.Inventory
                 return InventoryResult.Fail(InventoryFailure.NotFound, "物品不在源容器内。");
             }
 
+            // 分类检查必须在寻位之前：否则自动寻位失败会统一报"没空间"，
+            // 把"这个容器根本不收这类东西"这个真正的原因吞掉。
+            // 注意检查的是**目标**容器的分类，不是源容器——本方法是源网格的实例方法。
+            var categoryCheck = target.CheckCategoryAllowed(item);
+            if (!categoryCheck.Success)
+            {
+                return categoryCheck;
+            }
+
             // 规划阶段只读不写，因此这里失败时源容器一个字节都没动。
             if (!target.TryPlanAutoPlace(item, out var plan))
             {

@@ -31,7 +31,7 @@ namespace RaidDemo.UI
         /// <summary>面板尺寸与位置（像素）。</summary>
         private const float PanelWidth = 900f;
 
-        private const float PanelHeight = 760f;
+        private const float PanelHeight = 820f;
 
         private const float PanelTop = 120f;
 
@@ -73,12 +73,14 @@ namespace RaidDemo.UI
         private EventBus m_EventBus;
         private int m_BackpackContainerId;
         private int m_LootContainerId;
+        private int m_AmmoPouchContainerId;
         private EncumbranceProfile m_EncumbranceProfile;
         private Action<bool> m_SetCursorLock;
         private IDisposable m_Subscription;
 
         private GameObject m_Root;
         private InventoryGridView m_BackpackView;
+        private InventoryGridView m_AmmoPouchView;
         private InventoryGridView m_LootView;
         private Image m_BarFill;
         private Text m_BarLabel;
@@ -90,6 +92,9 @@ namespace RaidDemo.UI
         private GridPoint m_DragGrabOffset;
         private bool m_DragRotated;
         private SlotWidget m_HoveredSlot;
+
+        /// <summary>快速操作的决策上下文，复用同一个实例避免每次双击产生垃圾。</summary>
+        private readonly QuickActionContext m_QuickActionContext = new QuickActionContext();
 
         /// <summary>界面是否处于打开状态。装配层据此暂停角色移动。</summary>
         public bool IsOpen
@@ -106,6 +111,7 @@ namespace RaidDemo.UI
         /// <param name="eventBus">事件总线。</param>
         /// <param name="backpackContainerId">主背包的容器 ID。</param>
         /// <param name="lootContainerId">战利品容器的容器 ID。</param>
+        /// <param name="ammoPouchContainerId">弹药挂的容器 ID。</param>
         /// <param name="encumbranceProfile">负重配置，用于显示承载上限。</param>
         /// <param name="setCursorLock">光标锁定开关。界面需要解锁光标才能用鼠标拖拽。</param>
         public void Initialize(
@@ -115,6 +121,7 @@ namespace RaidDemo.UI
             EventBus eventBus,
             int backpackContainerId,
             int lootContainerId,
+            int ammoPouchContainerId,
             EncumbranceProfile encumbranceProfile,
             Action<bool> setCursorLock)
         {
@@ -124,6 +131,7 @@ namespace RaidDemo.UI
             m_EventBus = eventBus;
             m_BackpackContainerId = backpackContainerId;
             m_LootContainerId = lootContainerId;
+            m_AmmoPouchContainerId = ammoPouchContainerId;
             m_EncumbranceProfile = encumbranceProfile;
             m_SetCursorLock = setCursorLock;
 

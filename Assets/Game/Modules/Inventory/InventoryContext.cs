@@ -106,6 +106,8 @@ namespace RaidDemo.Inventory
                     return CommandCodes.InventoryNestingTooDeep;
                 case InventoryFailure.RotationNotAllowed:
                     return CommandCodes.InventoryRotationNotAllowed;
+                case InventoryFailure.CategoryNotAllowed:
+                    return CommandCodes.InventoryCategoryNotAllowed;
                 default:
                     return CommandCodes.Rejected;
             }

@@ -24,7 +24,7 @@ namespace RaidDemo.Combat
         private readonly CombatWorld m_World;
         private readonly CombatTuning m_Tuning;
         private readonly EventBus m_EventBus;
-        private readonly int m_BackpackContainerId;
+        private readonly int m_AmmoPouchContainerId;
 
         private Vector3 m_MuzzlePosition;
         private Vector2F m_AimWorldPoint;
@@ -40,9 +40,9 @@ namespace RaidDemo.Combat
         /// <param name="world">战斗单位注册表。</param>
         /// <param name="tuning">全局调参。</param>
         /// <param name="eventBus">事件总线。</param>
-        /// <param name="backpackContainerId">
-        /// 主背包的容器标识。换弹扣掉弹药之后要按这个标识广播背包变更事件，
-        /// 否则背包界面不会刷新，玩家会以为子弹没被消耗。传 0 表示不广播。
+        /// <param name="ammoPouchContainerId">
+        /// 弹药挂的容器标识。换弹扣掉弹药之后要按这个标识广播容器变更事件，
+        /// 否则界面不会刷新，玩家会以为子弹没被消耗。传 0 表示不广播。
         /// </param>
         public PlayerWeaponController(
             PlayerWeapon weapon,
@@ -51,7 +51,7 @@ namespace RaidDemo.Combat
             CombatWorld world,
             CombatTuning tuning,
             EventBus eventBus,
-            int backpackContainerId = 0)
+            int ammoPouchContainerId = 0)
         {
             m_Weapon = weapon;
             m_Loadout = loadout;
@@ -59,7 +59,7 @@ namespace RaidDemo.Combat
             m_World = world;
             m_Tuning = tuning ?? CombatTuning.Default;
             m_EventBus = eventBus;
-            m_BackpackContainerId = backpackContainerId;
+            m_AmmoPouchContainerId = ammoPouchContainerId;
         }
 
         /// <summary>手持武器状态。</summary>
@@ -172,8 +172,10 @@ namespace RaidDemo.Combat
             }
 
             var caliberId = runtime.Weapon.CaliberId;
-            if (AmmoReserve.CountAvailable(m_Loadout.Backpack, caliberId) <= 0)
+            if (AmmoReserve.CountAvailable(m_Loadout.AmmoPouch, caliberId) <= 0)
             {
+                // 弹药挂空的就打不了。背包里的弹药必须先搬进弹药挂——
+                // 这条规则让"弹挂里装多少"成为出击前的决策，代价是战斗中要开背包补弹。
                 failureCode = CommandCodes.CombatNoAmmo;
                 return false;
             }
@@ -223,20 +225,20 @@ namespace RaidDemo.Combat
 
             var caliberId = runtime.Weapon.CaliberId;
             var room = runtime.Weapon.MagazineCapacity - runtime.MagazineAmmo;
-            var available = AmmoReserve.CountAvailable(m_Loadout.Backpack, caliberId);
+            var available = AmmoReserve.CountAvailable(m_Loadout.AmmoPouch, caliberId);
             var want = available < room ? available : room;
 
             // 先取弹药再补弹匣：取出量一定不超过剩余空间，因此不会有取了却装不下的部分。
-            var withdrawal = AmmoReserve.Consume(m_Loadout.Backpack, caliberId, want);
+            var withdrawal = AmmoReserve.Consume(m_Loadout.AmmoPouch, caliberId, want);
             var loaded = runtime.CompleteReload(withdrawal.Amount);
 
-            if (withdrawal.Amount > 0 && m_BackpackContainerId != 0)
+            if (withdrawal.Amount > 0 && m_AmmoPouchContainerId != 0)
             {
-                // 取走弹药是在背包上做的真实改动，必须广播出去。
-                // 少了这一步，背包界面会一直显示换弹前的数量，
+                // 取走弹药是在弹药挂上做的真实改动，必须广播出去。
+                // 少了这一步，界面会一直显示换弹前的数量，
                 // 玩家会以为换弹没有消耗子弹——而实际上消耗了，只是界面没刷新。
                 m_EventBus.Publish(new InventoryChangedEvent(
-                    m_BackpackContainerId,
+                    m_AmmoPouchContainerId,
                     InventoryChangeTypes.Remove,
                     m_PlayerId));
             }
@@ -280,16 +282,17 @@ namespace RaidDemo.Combat
         }
 
         /// <summary>
-        /// 计算这一发的三维方向：从枪口指向"地面瞄准点按散布旋转后的位置"。
+        /// 计算这一发的三维方向：枪口水平指向"地面瞄准点按散布旋转后的方位"。
         /// </summary>
         /// <param name="spreadOffsetDegrees">散布造成的角度偏移（度）。</param>
         /// <returns>单位方向向量。</returns>
         /// <remarks>
-        /// <para><b>为什么不是水平射线：</b>准星落在地面上，而枪口在胸口高度。
-        /// 如果射线水平打出去，它在屏幕上的投影会比准星高出一截——
-        /// 玩家看到的就是"子弹和准星不在一条线上"。</para>
-        /// <para>改成"从枪口指向瞄准点"之后，子弹的落点必然与准星重合
-        /// （除非中途命中目标），弹道看起来才是从枪口打向准星的。</para>
+        /// <para><b>方向取水平，而不是"枪口指向瞄准点"。</b>
+        /// 后者会让射线在瞄准点处落到地面，看起来就是"子弹到准星为止"。</para>
+        /// <para>水平射线的长度由武器射程限制，因此子弹会**穿过准星继续飞**，
+        /// 直到命中目标或打满射程——手枪 25 米、步枪 40 米，射程差异体现在这里。</para>
+        /// <para>与准星的对齐改由表现层解决：弹道画在地面上（见 <c>TracerRenderer</c>），
+        /// 因此它仍然穿过准星，不会出现"子弹和准星不在一条线"的问题。</para>
         /// </remarks>
         private Vector3 ResolveShotDirection(float spreadOffsetDegrees)
         {
@@ -307,10 +310,9 @@ namespace RaidDemo.Combat
             // 散布绕竖直轴旋转瞄准点，因此弹着点的距离不变、只改变方位。
             var rotated = Quaternion.AngleAxis(spreadOffsetDegrees, Vector3.up)
                           * new Vector3(toAim.X, 0f, toAim.Y);
-            var targetGround = groundMuzzle + rotated;
 
-            var direction = targetGround - m_MuzzlePosition;
-            return direction.sqrMagnitude > 1e-6f ? direction.normalized : Vector3.forward;
+            // 只取水平分量：射线因此不会落到地面，能一直飞到射程末端。
+            return rotated.sqrMagnitude > 1e-6f ? rotated.normalized : Vector3.forward;
         }
 
         /// <summary>对命中目标结算伤害。</summary>

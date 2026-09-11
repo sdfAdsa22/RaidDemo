@@ -16,6 +16,9 @@ namespace RaidDemo.Inventory
 
         /// <summary>局外仓库。跨战局保留。</summary>
         Stash,
+
+        /// <summary>弹药挂。换弹只从这里取弹。</summary>
+        AmmoPouch,
     }
 
     /// <summary>

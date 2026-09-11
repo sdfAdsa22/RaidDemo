@@ -111,10 +111,11 @@ namespace RaidDemo.UI
             // 余弹低于四分之一时变色：玩家不需要去读数字就能感到该换弹了。
             m_AmmoLabel.color = runtime.MagazineAmmo * 4 <= capacity ? LowAmmoColor : TextColor;
 
-            var reserve = m_CaliberId == null
-                ? 0
-                : AmmoReserve.CountAvailable(m_Loadout.Backpack, m_CaliberId);
-            m_ReserveLabel.text = $"备弹 {reserve}";
+            // 换弹只从弹药挂取弹，因此这里必须显示**弹药挂**的余量而不是背包的。
+            // 显示背包数量会让玩家看到一个换不了弹的"备弹 120"。
+            var pouch = m_CaliberId == null ? 0 : AmmoReserve.CountAvailable(m_Loadout.AmmoPouch, m_CaliberId);
+            var backpack = m_CaliberId == null ? 0 : AmmoReserve.CountAvailable(m_Loadout.Backpack, m_CaliberId);
+            m_ReserveLabel.text = $"弹挂 {pouch}   背包 {backpack}";
 
             UpdateReloadBar(runtime);
         }

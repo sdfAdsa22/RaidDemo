@@ -49,6 +49,7 @@ namespace RaidDemo.Tests.EditMode
         private CombatTuning m_Tuning;
         private PlayerWeaponController m_Controller;
         private InventoryGrid m_Backpack;
+        private InventoryGrid m_AmmoPouch;
         private TestWeaponStats m_WeaponStats;
         private TestItemDefinition m_AmmoDefinition;
         private int m_TargetId;
@@ -64,7 +65,8 @@ namespace RaidDemo.Tests.EditMode
             m_Tuning = new CombatTuning { CriticalOffsetMeters = 0.25f };
 
             m_Backpack = new InventoryGrid(6, 6, "主背包");
-            var loadout = new PlayerLoadout(m_Backpack, new EquipmentLoadout());
+            m_AmmoPouch = new InventoryGrid(5, 1, "弹药挂", acceptedCategory: ItemCategory.Ammo);
+            var loadout = new PlayerLoadout(m_Backpack, new EquipmentLoadout(), m_AmmoPouch);
 
             var playerWeapon = new PlayerWeapon(new DeterministicRandom(777u));
             m_Controller = new PlayerWeaponController(
@@ -91,10 +93,16 @@ namespace RaidDemo.Tests.EditMode
             m_Controller.SetMuzzlePosition(Vector3.zero);
         }
 
-        /// <summary>把弹药放进背包。</summary>
+        /// <summary>
+        /// 把弹药放进弹药挂。
+        /// </summary>
+        /// <remarks>
+        /// 换弹只从弹药挂取弹，因此测试必须把弹药放在这里——
+        /// 放在背包里会让"换弹失败"看起来像功能坏了，其实是规则如此。
+        /// </remarks>
         private void PutAmmo(int count)
         {
-            m_Backpack.AutoPlace(m_Factory.Create(m_AmmoDefinition, count));
+            m_AmmoPouch.AutoPlace(m_Factory.Create(m_AmmoDefinition, count));
         }
 
         /// <summary>让假射线返回一次命中。</summary>
@@ -253,15 +261,15 @@ namespace RaidDemo.Tests.EditMode
             m_Controller.SyncEquippedWeapon(m_WeaponStats);
             PutAmmo(60);
             EmptyMagazine();
-            var ammoBefore = AmmoReserve.CountAvailable(m_Backpack, "9x19");
+            var ammoBefore = AmmoReserve.CountAvailable(m_AmmoPouch, "9x19");
 
             var result = m_Router.Dispatch(new PlayerReloadIntent(0));
             m_Controller.Tick(1.1f);
 
             Assert.IsTrue(result.Success, "有弹药时换弹应当被接受。");
             Assert.AreEqual(30, m_Controller.Runtime.MagazineAmmo, "换弹完成后弹匣应当装满。");
-            Assert.AreEqual(ammoBefore - 30, AmmoReserve.CountAvailable(m_Backpack, "9x19"),
-                "背包里的弹药应当减少恰好一个弹匣的量。");
+            Assert.AreEqual(ammoBefore - 30, AmmoReserve.CountAvailable(m_AmmoPouch, "9x19"),
+                "弹药挂里的弹药应当减少恰好一个弹匣的量。");
         }
 
         [Test]
@@ -275,8 +283,8 @@ namespace RaidDemo.Tests.EditMode
             m_Controller.Tick(1.1f);
 
             Assert.AreEqual(8, m_Controller.Runtime.MagazineAmmo, "弹药不足时应当部分装填。");
-            Assert.AreEqual(0, AmmoReserve.CountAvailable(m_Backpack, "9x19"),
-                "背包里的弹药应当被全部取走，不应有剩余。");
+            Assert.AreEqual(0, AmmoReserve.CountAvailable(m_AmmoPouch, "9x19"),
+                "弹药挂里的弹药应当被全部取走，不应有剩余。");
         }
 
         [Test]
@@ -284,14 +292,14 @@ namespace RaidDemo.Tests.EditMode
         {
             m_Controller.SyncEquippedWeapon(m_WeaponStats);
             PutAmmo(60);
-            var ammoBefore = AmmoReserve.CountAvailable(m_Backpack, "9x19");
+            var ammoBefore = AmmoReserve.CountAvailable(m_AmmoPouch, "9x19");
             var magazineBefore = m_Controller.Runtime.MagazineAmmo;
 
             // 弹匣是满的，这次换弹请求必然失败。
             m_Router.Dispatch(new PlayerReloadIntent(0));
             m_Controller.Tick(1.1f);
 
-            Assert.AreEqual(ammoBefore, AmmoReserve.CountAvailable(m_Backpack, "9x19"),
+            Assert.AreEqual(ammoBefore, AmmoReserve.CountAvailable(m_AmmoPouch, "9x19"),
                 "失败的换弹不应当消耗任何弹药。");
             Assert.AreEqual(magazineBefore, m_Controller.Runtime.MagazineAmmo,
                 "失败的换弹不应当改变弹匣数量。");

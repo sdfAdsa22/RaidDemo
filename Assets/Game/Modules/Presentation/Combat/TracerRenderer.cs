@@ -27,6 +27,9 @@ namespace RaidDemo.Presentation
         /// <summary>弹道线条的宽度（米）。</summary>
         private const float TracerWidth = 0.03f;
 
+        /// <summary>弹道离地高度（米）。略高于地面，避免与地板重叠产生闪烁。</summary>
+        private const float GroundOffset = 0.05f;
+
         /// <summary>弹道颜色。</summary>
         private static readonly Color TracerColor = new Color(1f, 0.9f, 0.5f, 0.9f);
 
@@ -83,11 +86,22 @@ namespace RaidDemo.Presentation
         private void OnWeaponFired(WeaponFiredEvent evt)
         {
             var line = Rent();
-            line.SetPosition(0, evt.Origin);
-            line.SetPosition(1, evt.EndPoint);
+
+            // 弹道画在地面上，而不是枪口高度。
+            // 原因：准星落在地面，而弹道从枪口水平打出，两者在斜俯视下不在同一条视线上。
+            // 把命中点投影到地面之后，这条线必然穿过准星——
+            // 玩家看到的才是"子弹从我这打到准星指的地方"。
+            line.SetPosition(0, ProjectToGround(evt.Origin));
+            line.SetPosition(1, ProjectToGround(evt.EndPoint));
             line.gameObject.SetActive(true);
 
             m_Active.Add(new TracerInstance { Line = line, Remaining = TracerLifetime });
+        }
+
+        /// <summary>把世界坐标压到地面高度，稍微抬高一点避免与地板重叠闪烁。</summary>
+        private static Vector3 ProjectToGround(Vector3 point)
+        {
+            return new Vector3(point.x, GroundOffset, point.z);
         }
 
         /// <summary>取一条可用的线段渲染器，池空时创建新的。</summary>

@@ -97,7 +97,7 @@ namespace RaidDemo.Bootstrap
                 m_CombatWorld,
                 m_CombatTuning,
                 m_EventBus,
-                m_BackpackContainerId);
+                m_AmmoPouchContainerId);
 
             m_CommandRouter.Register<PlayerFireIntent>(new FireCommandHandler(m_WeaponController));
             m_CommandRouter.Register<PlayerReloadIntent>(new ReloadCommandHandler(m_WeaponController));

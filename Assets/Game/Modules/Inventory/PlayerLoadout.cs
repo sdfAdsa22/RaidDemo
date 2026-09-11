@@ -15,21 +15,38 @@ namespace RaidDemo.Inventory
     public sealed class PlayerLoadout
     {
         private readonly InventoryGrid m_Backpack;
+        private readonly InventoryGrid m_AmmoPouch;
         private readonly EquipmentLoadout m_Equipment;
 
         /// <summary>创建角色携带物。</summary>
         /// <param name="backpack">主背包网格，不允许为 null。</param>
         /// <param name="equipment">装备栏，不允许为 null。</param>
-        public PlayerLoadout(InventoryGrid backpack, EquipmentLoadout equipment)
+        /// <param name="ammoPouch">
+        /// 弹药挂。换弹只从它取弹，因此它可以为 null（表示身上没有可用的弹药）。
+        /// </param>
+        public PlayerLoadout(InventoryGrid backpack, EquipmentLoadout equipment, InventoryGrid ammoPouch = null)
         {
             m_Backpack = backpack ?? throw new System.ArgumentNullException(nameof(backpack));
             m_Equipment = equipment ?? throw new System.ArgumentNullException(nameof(equipment));
+            m_AmmoPouch = ammoPouch;
         }
 
         /// <summary>主背包网格。</summary>
         public InventoryGrid Backpack
         {
             get { return m_Backpack; }
+        }
+
+        /// <summary>
+        /// 弹药挂：随身可取的弹药。
+        /// </summary>
+        /// <remarks>
+        /// 换弹**只**从这里取弹，因此它是"能不能继续打"的唯一来源。
+        /// 背包里的弹药要先搬进来才能使用——这条规则让"弹挂里装多少"成为出击前的决策。
+        /// </remarks>
+        public InventoryGrid AmmoPouch
+        {
+            get { return m_AmmoPouch; }
         }
 
         /// <summary>装备栏。</summary>
@@ -41,7 +58,16 @@ namespace RaidDemo.Inventory
         /// <summary>背包与装备栏的总重量（千克）。</summary>
         public float TotalWeightKg
         {
-            get { return m_Backpack.TotalWeightKg + m_Equipment.TotalWeightKg; }
+            get
+            {
+                var total = m_Backpack.TotalWeightKg + m_Equipment.TotalWeightKg;
+                if (m_AmmoPouch != null)
+                {
+                    total += m_AmmoPouch.TotalWeightKg;
+                }
+
+                return total;
+            }
         }
 
         /// <summary>

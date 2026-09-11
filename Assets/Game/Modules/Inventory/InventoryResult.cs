@@ -44,6 +44,9 @@ namespace RaidDemo.Inventory
         /// <summary>装备槽不接受该分类的物品。</summary>
         SlotTypeMismatch,
 
+        /// <summary>容器不接受该分类的物品（例如弹药挂只收弹药）。</summary>
+        CategoryNotAllowed,
+
         /// <summary>找不到指定物品、容器或格子。</summary>
         NotFound,
     }

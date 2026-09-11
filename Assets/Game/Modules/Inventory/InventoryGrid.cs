@@ -41,6 +41,17 @@ namespace RaidDemo.Inventory
         /// <remarks>它的唯一用途是拦下"把容器放进它自己的内部网格"这种自环操作。</remarks>
         private readonly ItemInstance m_HostItem;
 
+        /// <summary>
+        /// 本容器只接受的物品分类。为 null 表示不限制。
+        /// </summary>
+        /// <remarks>
+        /// 用途是弹药挂这类**专用容器**：它只是一行五格的网格，
+        /// 唯一的区别是拒收非弹药。
+        /// 因为规则写在网格本身，拖拽、堆叠、拆分、整理、快速转移全部自动生效，
+        /// 不需要为"弹药挂"单独写任何一条逻辑。
+        /// </remarks>
+        private readonly ItemCategory? m_AcceptedCategory;
+
         /// <summary>网格内的全部物品。顺序不代表摆放顺序，摆放位置以占用表为准。</summary>
         private readonly List<ItemInstance> m_Items;
 
@@ -62,12 +73,14 @@ namespace RaidDemo.Inventory
         /// <param name="label">调试标签。留空时自动生成尺寸描述。</param>
         /// <param name="depth">嵌套深度，顶层容器为 0。</param>
         /// <param name="hostItem">拥有本网格的容器物品，顶层容器留空。</param>
+        /// <param name="acceptedCategory">只接受的物品分类；留空表示不限制。</param>
         public InventoryGrid(
             int width,
             int height,
             string label = null,
             int depth = 0,
-            ItemInstance hostItem = null)
+            ItemInstance hostItem = null,
+            ItemCategory? acceptedCategory = null)
         {
             if (width <= 0)
             {
@@ -88,6 +101,7 @@ namespace RaidDemo.Inventory
             m_Height = height;
             m_Depth = depth;
             m_HostItem = hostItem;
+            m_AcceptedCategory = acceptedCategory;
             m_Label = string.IsNullOrEmpty(label) ? $"{width}x{height}" : label;
             m_Items = new List<ItemInstance>(16);
             m_Occupancy = new ItemInstance[width * height];
@@ -121,6 +135,12 @@ namespace RaidDemo.Inventory
         public ItemInstance HostItem
         {
             get { return m_HostItem; }
+        }
+
+        /// <summary>本容器只接受的物品分类；null 表示不限制。</summary>
+        public ItemCategory? AcceptedCategory
+        {
+            get { return m_AcceptedCategory; }
         }
 
         /// <summary>网格内的全部物品，供 UI 与存档遍历。</summary>

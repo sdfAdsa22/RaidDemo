@@ -29,8 +29,18 @@ namespace RaidDemo.Bootstrap
             }
 
             var backpack = CreateGrid(m_BackpackSize, "主背包");
-            m_Loadout = new PlayerLoadout(backpack, new EquipmentLoadout());
+
+            // 弹药挂：一行五格，只收弹药。规则写在网格自身的分类过滤上，
+            // 因此拖拽、堆叠、拆分、整理全部自动可用。
+            var ammoPouch = new InventoryGrid(
+                m_AmmoPouchCells,
+                1,
+                "弹药挂",
+                acceptedCategory: ItemCategory.Ammo);
+
+            m_Loadout = new PlayerLoadout(backpack, new EquipmentLoadout(), ammoPouch);
             m_BackpackContainerId = m_ContainerRegistry.Register(backpack, ContainerKind.PlayerBackpack);
+            m_AmmoPouchContainerId = m_ContainerRegistry.Register(ammoPouch, ContainerKind.AmmoPouch);
 
             var loot = CreateGrid(m_LootContainerSize, "战利品箱");
             m_LootContainerId = m_ContainerRegistry.Register(loot, ContainerKind.Loot);
@@ -55,6 +65,7 @@ namespace RaidDemo.Bootstrap
                 m_EventBus,
                 m_BackpackContainerId,
                 m_LootContainerId,
+                m_AmmoPouchContainerId,
                 m_EncumbranceProfile,
                 ApplyCursorLock);
 

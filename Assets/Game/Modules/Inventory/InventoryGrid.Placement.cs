@@ -111,6 +111,14 @@ namespace RaidDemo.Inventory
                 return InventoryResult.Fail(InventoryFailure.Occupied, "该物品已经在容器内。");
             }
 
+            // 先做分类检查：自动寻位失败时统一报"没空间"会把"这个容器根本不该收它"
+            // 这类原因一起吞掉，玩家与日志都会得到误导性的结论。
+            var categoryCheck = CheckCategoryAllowed(item);
+            if (!categoryCheck.Success)
+            {
+                return categoryCheck;
+            }
+
             if (!TryPlanAutoPlace(item, out var plan))
             {
                 return InventoryResult.Fail(InventoryFailure.Full, $"{m_Label} 没有可用空间。");
@@ -130,7 +138,37 @@ namespace RaidDemo.Inventory
         /// </remarks>
         public bool CanAutoPlace(ItemInstance item)
         {
-            return item != null && !Contains(item) && TryPlanAutoPlace(item, out _);
+            return item != null
+                   && !Contains(item)
+                   && CheckCategoryAllowed(item).Success
+                   && TryPlanAutoPlace(item, out _);
+        }
+
+        /// <summary>
+        /// 检查本容器是否接受该物品的分类。
+        /// </summary>
+        /// <param name="item">要检查的物品。</param>
+        /// <returns>接受时返回成功，否则返回 <see cref="InventoryFailure.CategoryNotAllowed"/>。</returns>
+        /// <remarks>
+        /// 分类过滤是**专用容器**（例如只收弹药的弹药挂）的唯一附加规则。
+        /// 它放在放置校验的最前面：分类不对的物品连"能不能放下"都不需要继续算。
+        /// </remarks>
+        private InventoryResult CheckCategoryAllowed(ItemInstance item)
+        {
+            if (!m_AcceptedCategory.HasValue || item == null)
+            {
+                return InventoryResult.Ok();
+            }
+
+            var definition = item.Definition;
+            if (definition.Category == m_AcceptedCategory.Value)
+            {
+                return InventoryResult.Ok();
+            }
+
+            return InventoryResult.Fail(
+                InventoryFailure.CategoryNotAllowed,
+                $"{m_Label} 只接受{DescribeCategory(m_AcceptedCategory.Value)}，放不下{definition.DisplayName}。");
         }
 
         /// <summary>
@@ -188,6 +226,13 @@ namespace RaidDemo.Inventory
             }
 
             var definition = item.Definition;
+
+            var categoryCheck = CheckCategoryAllowed(item);
+            if (!categoryCheck.Success)
+            {
+                return categoryCheck;
+            }
+
             if (rotated && !definition.CanRotate)
             {
                 return InventoryResult.Fail(
@@ -324,6 +369,27 @@ namespace RaidDemo.Inventory
             item.Rotated = rotated;
             m_Items.Add(item);
             FillCells(item, origin, SizeFor(item.Definition, rotated));
+        }
+
+        /// <summary>把物品分类翻译成中文，用于失败提示。</summary>
+        private static string DescribeCategory(ItemCategory category)
+        {
+            switch (category)
+            {
+                case ItemCategory.Weapon:
+                    return "武器";
+                case ItemCategory.Ammo:
+                    return "弹药";
+                case ItemCategory.Medical:
+                    return "医疗用品";
+                case ItemCategory.Helmet:
+                case ItemCategory.BodyArmor:
+                    return "护甲";
+                case ItemCategory.Backpack:
+                    return "背包";
+                default:
+                    return "该类物品";
+            }
         }
     }
 }
