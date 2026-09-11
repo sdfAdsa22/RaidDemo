@@ -63,5 +63,24 @@ namespace RaidDemo.Data
 
         /// <summary>作为容器时的内部网格尺寸。非容器时无意义。</summary>
         GridSize ContainerGridSize { get; }
+
+        /// <summary>
+        /// 作为武器时的战斗参数。不是武器时返回 null。
+        /// </summary>
+        /// <remarks>
+        /// <para>这三个访问器是 M3（战斗）加入的。物品的静态属性在 M2 只涉及背包，
+        /// 而战斗需要知道"这把枪打得怎么样、这种子弹能不能穿透"，因此把三类战斗参数
+        /// 提升为物品契约的一部分。</para>
+        /// <para>用三个具体属性而不是一个泛型方法，是为了让"某个物品能扮演哪些战斗角色"
+        /// 在接口上直接可读：护甲返回非空的就是护甲，武器返回非空的就是武器，
+        /// 不需要调用方去猜类型参数。</para>
+        /// </remarks>
+        IWeaponStats WeaponStats { get; }
+
+        /// <summary>作为弹药时的战斗参数。不是弹药时返回 null。</summary>
+        IAmmoStats AmmoStats { get; }
+
+        /// <summary>作为护甲时的战斗参数。不是护甲时返回 null。</summary>
+        IArmorStats ArmorStats { get; }
     }
 }

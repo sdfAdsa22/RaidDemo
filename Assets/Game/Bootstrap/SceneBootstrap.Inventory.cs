@@ -80,6 +80,9 @@ namespace RaidDemo.Bootstrap
         /// 从而能观察到堆叠合并与拆分的效果。</para>
         /// <para>放置顺序按占地从大到小，否则小件会先把空间切碎，大件（护甲、步枪）
         /// 反而一件都放不进去，灰盒演示时就看不到负重系统真正起作用。</para>
+        /// <para>**背包类物品不进灰盒战利品箱**：它们占地 9 到 16 格，两件就能吃掉整箱空间，
+        /// 把弹药与武器挤出去，而后者才是验证射击链路必需的东西。
+        /// 背包本身属于 M6 局外系统的内容，到那时会有专门的获取途径。</para>
         /// </remarks>
         private void PopulateLootContainer(InventoryGrid loot)
         {
@@ -106,6 +109,11 @@ namespace RaidDemo.Bootstrap
                 // 占地超过容器一半的物品不收：例如 4x4 的突击背包塞进 5x4 的箱子，
                 // 只会把整箱挤满一件，既不合理也看不出背包系统的效果。
                 if (definition.GridSize.CellCount > halfOfContainer)
+                {
+                    continue;
+                }
+
+                if (definition.Category == ItemCategory.Backpack)
                 {
                     continue;
                 }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using RaidDemo.Data;
 using UnityEditor;
 using UnityEngine;
@@ -18,7 +18,7 @@ namespace RaidDemo.Bootstrap.Editor
     /// <para><b>重新生成会覆盖同名资产</b>，因此不要在生成出来的资产上手工改数值——
     /// 要改数值请改这张表。</para>
     /// </remarks>
-    public static class ItemContentBuilder
+    public static partial class ItemContentBuilder
     {
         /// <summary>物品资产的存放目录（仓库相对路径）。</summary>
         private const string ItemFolder = "Assets/Game/Content/Items";
@@ -139,7 +139,9 @@ namespace RaidDemo.Bootstrap.Editor
             var definitions = new List<ItemDefinition>(s_Specs.Length);
             for (var i = 0; i < s_Specs.Length; i++)
             {
-                definitions.Add(CreateOrUpdate(s_Specs[i]));
+                var definition = CreateOrUpdate(s_Specs[i]);
+                AttachCombatStats(definition);
+                definitions.Add(definition);
             }
 
             var catalog = LoadOrCreate<ItemCatalog>(CatalogPath);

@@ -136,6 +136,24 @@ namespace RaidDemo.Shared
 
         /// <summary>物品不允许旋转，但请求了旋转。</summary>
         public const string InventoryRotationNotAllowed = "inventory_rotation_not_allowed";
+
+        /// <summary>主武器槽是空的。</summary>
+        public const string CombatNoWeapon = "combat_no_weapon";
+
+        /// <summary>弹匣里没有弹药。</summary>
+        public const string CombatMagazineEmpty = "combat_magazine_empty";
+
+        /// <summary>射速限制，本次射击被忽略——这是正常的节奏控制，不是错误。</summary>
+        public const string CombatFireRateLimited = "combat_fire_rate_limited";
+
+        /// <summary>正在换弹，无法射击。</summary>
+        public const string CombatReloading = "combat_reloading";
+
+        /// <summary>弹匣已满，无需换弹。</summary>
+        public const string CombatMagazineFull = "combat_magazine_full";
+
+        /// <summary>背包里没有匹配口径的弹药。</summary>
+        public const string CombatNoAmmo = "combat_no_ammo";
     }
 
     /// <summary>

@@ -11,6 +11,7 @@
         "RaidDemo.Data",
         "RaidDemo.Data.Content",
         "RaidDemo.Inventory",
+        "RaidDemo.Combat",
         "RaidDemo.UI"
     ],
     "includePlatforms": [],

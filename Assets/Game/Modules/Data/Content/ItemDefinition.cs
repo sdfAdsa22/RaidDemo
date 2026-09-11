@@ -133,6 +133,24 @@ namespace RaidDemo.Data
             get { return m_Behavior; }
         }
 
+        /// <inheritdoc />
+        public IWeaponStats WeaponStats
+        {
+            get { return m_Behavior as IWeaponStats; }
+        }
+
+        /// <inheritdoc />
+        public IAmmoStats AmmoStats
+        {
+            get { return m_Behavior as IAmmoStats; }
+        }
+
+        /// <inheritdoc />
+        public IArmorStats ArmorStats
+        {
+            get { return m_Behavior as IArmorStats; }
+        }
+
         /// <summary>
         /// 校验本资产的字段是否自洽。
         /// </summary>

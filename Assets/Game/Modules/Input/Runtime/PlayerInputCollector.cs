@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using RaidDemo.Shared;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -18,7 +18,7 @@ namespace RaidDemo.Input
     /// 得到瞄准向量。这样朝向与移动方向完全解耦，玩家可以在侧向移动时保持朝前瞄准。</para>
     /// </remarks>
     [DisallowMultipleComponent]
-    public sealed class PlayerInputCollector : MonoBehaviour
+    public sealed partial class PlayerInputCollector : MonoBehaviour
     {
         /// <summary>输入动作资产。对应工程内 Assets 下的 InputSystem_Actions。</summary>
         [SerializeField] private InputActionAsset m_Actions;
@@ -31,6 +31,12 @@ namespace RaidDemo.Input
 
         /// <summary>冲刺动作名称。</summary>
         [SerializeField] private string m_SprintActionName = "Sprint";
+
+        /// <summary>射击动作名称。</summary>
+        [SerializeField] private string m_AttackActionName = "Attack";
+
+        /// <summary>换弹动作名称。</summary>
+        [SerializeField] private string m_ReloadActionName = "Reload";
 
         /// <summary>
         /// 摄像机引用，用于把屏幕坐标转换为世界坐标。
@@ -91,6 +97,12 @@ namespace RaidDemo.Input
 
         private InputAction m_MoveAction;
         private InputAction m_SprintAction;
+
+        /// <summary>射击动作。按住期间每帧都视为"想开火"。</summary>
+        private InputAction m_AttackAction;
+
+        /// <summary>换弹动作。只在按下的那一帧生效。</summary>
+        private InputAction m_ReloadAction;
         private bool m_IsInitialized;
 
         /// <summary>
@@ -106,8 +118,28 @@ namespace RaidDemo.Input
         /// <summary>脚本化输入是否请求奔跑。</summary>
         public bool ScriptedWantsToSprint { get; set; }
 
+        /// <summary>脚本化输入是否请求射击。</summary>
+        public bool ScriptedWantsToFire { get; set; }
+
+        /// <summary>脚本化输入是否请求换弹。</summary>
+        public bool ScriptedWantsToReload { get; set; }
+
         /// <summary>是否启用脚本化输入。启用后真实设备输入被忽略。</summary>
         public bool UseScriptedInput { get; set; }
+
+        /// <summary>
+        /// 设置瞄准点的最大距离（米）。
+        /// </summary>
+        /// <param name="meters">最大距离。非正值表示不限制。</param>
+        /// <remarks>
+        /// 由战斗系统在换枪时写入，取当前武器的射程。
+        /// 这样准星能标出的范围与子弹真正能打到的范围始终一致——
+        /// 玩家不会朝着一个超出射程的目标瞄准，然后疑惑为什么打不中。
+        /// </remarks>
+        public void SetMaxAimDistance(float meters)
+        {
+            m_MaxAimDistance = meters;
+        }
 
         /// <summary>脚本化输入的瞄准方向。设置后优先于鼠标瞄准。</summary>
         public Vector2F ScriptedLookDirection { get; set; }
@@ -192,12 +224,16 @@ namespace RaidDemo.Input
             Initialize();
             m_MoveAction?.Enable();
             m_SprintAction?.Enable();
+            m_AttackAction?.Enable();
+            m_ReloadAction?.Enable();
         }
 
         private void OnDisable()
         {
             m_MoveAction?.Disable();
             m_SprintAction?.Disable();
+            m_AttackAction?.Disable();
+            m_ReloadAction?.Disable();
         }
 
         /// <summary>
@@ -234,107 +270,37 @@ namespace RaidDemo.Input
         }
 
         /// <summary>
-        /// 推进瞄准点并计算角色朝向。
+        /// 读取本帧的战斗输入。
         /// </summary>
+        /// <param name="wantsToFire">本帧是否按住射击键。</param>
+        /// <param name="wantsToReload">本帧是否刚按下换弹键。</param>
         /// <remarks>
-        /// 流程是：鼠标移动增量推进屏幕瞄准点，限制在屏幕内，
-        /// 再由射线与地面求交得到世界瞄准点，最后限制在最大射程内并求朝向。
-        /// 世界瞄准点会被保存下来，供准星绘制复用，
-        /// 从而保证准星与角色朝向指向同一个位置。
+        /// 两个输入的性质不同：射击是**持续**状态（全自动武器需要按住期间每帧都提交意图），
+        /// 换弹是**一次性**动作（只在按下的那一帧提交一次）。
+        /// 把它们区分开，是为了避免按住换弹键时命令每帧重复派发。
         /// </remarks>
-        private Vector2F ResolveLookDirection()
+        public void ReadCombatIntent(out bool wantsToFire, out bool wantsToReload)
         {
-            var mouse = Mouse.current;
-            if (mouse == null)
+            Initialize();
+
+            if (UseScriptedInput)
             {
-                return Vector2F.Zero;
-            }
-
-            var cam = m_AimCamera != null ? m_AimCamera : Camera.main;
-            if (cam == null)
-            {
-                return Vector2F.Zero;
-            }
-
-            UpdateAimScreenPosition(mouse);
-
-            var world = ScreenToWorldOnPlane(cam, m_AimScreenPosition, m_OriginHeight);
-            var worldAim = AimResolver.ClampToMaxRange(
-                new Vector2F(world.x, world.y),
-                new Vector2F(m_OriginPosition.x, m_OriginPosition.y),
-                m_MaxAimDistance);
-
-            m_AimWorldPosition = worldAim;
-            m_HasAimPosition = true;
-
-            // 死区判定与方向归一化由共享层的纯函数完成，便于单元测试覆盖边界情形。
-            // 返回零向量表示"保持上一次朝向不变"。
-            return AimResolver.Resolve(
-                worldAim,
-                new Vector2F(m_OriginPosition.x, m_OriginPosition.y),
-                m_AimDeadZoneRadius);
-        }
-
-        /// <summary>
-        /// 用鼠标移动增量推进屏幕瞄准点。
-        /// </summary>
-        /// <remarks>
-        /// 鼠标被锁定时，系统光标固定在窗口内不再移动，但仍然会上报移动增量。
-        /// 因此这里不使用光标的绝对位置，而是自行累加增量维护瞄准点，
-        /// 这样才能在锁定状态下正常瞄准。
-        /// 未锁定时直接采用光标位置，保持编辑器下的常规操作习惯。
-        /// </remarks>
-        private void UpdateAimScreenPosition(Mouse mouse)
-        {
-            if (Cursor.lockState == CursorLockMode.Locked)
-            {
-                if (!m_HasAimPosition)
-                {
-                    // 首次进入锁定时以屏幕中心作为初始瞄准点，避免从角落开始。
-                    m_AimScreenPosition = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-                    m_HasAimPosition = true;
-                }
-
-                m_AimScreenPosition += mouse.delta.ReadValue();
-
-                var clamp = AimResolver.ClampToScreen(
-                    new Vector2F(m_AimScreenPosition.x, m_AimScreenPosition.y),
-                    Screen.width,
-                    Screen.height);
-                m_AimScreenPosition = new Vector2(clamp.X, clamp.Y);
+                wantsToFire = ScriptedWantsToFire;
+                wantsToReload = ScriptedWantsToReload;
                 return;
             }
 
-            // 未锁定状态（例如编辑器失去焦点，或玩家打开了界面菜单）：
-            // 此时鼠标位置由系统光标决定，但系统光标可能位于游戏窗口之外，
-            // 其坐标对游戏没有意义。因此这里重置跟踪状态，
-            // 等下次重新锁定时再从屏幕中心开始。
-            if (!m_HasAimPosition)
+            if (!m_IsInitialized)
             {
-                m_AimScreenPosition = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-            }
-        }
-
-        /// <summary>
-        /// 把屏幕坐标转换为角色所在水平面上的世界坐标。
-        /// </summary>
-        /// <remarks>
-        /// 不直接使用 ScreenToWorldPoint，是因为它需要知道目标点的深度；
-        /// 这里改用一条从摄像机出发的射线与水平面求交，结果与角色所在高度无关。
-        /// </remarks>
-        private static Vector2 ScreenToWorldOnPlane(Camera cam, Vector2 screenPoint, float planeHeight)
-        {
-            var ray = cam.ScreenPointToRay(screenPoint);
-            var plane = new Plane(Vector3.up, new Vector3(0f, planeHeight, 0f));
-
-            if (plane.Raycast(ray, out var distance))
-            {
-                var hit = ray.GetPoint(distance);
-                return new Vector2(hit.x, hit.z);
+                wantsToFire = false;
+                wantsToReload = false;
+                return;
             }
 
-            return Vector2.zero;
+            wantsToFire = m_AttackAction != null && m_AttackAction.IsPressed();
+            wantsToReload = m_ReloadAction != null && m_ReloadAction.WasPressedThisFrame();
         }
+
 
         /// <summary>
         /// 解析输入动作。允许重复调用，未配置资产时不会抛异常，
@@ -356,6 +322,8 @@ namespace RaidDemo.Input
 
             m_MoveAction = map.FindAction(m_MoveActionName, false);
             m_SprintAction = map.FindAction(m_SprintActionName, false);
+            m_AttackAction = map.FindAction(m_AttackActionName, false);
+            m_ReloadAction = map.FindAction(m_ReloadActionName, false);
 
             if (m_MoveAction == null)
             {

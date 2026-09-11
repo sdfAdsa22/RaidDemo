@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed966e54209cdf044ae4ba1c9f93a2e2, type: 3}
+  m_Name: Stats_weapon.rifle.ak74
+  m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.WeaponStats
+  m_BaseDamage: 25
+  m_RoundsPerMinute: 600
+  m_FireMode: 2
+  m_BurstCount: 3
+  m_MagazineCapacity: 30
+  m_CaliberId: 5.45
+  m_ReloadSeconds: 2.2
+  m_BaseSpreadDegrees: 1.5
+  m_SpreadPerShotDegrees: 0.5
+  m_MaxSpreadDegrees: 6
+  m_SpreadRecoveryPerSecond: 4
+  m_RangeMeters: 40

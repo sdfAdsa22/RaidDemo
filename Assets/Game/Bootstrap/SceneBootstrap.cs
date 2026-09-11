@@ -170,6 +170,7 @@ namespace RaidDemo.Bootstrap
             }
 
             UpdateEncumbrance();
+            UpdateCombat(Time.deltaTime, inventoryOpen);
         }
 
         /// <summary>
@@ -207,6 +208,7 @@ namespace RaidDemo.Bootstrap
             m_CommandRouter.Register(m_MoveHandler);
 
             InitializeInventory();
+            InitializeCombat();
 
             // 表现层需要在事件总线就绪之后重新订阅，否则 OnEnable 阶段拿不到服务。
             if (m_PlayerMotor != null)

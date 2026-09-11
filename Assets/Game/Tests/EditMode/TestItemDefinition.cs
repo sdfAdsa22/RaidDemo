@@ -26,6 +26,9 @@ namespace RaidDemo.Tests.EditMode
         /// <param name="containerWidth">作为容器时的内部宽度。</param>
         /// <param name="containerHeight">作为容器时的内部高度。</param>
         /// <param name="rarity">稀有度档位。</param>
+        /// <param name="weaponStats">作为武器时的战斗参数，可为空。</param>
+        /// <param name="ammoStats">作为弹药时的战斗参数，可为空。</param>
+        /// <param name="armorStats">作为护甲时的战斗参数，可为空。</param>
         public TestItemDefinition(
             string id,
             ItemCategory category = ItemCategory.Loot,
@@ -37,7 +40,10 @@ namespace RaidDemo.Tests.EditMode
             bool canRotate = true,
             int containerWidth = 4,
             int containerHeight = 4,
-            RarityTier rarity = RarityTier.Common)
+            RarityTier rarity = RarityTier.Common,
+            IWeaponStats weaponStats = null,
+            IAmmoStats ammoStats = null,
+            IArmorStats armorStats = null)
         {
             Id = id;
             DisplayName = id;
@@ -50,6 +56,9 @@ namespace RaidDemo.Tests.EditMode
             ContainerGridSize = new GridSize(containerWidth, containerHeight);
             Rarity = rarity;
             IsContainer = category == ItemCategory.Backpack;
+            WeaponStats = weaponStats;
+            AmmoStats = ammoStats;
+            ArmorStats = armorStats;
         }
 
         /// <inheritdoc />
@@ -86,10 +95,137 @@ namespace RaidDemo.Tests.EditMode
         public GridSize ContainerGridSize { get; }
 
         /// <inheritdoc />
+        public IWeaponStats WeaponStats { get; }
+
+        /// <inheritdoc />
+        public IAmmoStats AmmoStats { get; }
+
+        /// <inheritdoc />
+        public IArmorStats ArmorStats { get; }
+
+        /// <inheritdoc />
         public override string ToString()
         {
             return $"TestItemDefinition({Id})";
         }
+    }
+
+    /// <summary>
+    /// 供测试使用的武器参数替身。
+    /// </summary>
+    /// <remarks>
+    /// 所有字段都可以在构造时精确指定，因此"射速 600、弹匣 30、基础散布 1.5 度"
+    /// 这类条件在测试里是写死的确定值，不会因为资产被改动而失效。
+    /// </remarks>
+    internal sealed class TestWeaponStats : IWeaponStats
+    {
+        /// <summary>创建武器参数。</summary>
+        public TestWeaponStats(
+            float baseDamage = 25f,
+            float roundsPerMinute = 600f,
+            WeaponFireMode fireMode = WeaponFireMode.Auto,
+            int burstCount = 3,
+            int magazineCapacity = 30,
+            string caliberId = "9x19",
+            float reloadSeconds = 2f,
+            float baseSpreadDegrees = 0f,
+            float spreadPerShotDegrees = 0f,
+            float maxSpreadDegrees = 0f,
+            float spreadRecoveryPerSecond = 0f,
+            float rangeMeters = 40f)
+        {
+            BaseDamage = baseDamage;
+            RoundsPerMinute = roundsPerMinute;
+            FireMode = fireMode;
+            BurstCount = burstCount;
+            MagazineCapacity = magazineCapacity;
+            CaliberId = caliberId;
+            ReloadSeconds = reloadSeconds;
+            BaseSpreadDegrees = baseSpreadDegrees;
+            SpreadPerShotDegrees = spreadPerShotDegrees;
+            MaxSpreadDegrees = maxSpreadDegrees;
+            SpreadRecoveryPerSecond = spreadRecoveryPerSecond;
+            RangeMeters = rangeMeters;
+        }
+
+        /// <inheritdoc />
+        public float BaseDamage { get; }
+
+        /// <inheritdoc />
+        public float RoundsPerMinute { get; }
+
+        /// <inheritdoc />
+        public WeaponFireMode FireMode { get; }
+
+        /// <inheritdoc />
+        public int BurstCount { get; }
+
+        /// <inheritdoc />
+        public int MagazineCapacity { get; }
+
+        /// <inheritdoc />
+        public string CaliberId { get; }
+
+        /// <inheritdoc />
+        public float ReloadSeconds { get; }
+
+        /// <inheritdoc />
+        public float BaseSpreadDegrees { get; }
+
+        /// <inheritdoc />
+        public float SpreadPerShotDegrees { get; }
+
+        /// <inheritdoc />
+        public float MaxSpreadDegrees { get; }
+
+        /// <inheritdoc />
+        public float SpreadRecoveryPerSecond { get; }
+
+        /// <inheritdoc />
+        public float RangeMeters { get; }
+    }
+
+    /// <summary>供测试使用的弹药参数替身。</summary>
+    internal sealed class TestAmmoStats : IAmmoStats
+    {
+        /// <summary>创建弹药参数。</summary>
+        /// <param name="caliberId">口径标识。</param>
+        /// <param name="penetration">穿透力。</param>
+        public TestAmmoStats(string caliberId = "9x19", float penetration = 15f)
+        {
+            CaliberId = caliberId;
+            Penetration = penetration;
+        }
+
+        /// <inheritdoc />
+        public string CaliberId { get; }
+
+        /// <inheritdoc />
+        public float Penetration { get; }
+    }
+
+    /// <summary>供测试使用的护甲参数替身。</summary>
+    internal sealed class TestArmorStats : IArmorStats
+    {
+        /// <summary>创建护甲参数。</summary>
+        /// <param name="protectionLevel">防护等级。</param>
+        /// <param name="maxDurability">最大耐久。</param>
+        /// <param name="wearFactor">磨损系数。</param>
+        public TestArmorStats(int protectionLevel = 2, float maxDurability = 60f, float wearFactor = 0.35f)
+        {
+            ProtectionLevel = protectionLevel;
+            MaxDurability = maxDurability;
+            WearFactor = wearFactor;
+        }
+
+        /// <inheritdoc />
+        public int ProtectionLevel { get; }
+
+        /// <inheritdoc />
+        public float MaxDurability { get; }
+
+        /// <inheritdoc />
+        public float WearFactor { get; }
     }
 
     /// <summary>

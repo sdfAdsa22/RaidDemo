@@ -7,6 +7,8 @@
         "RaidDemo.Shared",
         "RaidDemo.Simulation",
         "RaidDemo.Input",
+        "RaidDemo.Data",
+        "RaidDemo.Combat",
         "Unity.Cinemachine",
         "Unity.InputSystem",
         "UnityEngine.UI"

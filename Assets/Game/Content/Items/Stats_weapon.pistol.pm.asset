@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed966e54209cdf044ae4ba1c9f93a2e2, type: 3}
+  m_Name: Stats_weapon.pistol.pm
+  m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.WeaponStats
+  m_BaseDamage: 18
+  m_RoundsPerMinute: 400
+  m_FireMode: 0
+  m_BurstCount: 1
+  m_MagazineCapacity: 8
+  m_CaliberId: 9x19
+  m_ReloadSeconds: 1.8
+  m_BaseSpreadDegrees: 2.5
+  m_SpreadPerShotDegrees: 0.8
+  m_MaxSpreadDegrees: 6
+  m_SpreadRecoveryPerSecond: 5
+  m_RangeMeters: 25
