@@ -24,8 +24,10 @@ namespace RaidDemo.Combat
         private readonly CombatWorld m_World;
         private readonly CombatTuning m_Tuning;
         private readonly EventBus m_EventBus;
+        private readonly int m_BackpackContainerId;
 
         private Vector3 m_MuzzlePosition;
+        private Vector2F m_AimWorldPoint;
         private float m_AimDegrees;
         private bool m_TriggerHeld;
         private int m_PlayerId;
@@ -38,13 +40,18 @@ namespace RaidDemo.Combat
         /// <param name="world">战斗单位注册表。</param>
         /// <param name="tuning">全局调参。</param>
         /// <param name="eventBus">事件总线。</param>
+        /// <param name="backpackContainerId">
+        /// 主背包的容器标识。换弹扣掉弹药之后要按这个标识广播背包变更事件，
+        /// 否则背包界面不会刷新，玩家会以为子弹没被消耗。传 0 表示不广播。
+        /// </param>
         public PlayerWeaponController(
             PlayerWeapon weapon,
             PlayerLoadout loadout,
             IHitProbe probe,
             CombatWorld world,
             CombatTuning tuning,
-            EventBus eventBus)
+            EventBus eventBus,
+            int backpackContainerId = 0)
         {
             m_Weapon = weapon;
             m_Loadout = loadout;
@@ -52,6 +59,7 @@ namespace RaidDemo.Combat
             m_World = world;
             m_Tuning = tuning ?? CombatTuning.Default;
             m_EventBus = eventBus;
+            m_BackpackContainerId = backpackContainerId;
         }
 
         /// <summary>手持武器状态。</summary>
@@ -114,6 +122,19 @@ namespace RaidDemo.Combat
             }
 
             m_AimDegrees = Mathf.Atan2(aimDirection.Y, aimDirection.X) * Mathf.Rad2Deg;
+        }
+
+        /// <summary>
+        /// 更新瞄准点在地面上的世界坐标。
+        /// </summary>
+        /// <param name="worldPoint">准星所在的地面位置。</param>
+        /// <remarks>
+        /// 弹道从这个点反推方向，而不是简单地把射线放平——放平的射线在斜俯视下
+        /// 与准星不在同一条视线上，玩家会看到"子弹和准星对不上"。
+        /// </remarks>
+        public void SetAimWorldPoint(Vector2F worldPoint)
+        {
+            m_AimWorldPoint = worldPoint;
         }
 
         /// <summary>设置扳机是否按住。</summary>
@@ -209,6 +230,17 @@ namespace RaidDemo.Combat
             var withdrawal = AmmoReserve.Consume(m_Loadout.Backpack, caliberId, want);
             var loaded = runtime.CompleteReload(withdrawal.Amount);
 
+            if (withdrawal.Amount > 0 && m_BackpackContainerId != 0)
+            {
+                // 取走弹药是在背包上做的真实改动，必须广播出去。
+                // 少了这一步，背包界面会一直显示换弹前的数量，
+                // 玩家会以为换弹没有消耗子弹——而实际上消耗了，只是界面没刷新。
+                m_EventBus.Publish(new InventoryChangedEvent(
+                    m_BackpackContainerId,
+                    InventoryChangeTypes.Remove,
+                    m_PlayerId));
+            }
+
             if (!withdrawal.IsEmpty)
             {
                 m_Weapon.SetLoadedPenetration(withdrawal.Penetration);
@@ -224,14 +256,12 @@ namespace RaidDemo.Combat
         /// <summary>发射一发：算散布、投射射线、结算伤害、广播事件。</summary>
         private void FireOnce(WeaponRuntime runtime, float spreadOffsetDegrees)
         {
-            var shotDegrees = m_AimDegrees + spreadOffsetDegrees;
-            var planar = Vector2F.FromDegrees(shotDegrees);
-            var direction = new Vector3(planar.X, 0f, planar.Y);
             var origin = m_MuzzlePosition;
             var range = runtime.Weapon.RangeMeters;
+            var direction = ResolveShotDirection(spreadOffsetDegrees);
 
             var didHit = m_Probe.TryRaycast(origin, direction, range, out var hit);
-            var endPoint = didHit ? hit.Point : origin + (direction.normalized * range);
+            var endPoint = didHit ? hit.Point : origin + (direction * range);
             var targetId = didHit ? hit.TargetId : 0;
 
             if (targetId != 0)
@@ -247,6 +277,40 @@ namespace RaidDemo.Combat
                 targetId,
                 0d,
                 m_Sequence));
+        }
+
+        /// <summary>
+        /// 计算这一发的三维方向：从枪口指向"地面瞄准点按散布旋转后的位置"。
+        /// </summary>
+        /// <param name="spreadOffsetDegrees">散布造成的角度偏移（度）。</param>
+        /// <returns>单位方向向量。</returns>
+        /// <remarks>
+        /// <para><b>为什么不是水平射线：</b>准星落在地面上，而枪口在胸口高度。
+        /// 如果射线水平打出去，它在屏幕上的投影会比准星高出一截——
+        /// 玩家看到的就是"子弹和准星不在一条线上"。</para>
+        /// <para>改成"从枪口指向瞄准点"之后，子弹的落点必然与准星重合
+        /// （除非中途命中目标），弹道看起来才是从枪口打向准星的。</para>
+        /// </remarks>
+        private Vector3 ResolveShotDirection(float spreadOffsetDegrees)
+        {
+            var groundMuzzle = new Vector3(m_MuzzlePosition.x, 0f, m_MuzzlePosition.z);
+            var toAim = m_AimWorldPoint.IsNearlyZero
+                ? Vector2F.FromDegrees(m_AimDegrees)
+                : new Vector2F(m_AimWorldPoint.X - groundMuzzle.x, m_AimWorldPoint.Y - groundMuzzle.z);
+
+            if (toAim.IsNearlyZero)
+            {
+                // 瞄准点与角色重合时没有方向可言，退回当前朝向。
+                toAim = Vector2F.FromDegrees(m_AimDegrees);
+            }
+
+            // 散布绕竖直轴旋转瞄准点，因此弹着点的距离不变、只改变方位。
+            var rotated = Quaternion.AngleAxis(spreadOffsetDegrees, Vector3.up)
+                          * new Vector3(toAim.X, 0f, toAim.Y);
+            var targetGround = groundMuzzle + rotated;
+
+            var direction = targetGround - m_MuzzlePosition;
+            return direction.sqrMagnitude > 1e-6f ? direction.normalized : Vector3.forward;
         }
 
         /// <summary>对命中目标结算伤害。</summary>

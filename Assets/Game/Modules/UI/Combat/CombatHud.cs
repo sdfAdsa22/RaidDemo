@@ -155,31 +155,25 @@ namespace RaidDemo.UI
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
 
-            var panel = new GameObject("Panel", typeof(RectTransform));
-            var panelRect = (RectTransform)panel.transform;
-            panelRect.SetParent(canvasHost.transform, worldPositionStays: false);
-            panelRect.anchorMin = new Vector2(1f, 0f);
-            panelRect.anchorMax = new Vector2(1f, 0f);
-            panelRect.pivot = new Vector2(1f, 0f);
-            panelRect.anchoredPosition = new Vector2(-Margin, Margin);
-            panelRect.sizeDelta = new Vector2(PanelWidth, 120f);
-
-            m_WeaponLabel = CreateLabel(panelRect, "无武器", 96f, 28f, 15, DimTextColor);
-            m_AmmoLabel = CreateLabel(panelRect, "-- / --", 58f, 40f, 30, TextColor);
-            m_ReserveLabel = CreateLabel(panelRect, "备弹 0", 32f, 22f, 14, DimTextColor);
-            BuildReloadBar(panelRect);
+            // 每个元素直接锚到画布右下角，不再套一层中间面板。
+            // 少一层嵌套就少一处可能出错的地方：只要画布正确覆盖屏幕，
+            // 这些元素就一定在屏幕内，且与画布缩放无关。
+            m_WeaponLabel = CreateLabel(canvasHost.transform, "无武器", Margin + 96f, 28f, 15, DimTextColor);
+            m_AmmoLabel = CreateLabel(canvasHost.transform, "-- / --", Margin + 58f, 40f, 30, TextColor);
+            m_ReserveLabel = CreateLabel(canvasHost.transform, "备弹 0", Margin + 32f, 22f, 14, DimTextColor);
+            BuildReloadBar(canvasHost.transform);
         }
 
         /// <summary>创建换弹进度条。</summary>
-        private void BuildReloadBar(RectTransform parent)
+        private void BuildReloadBar(Transform parent)
         {
             var backHost = new GameObject("ReloadBarBack", typeof(RectTransform), typeof(Image));
             var backRect = (RectTransform)backHost.transform;
             backRect.SetParent(parent, worldPositionStays: false);
-            backRect.anchorMin = new Vector2(0f, 0f);
-            backRect.anchorMax = new Vector2(0f, 0f);
-            backRect.pivot = new Vector2(0f, 0f);
-            backRect.anchoredPosition = new Vector2(0f, 14f);
+            backRect.anchorMin = new Vector2(1f, 0f);
+            backRect.anchorMax = new Vector2(1f, 0f);
+            backRect.pivot = new Vector2(1f, 0f);
+            backRect.anchoredPosition = new Vector2(-Margin, Margin + 14f);
             backRect.sizeDelta = new Vector2(PanelWidth, BarHeight);
 
             var backImage = backHost.GetComponent<Image>();
@@ -205,7 +199,7 @@ namespace RaidDemo.UI
 
         /// <summary>创建一个右对齐的文本标签。</summary>
         private static Text CreateLabel(
-            RectTransform parent,
+            Transform parent,
             string content,
             float bottom,
             float height,
@@ -215,11 +209,14 @@ namespace RaidDemo.UI
             var host = new GameObject("Label", typeof(RectTransform), typeof(Text));
             var rect = (RectTransform)host.transform;
             rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = new Vector2(0f, 0f);
+
+            // 固定尺寸 + 右对齐锚点：右边缘钉在距屏幕右缘 Margin 处，
+            // 文字向左展开。宽度取足够大，避免任何情况下发生换行。
+            rect.anchorMin = new Vector2(1f, 0f);
             rect.anchorMax = new Vector2(1f, 0f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.anchoredPosition = new Vector2(0f, bottom);
-            rect.sizeDelta = new Vector2(0f, height);
+            rect.pivot = new Vector2(1f, 0f);
+            rect.anchoredPosition = new Vector2(-Margin, bottom);
+            rect.sizeDelta = new Vector2(PanelWidth, height);
 
             var text = host.GetComponent<Text>();
             text.font = UiFontProvider.Get(fontSize);

@@ -96,7 +96,8 @@ namespace RaidDemo.Bootstrap
                 probe,
                 m_CombatWorld,
                 m_CombatTuning,
-                m_EventBus);
+                m_EventBus,
+                m_BackpackContainerId);
 
             m_CommandRouter.Register<PlayerFireIntent>(new FireCommandHandler(m_WeaponController));
             m_CommandRouter.Register<PlayerReloadIntent>(new ReloadCommandHandler(m_WeaponController));
@@ -162,6 +163,10 @@ namespace RaidDemo.Bootstrap
             // 只更新开火帧的话，枪会一直停在最后一次开火的方向上。
             var aim = m_InputCollector.LookDirection;
             m_WeaponController.SetAimDirection(aim);
+
+            // 瞄准点也要一并交给武器：弹道要指向准星所在的那一点，
+            // 只给方向的话，射线只能水平打出去，与准星对不上。
+            m_WeaponController.SetAimWorldPoint(m_InputCollector.AimWorldPosition);
 
             if (!wantsToFire)
             {
