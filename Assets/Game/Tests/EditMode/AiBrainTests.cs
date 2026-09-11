@@ -50,13 +50,13 @@ namespace RaidDemo.Tests.EditMode
 
             m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
                 sourceId: 0,
-                position: new Vector2F(9f, 0f),
+                position: new Vector2F(7f, 0f),
                 tier: MovementNoiseTier.Sprint));
 
             m_Fixture.Advance(0.1f);
 
             Assert.AreEqual(AiStateId.Investigate, agent.CurrentState, "听到动静后应当前往调查。");
-            Assert.AreEqual(new Vector2F(9f, 0f), agent.Context.Memory.LastKnownPosition);
+            Assert.AreEqual(new Vector2F(7f, 0f), agent.Context.Memory.LastKnownPosition);
         }
 
         [Test]

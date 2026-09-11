@@ -55,10 +55,13 @@ namespace RaidDemo.AI
 
         /// <summary>奔跑噪音的可听半径（米）。这是玩家最容易踩到的一档。</summary>
         /// <remarks>
-        /// 刻意保持在**略大于视觉上限（9 米）**：听觉因此才有独立价值——
-        /// 玩家会先被"引过来"，而不是每次都已经被看见了才被发现。
+        /// <para>取值 8 米，**略小于视觉上限（9 米）但大于必定发现距离（6 米）**。
+        /// 听觉的独立价值来自它**不看朝向**：站在 AI 背后 7 米奔跑会被听见，而不会被看见；
+        /// 反过来，正前方 7 米的奔跑者会先被"看见"（进入警惕），听觉只是补充。</para>
+        /// <para>这意味着**奔跑不再能惊动 9 米以外的敌人**——那是超载档（12 米）独有的后果。
+        /// 从"贪婪循环"的角度看这反而更清晰：只有拿得太多的人才会在远处暴露自己。</para>
         /// </remarks>
-        public float HearingRadiusSprint = 10f;
+        public float HearingRadiusSprint = 8f;
 
         /// <summary>超载移动的可听半径（米）。贪心的额外代价。</summary>
         public float HearingRadiusOverloaded = 12f;
