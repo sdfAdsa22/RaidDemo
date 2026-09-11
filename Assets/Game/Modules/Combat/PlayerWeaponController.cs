@@ -1,4 +1,4 @@
-using RaidDemo.Data;
+﻿using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
 using RaidDemo.Shared;
@@ -345,72 +345,6 @@ namespace RaidDemo.Combat
             {
                 m_EventBus.Publish(new TargetDestroyedEvent(targetId, m_PlayerId));
             }
-        }
-    }
-
-    /// <summary>
-    /// 处理射击意图：记录瞄准方向并压住扳机。
-    /// </summary>
-    /// <remarks>
-    /// 处理器刻意保持极薄。真正的射击循环在 <see cref="PlayerWeaponController.Tick"/>，
-    /// 由启动层每帧调用一次——这样"每帧只推进一次武器时间"这件事由结构保证，
-    /// 而不是靠每个处理器都记得别多调一次。
-    /// </remarks>
-    public sealed class FireCommandHandler : ICommandHandler<PlayerFireIntent>
-    {
-        private readonly PlayerWeaponController m_Controller;
-
-        /// <summary>创建处理器。</summary>
-        /// <param name="controller">武器控制器。</param>
-        public FireCommandHandler(PlayerWeaponController controller)
-        {
-            m_Controller = controller;
-        }
-
-        /// <inheritdoc />
-        public CommandResult Execute(in PlayerFireIntent command)
-        {
-            if (!m_Controller.Weapon.IsEquipped)
-            {
-                // 没有武器时立刻拒绝，而不是默默地什么都不做：
-                // 玩家按住扳机却毫无反馈时，会以为游戏卡住了。
-                return CommandResult.Fail(CommandCodes.CombatNoWeapon, "主武器槽是空的。");
-            }
-
-            m_Controller.SetAimDirection(command.AimDirection);
-            m_Controller.SetTriggerHeld(true);
-            return CommandResult.Ok();
-        }
-    }
-
-    /// <summary>
-    /// 处理换弹意图。
-    /// </summary>
-    /// <remarks>
-    /// 这是少数会**同步失败**的命令之一：弹匣满、没有匹配弹药、正在换弹，
-    /// 这三种情况都不需要等待，立刻就能给出结果，因此直接在处理器里返回失败码，
-    /// 而不是等到下一帧再通过事件通知。
-    /// </remarks>
-    public sealed class ReloadCommandHandler : ICommandHandler<PlayerReloadIntent>
-    {
-        private readonly PlayerWeaponController m_Controller;
-
-        /// <summary>创建处理器。</summary>
-        /// <param name="controller">武器控制器。</param>
-        public ReloadCommandHandler(PlayerWeaponController controller)
-        {
-            m_Controller = controller;
-        }
-
-        /// <inheritdoc />
-        public CommandResult Execute(in PlayerReloadIntent command)
-        {
-            if (m_Controller.TryRequestReload(command.PlayerId, command.Sequence, out var failureCode))
-            {
-                return CommandResult.Ok();
-            }
-
-            return CommandResult.Fail(failureCode, "换弹请求被拒绝。");
         }
     }
 }
