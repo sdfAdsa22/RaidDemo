@@ -157,13 +157,33 @@ namespace RaidDemo.Bootstrap
 
             m_InputCollector.ReadCombatIntent(out var wantsToFire, out var wantsToReload);
 
+            // 瞄准方向每帧都要同步给武器，而不是只在开火时同步。
+            // 武器模型的朝向靠它驱动，而玩家不开火时朝向一样在变——
+            // 只更新开火帧的话，枪会一直停在最后一次开火的方向上。
+            var aim = m_InputCollector.LookDirection;
+            m_WeaponController.SetAimDirection(aim);
+
             if (!wantsToFire)
             {
                 m_WeaponController.SetTriggerHeld(false);
-                return;
+            }
+            else
+            {
+                DispatchFire(aim);
             }
 
-            var aim = m_InputCollector.LookDirection;
+            // 换弹与开火是彼此独立的两件事：不按住左键也应该能按 R 换弹。
+            if (wantsToReload)
+            {
+                m_CommandRouter.Dispatch(new PlayerReloadIntent(
+                    m_InputCollector.PlayerId,
+                    ++m_CommandSequence));
+            }
+        }
+
+        /// <summary>派发一次射击意图。</summary>
+        private void DispatchFire(Vector2F aim)
+        {
             var fireResult = m_CommandRouter.Dispatch(new PlayerFireIntent(
                 m_InputCollector.PlayerId,
                 aim,
@@ -172,13 +192,6 @@ namespace RaidDemo.Bootstrap
             if (!fireResult.Success)
             {
                 m_WeaponController.SetTriggerHeld(false);
-            }
-
-            if (wantsToReload)
-            {
-                m_CommandRouter.Dispatch(new PlayerReloadIntent(
-                    m_InputCollector.PlayerId,
-                    ++m_CommandSequence));
             }
         }
     }

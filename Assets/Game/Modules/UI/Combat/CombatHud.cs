@@ -24,7 +24,8 @@ namespace RaidDemo.UI
         private const float ReferenceHeight = 1080f;
 
         /// <summary>面板到屏幕右下角的边距（像素）。</summary>
-        private const float Margin = 40f;
+        /// <remarks>取 56 而不是贴边的 20~30：HUD 压在最角落时容易被玩家忽略，也容易被屏幕边框切掉。</remarks>
+        private const float Margin = 56f;
 
         /// <summary>面板宽度（像素）。</summary>
         private const float PanelWidth = 260f;
@@ -226,6 +227,14 @@ namespace RaidDemo.UI
             text.text = content;
             text.alignment = TextAnchor.LowerRight;
             text.color = color;
+
+            // 溢出显示而不是换行：文字一旦略宽于矩形，默认的自动换行会把后半段
+            // 折到第二行，而矩形高度只有几十像素，第二行随即被垂直裁掉——
+            // 表现就是"界面上只显示了一部分文字"。
+            // 这里宁可让文字略微超出矩形，也不要它被无声地裁掉。
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+
             text.raycastTarget = false;
             return text;
         }
