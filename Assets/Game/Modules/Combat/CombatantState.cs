@@ -129,6 +129,34 @@ namespace RaidDemo.Combat
             m_Health = value < 0f ? 0f : value > m_MaxHealth ? m_MaxHealth : value;
         }
 
+        /// <summary>
+        /// 恢复生命值。
+        /// </summary>
+        /// <param name="amount">想要恢复的量。非正值会被忽略。</param>
+        /// <returns>实际恢复量（会被生命上限截断）。</returns>
+        /// <remarks>
+        /// <para>M4 的用途是 AI 撤退阶段的自我恢复：撤退状态必须能真的把血补回来，
+        /// 否则"生命过低 → 撤退 → 恢复 → 再次交战"这条链路永远走不通。</para>
+        /// <para>死亡单位不会被治疗：<see cref="IsAlive"/> 为 false 时直接返回 0，
+        /// 这样后续加入复活机制时不会出现"医疗包把尸体救活但状态机没重置"的怪象。</para>
+        /// </remarks>
+        public float Heal(float amount)
+        {
+            if (amount <= 0f || !IsAlive)
+            {
+                return 0f;
+            }
+
+            var before = m_Health;
+            m_Health += amount;
+            if (m_Health > m_MaxHealth)
+            {
+                m_Health = m_MaxHealth;
+            }
+
+            return m_Health - before;
+        }
+
         public override string ToString()
         {
             return $"Combatant#{m_Id}(生命={m_Health:F0}/{m_MaxHealth:F0}, 甲={m_ArmorLevel}级/{m_ArmorDurability:F0})";

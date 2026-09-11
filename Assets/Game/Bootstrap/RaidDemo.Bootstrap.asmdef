@@ -12,7 +12,9 @@
         "RaidDemo.Data.Content",
         "RaidDemo.Inventory",
         "RaidDemo.Combat",
-        "RaidDemo.UI"
+        "RaidDemo.AI",
+        "RaidDemo.UI",
+        "Unity.AI.Navigation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

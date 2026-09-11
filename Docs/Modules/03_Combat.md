@@ -363,7 +363,7 @@ public readonly struct HitInfo
 | --- | --- |
 | M2 背包 | 从 `EquipmentLoadout.Get(PrimaryWeapon)` 取武器定义；换弹从背包扣除弹药物品 |
 | 表现层 | 订阅 `WeaponFiredEvent` 画弹道；`PhysicsHitProbe` 提供射线能力 |
-| M4 AI | AI 复用同一套 `WeaponRuntime` 与伤害结算，只是意图来源不同 |
+| M4 AI | **已完成**：AI 复用同一套 `WeaponRuntime` 与伤害结算，只是意图来源不同（见 [04_AI.md](04_AI.md)） |
 | M5 战局 | 命中与击杀计入结算数据 |
 | M9 联机 | 命中判定全部在服务端；客户端只发 `PlayerFireIntent` 并播放表现 |
 

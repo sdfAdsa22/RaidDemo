@@ -13,7 +13,8 @@
         "RaidDemo.Data.Content",
         "RaidDemo.Inventory",
         "RaidDemo.UI",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.AI.Navigation"
     ],
     "includePlatforms": [
         "Editor"

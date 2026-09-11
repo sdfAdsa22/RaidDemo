@@ -9,9 +9,11 @@
         "RaidDemo.Input",
         "RaidDemo.Data",
         "RaidDemo.Combat",
+        "RaidDemo.AI",
         "Unity.Cinemachine",
         "Unity.InputSystem",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.AI.Navigation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

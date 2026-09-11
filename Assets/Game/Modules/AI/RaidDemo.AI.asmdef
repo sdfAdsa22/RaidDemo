@@ -7,8 +7,7 @@
         "RaidDemo.Shared",
         "RaidDemo.Data",
         "RaidDemo.Data.Content",
-        "RaidDemo.Combat",
-        "Unity.AI.Navigation"
+        "RaidDemo.Combat"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

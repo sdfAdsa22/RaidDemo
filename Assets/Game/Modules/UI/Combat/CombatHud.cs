@@ -41,6 +41,8 @@ namespace RaidDemo.UI
         private static readonly Color TextColor = new Color(0.94f, 0.94f, 0.96f);
         private static readonly Color DimTextColor = new Color(0.72f, 0.72f, 0.78f);
         private static readonly Color LowAmmoColor = new Color(1f, 0.55f, 0.35f);
+        private static readonly Color LowHealthColor = new Color(1f, 0.4f, 0.35f);
+        private static readonly Color DeadColor = new Color(0.6f, 0.6f, 0.65f);
         private static readonly Color BarBackColor = new Color(0.18f, 0.18f, 0.20f, 0.8f);
         private static readonly Color BarFillColor = new Color(0.95f, 0.75f, 0.25f);
 
@@ -50,10 +52,14 @@ namespace RaidDemo.UI
         private Text m_WeaponLabel;
         private Text m_AmmoLabel;
         private Text m_ReserveLabel;
+        private Text m_HealthLabel;
         private Image m_ReloadBarFill;
         private RectTransform m_ReloadBarRoot;
         private string m_WeaponName = "无武器";
         private string m_CaliberId;
+
+        /// <summary>生命比例低于该值时生命数字变红。</summary>
+        private const float LowHealthRatio = 0.3f;
 
         /// <summary>
         /// 初始化并构建界面。
@@ -84,6 +90,41 @@ namespace RaidDemo.UI
             {
                 m_WeaponLabel.text = m_WeaponName;
             }
+        }
+
+        /// <summary>
+        /// 更新生命值显示。由启动层推送。
+        /// </summary>
+        /// <param name="current">当前生命值。</param>
+        /// <param name="max">生命上限。</param>
+        /// <param name="isAlive">是否存活。</param>
+        /// <remarks>
+        /// <para><b>生命值走"推送"，而弹药走"每帧拉取权威状态"</b>，这是刻意的差别：
+        /// 弹药会因为开火、换弹、换枪、捡拾四条路径变化，任何一条漏掉就再也不会自愈，
+        /// 因此每帧读取最稳；而生命值只由受击与治疗改变，来源是战斗层的单位状态，
+        /// 界面若自己去取就需要反向依赖 AI 与启动层的数据结构。</para>
+        /// <para>方法名与参数保持"界面只描述它需要什么"，不暴露任何战斗层类型。</para>
+        /// </remarks>
+        public void SetHealth(float current, float max, bool isAlive)
+        {
+            if (m_HealthLabel == null)
+            {
+                return;
+            }
+
+            if (!isAlive)
+            {
+                m_HealthLabel.text = "已阵亡";
+                m_HealthLabel.color = DeadColor;
+                return;
+            }
+
+            m_HealthLabel.text = $"生命 {Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)}";
+
+            // 用向上取整的整数比较，避免"血量恰好 30%"时因为浮点误差而闪烁变色。
+            m_HealthLabel.color = max > 0f && current <= max * LowHealthRatio
+                ? LowHealthColor
+                : TextColor;
         }
 
         private void Update()
@@ -167,6 +208,10 @@ namespace RaidDemo.UI
             m_WeaponLabel = CreateLabel(canvasHost.transform, "无武器", Margin + 96f, 28f, 15, DimTextColor);
             m_AmmoLabel = CreateLabel(canvasHost.transform, "-- / --", Margin + 58f, 40f, 30, TextColor);
             m_ReserveLabel = CreateLabel(canvasHost.transform, "备弹 0", Margin + 32f, 22f, 14, DimTextColor);
+
+            // 生命值放在武器信息上方：它是玩家最先要看的数字，
+            // 而弹匣数量在交火中反而是次要信息。
+            m_HealthLabel = CreateLabel(canvasHost.transform, "生命 -- / --", Margin + 132f, 24f, 18, TextColor);
             BuildReloadBar(canvasHost.transform);
         }
 

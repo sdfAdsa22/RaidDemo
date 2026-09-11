@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
 namespace RaidDemo.Bootstrap.Editor
@@ -105,10 +107,25 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>创建地面。</summary>
+        /// <remarks>
+        /// <para>地面上额外挂一个 <see cref="NavMeshSurface"/>，但**不在这里烘焙**：
+        /// 导航网格由启动层在运行时调用 <c>BuildNavMesh()</c> 生成。</para>
+        ///
+        /// <para>这样选择的原因是本场景由代码生成：若在编辑器里预先烘焙，数据会与布局脱节，
+        /// 改了箱子的位置却忘记重新烘焙时，AI 会绕着已经不存在的箱子走——
+        /// 这种问题从画面上完全看不出来，只能靠人偶然发现。运行时烘焙保证导航网格
+        /// 永远与当前布局一致，而灰盒地图只有 60x60，这点开销可以忽略。</para>
+        /// </remarks>
         private static void CreateGround()
         {
             var ground = CreateBox("Ground", new Vector3(0f, -0.5f, 0f), new Vector3(GroundSize, 1f, GroundSize));
             SetMaterialColor(ground, new Color(0.32f, 0.34f, 0.36f));
+
+            // 采集方式显式指定而不是依赖默认值：默认值随包版本变过，
+            // 而"哪些物体参与烘焙"直接决定 AI 能不能绕过集装箱。
+            var surface = ground.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.All;
+            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
         }
 
         /// <summary>创建四面围墙，把玩家限制在场景内。</summary>

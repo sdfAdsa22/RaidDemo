@@ -113,6 +113,8 @@ namespace RaidDemo.Bootstrap
 
         private void OnDestroy()
         {
+            // 释放订阅。AI 调度器订阅了伤害事件，漏掉这一步会在退出播放模式时留下悬挂引用。
+            m_AiDirector?.Dispose();
             ServiceLocatorHolder.Clear();
             m_Services?.Clear();
         }
@@ -126,6 +128,10 @@ namespace RaidDemo.Bootstrap
 
             var inventoryOpen = m_InventoryScreen != null && m_InventoryScreen.IsOpen;
 
+            // 阵亡期间也屏蔽操作：否则玩家在倒计时里还能跑动与开枪，
+            // 会让"已经死了"这件事完全无法从画面上看出来。
+            var inputBlocked = inventoryOpen || IsPlayerDefeated();
+
             // 编辑器在失去焦点时会自动解除光标锁定；玩家点回游戏窗口后需要重新锁上。
             // 这里只在应用有焦点时维持锁定，避免与操作系统的焦点切换互相抢控制权。
             // 背包界面打开时不抢光标：那时玩家需要鼠标来拖拽物品。
@@ -137,7 +143,7 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.SetCursorLock(true);
             }
 
-            if (inventoryOpen)
+            if (inputBlocked)
             {
                 // 翻背包时角色必须立刻停住。只清意图而不停模拟，角色会按上一次的
                 // 输入继续滑行，玩家一松手就发现人物跑出掩体了。
@@ -174,7 +180,8 @@ namespace RaidDemo.Bootstrap
             }
 
             UpdateEncumbrance();
-            UpdateCombat(Time.deltaTime, inventoryOpen);
+            UpdateCombat(Time.deltaTime, inputBlocked);
+            UpdateAi(Time.deltaTime, inputBlocked);
         }
 
         /// <summary>
@@ -213,6 +220,7 @@ namespace RaidDemo.Bootstrap
 
             InitializeInventory();
             InitializeCombat();
+            InitializeAi();
 
             // 表现层需要在事件总线就绪之后重新订阅，否则 OnEnable 阶段拿不到服务。
             if (m_PlayerMotor != null)
