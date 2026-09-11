@@ -2,7 +2,9 @@ using System;
 using RaidDemo.AI;
 using RaidDemo.Combat;
 using RaidDemo.Kernel;
+using RaidDemo.Shared;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace RaidDemo.Presentation
 {
@@ -155,11 +157,35 @@ namespace RaidDemo.Presentation
             }
 
             var position = m_Agent.Position;
-            transform.position = new Vector3(position.X, 0f, position.Y);
+            transform.position = new Vector3(position.X, ResolveGroundHeight(position), position.Y);
 
             // 坐标系映射与玩家完全一致：Unity 旋转角 = 90 - 模拟角度。
             // 两处用的是同一条换算，因此敌人的朝向指示与弹道方向天然对齐。
             transform.rotation = Quaternion.Euler(0f, 90f - m_Agent.FacingDegrees, 0f);
+        }
+
+        /// <summary>
+        /// 采样脚下的导航网格高度，让敌人能站在装卸平台上而不是陷进台体里。
+        /// </summary>
+        /// <param name="position">逻辑层给出的平面位置。</param>
+        /// <returns>脚底应处的世界高度（米）。采样失败时退化为 0，即灰盒地面。</returns>
+        /// <remarks>
+        /// <para>逻辑层的位置是二维的（它必须能在无头服务端运行），高度属于场景信息，
+        /// 因此由表现层补上。这正是「逻辑层只管平面、表现层负责落地」这条分工的落点。</para>
+        ///
+        /// <para>采样点要抬到单位当前位置的上方再往下找：若直接拿 y 等于 0 的点去采样，
+        /// 站在平台上时该点位于台体内部，采样要么失败、要么把结果拉回地面，
+        /// 表现为「敌人半个身子埋进台面」，而这在俯视角下很难与「敌人被击倒」区分。</para>
+        /// </remarks>
+        private float ResolveGroundHeight(Vector2F position)
+        {
+            var probe = new Vector3(position.X, transform.position.y + 2f, position.Y);
+            if (NavMesh.SamplePosition(probe, out var hit, 4f, NavMesh.AllAreas))
+            {
+                return hit.position.y;
+            }
+
+            return 0f;
         }
 
         /// <summary>状态到灰盒颜色的对照表。</summary>

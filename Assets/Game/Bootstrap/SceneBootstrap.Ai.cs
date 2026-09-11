@@ -35,24 +35,59 @@ namespace RaidDemo.Bootstrap
         /// <summary>敌人初始备弹（发）。约等于三个弹匣。</summary>
         private const int EnemyReserveAmmo = 90;
 
-        /// <summary>玩家阵亡后灰盒复活的等待时长（秒）。</summary>
-        private const float PlayerRespawnSeconds = 4f;
-
         /// <summary>
         /// AI 活动范围半径（米）。
         /// </summary>
         /// <remarks>
         /// 灰盒地面是 60x60，围墙内侧约在 ±29.6 处。这里取 26，留出一点余量，
-        /// 避免 AI 贴着围墙卡在角落里。M5 换成正式地图后，这个值应由地图数据提供。
+        /// 避免 AI 贴着围墙卡在角落里。三个撤离点都在这个范围内，
+        /// 因此撤离区同样会有 AI 经过——这是刻意的：撤离前的最后一段路必须有风险。
         /// </remarks>
         private const float AiPlayAreaHalfExtent = 26f;
 
-        /// <summary>每个敌人的出生点与巡逻路线。</summary>
+        /// <summary>
+        /// 每个敌人的出生点与巡逻路线（M5 四分区地图版本）。
+        /// </summary>
+        /// <remarks>
+        /// <para>五个敌人分布在四个分区：堆场两个（南、北各一）、厂房一个、
+        /// 装卸平台一个、外围环道一个。数量按「玩家一路会遇到几次交火」来定：
+        /// 太少则搜刮毫无压力，太多则 8 分钟根本搜不完。</para>
+        ///
+        /// <para>巡逻点全部落在通道与空地上，不穿箱子也不穿墙。路线刻意经过容器附近，
+        /// 因此玩家搜刮时被撞见的概率是真实的——这是搜刮读条这个「成本」能成立的前提。</para>
+        /// </remarks>
         private static readonly (Vector2F Spawn, Vector2F[] Route)[] s_EnemyLayouts =
         {
-            (new Vector2F(14f, 4f), new[] { new Vector2F(14f, 4f), new Vector2F(20f, 10f), new Vector2F(8f, 12f) }),
-            (new Vector2F(-14f, 4f), new[] { new Vector2F(-14f, 4f), new Vector2F(-20f, 10f), new Vector2F(-8f, 12f) }),
-            (new Vector2F(0f, 22f), new[] { new Vector2F(0f, 22f), new Vector2F(10f, 24f), new Vector2F(-10f, 24f) }),
+            // 堆场南侧：沿南入口向北推进，覆盖弹药箱与武器架之间的通道
+            (new Vector2F(5f, -3f), new[]
+            {
+                new Vector2F(5f, -3f), new Vector2F(12f, -8f), new Vector2F(20f, -8f),
+            }),
+
+            // 堆场北侧：绕堆场北端与东侧，守着价值最高的武器架
+            (new Vector2F(16f, 22f), new[]
+            {
+                new Vector2F(16f, 22f), new Vector2F(25f, 24f), new Vector2F(25f, 8f),
+            }),
+
+            // 厂房内部：穿过三个厅与两处门洞，是近战交火的主要来源
+            (new Vector2F(-24f, -8f), new[]
+            {
+                new Vector2F(-24f, -8f), new Vector2F(-24f, 2f),
+                new Vector2F(-20.5f, 8f), new Vector2F(-12f, 5.5f),
+            }),
+
+            // 装卸平台：在高台上巡逻，玩家爬坡时最容易遭遇
+            (new Vector2F(2f, -23f), new[]
+            {
+                new Vector2F(2f, -23f), new Vector2F(-6f, -24f), new Vector2F(8f, -24f),
+            }),
+
+            // 外围环道：南北向长距离巡逻，让撤离路线始终有变数
+            (new Vector2F(0f, 18f), new[]
+            {
+                new Vector2F(0f, 18f), new Vector2F(8f, 25f), new Vector2F(-6f, 24f),
+            }),
         };
 
         private AiDirector m_AiDirector;
@@ -61,8 +96,6 @@ namespace RaidDemo.Bootstrap
         private DamageScreenFlash m_DamageFlash;
         private NavMeshSurface m_NavMeshSurface;
         private int m_PlayerCombatantId;
-        private float m_RespawnTimer;
-        private bool m_PlayerDeathHandled;
 
         /// <summary>本帧交给 AI 的目标快照。开发者模式读的也是这一份。</summary>
         private AiTargetInfo m_CurrentAiTarget = AiTargetInfo.None;
@@ -280,54 +313,31 @@ namespace RaidDemo.Bootstrap
 
             if (playerAlive)
             {
-                m_PlayerDeathHandled = false;
                 UpdatePlayerNoise(deltaTime, inputBlocked);
             }
             else
             {
                 // 阵亡即静音：噪音是"移动发出的声音"，而尸体不会跑动。
                 m_CurrentNoiseTier = NoiseTier.Silent;
-                HandlePlayerDeath(deltaTime);
+                NotifyPlayerKilled();
             }
 
             m_AiDirector.Tick(deltaTime);
         }
 
         /// <summary>
-        /// 处理玩家阵亡与灰盒复活。
+        /// 玩家阵亡：交给战局会话判负。
         /// </summary>
         /// <remarks>
-        /// 战局结算（阵亡即结束本次出击）属于 M5。在那之前，玩家阵亡后原地复活，
-        /// 否则一次失误就让整个 M4 无法继续验证。复活使用 <c>SetHealth</c>，
-        /// 该方法本来就是为调试入口准备的。
+        /// <para>M4 阶段这里写的是「4 秒后原地灰盒复活」的临时代码，目的是让一次失误
+        /// 不至于中断 AI 调试。M5 起阵亡就是这一局的结束。</para>
+        ///
+        /// <para>复活会直接抹掉「贪心要付出代价」这条核心规则：如果死亡可以无限撤销，
+        /// 那么「再多搜一个箱子」就永远是正确的选择，整个紧张感也就不存在了。</para>
         /// </remarks>
-        private void HandlePlayerDeath(float deltaTime)
+        private void NotifyPlayerKilled()
         {
-            if (!m_PlayerDeathHandled)
-            {
-                m_PlayerDeathHandled = true;
-                m_RespawnTimer = PlayerRespawnSeconds;
-                Debug.Log($"[RaidDemo] 玩家阵亡。{PlayerRespawnSeconds:F0} 秒后灰盒复活（M5 将替换为战局结算）。", this);
-            }
-
-            m_RespawnTimer -= deltaTime;
-            if (m_RespawnTimer > 0f)
-            {
-                return;
-            }
-
-            m_RespawnTimer = 0f;
-            if (m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
-            {
-                state.SetHealth(PlayerMaxHealth);
-            }
-
-            // 位置也一并复位：否则玩家会在敌人堆里复活，复活的下一秒再次阵亡。
-            var facing = Vector2F.FromDegrees(m_PlayerSpawnFacingDegrees);
-            m_MoveHandler?.Simulator.Reset(
-                new Vector2F(m_PlayerSpawnPosition.x, m_PlayerSpawnPosition.y),
-                facing);
-            m_PlayerMotor?.SnapTo(m_PlayerSpawnPosition, new Vector2(facing.X, facing.Y));
+            m_RaidSession?.NotifyPlayerKilled();
         }
     }
 }

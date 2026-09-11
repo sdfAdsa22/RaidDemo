@@ -72,7 +72,10 @@ namespace RaidDemo.UI
         private PlayerLoadout m_Loadout;
         private EventBus m_EventBus;
         private int m_BackpackContainerId;
+
+        /// <summary>当前展示在面板里的战利品容器 ID。0 表示没有打开任何容器。</summary>
         private int m_LootContainerId;
+
         private int m_AmmoPouchContainerId;
         private EncumbranceProfile m_EncumbranceProfile;
         private Action<bool> m_SetCursorLock;
@@ -82,6 +85,10 @@ namespace RaidDemo.UI
         private InventoryGridView m_BackpackView;
         private InventoryGridView m_AmmoPouchView;
         private InventoryGridView m_LootView;
+
+        /// <summary>战利品面板的左上角锚点（像素）。由背包与弹药挂的实际高度算出来。</summary>
+        private Vector2 m_LootAnchorTopLeft;
+
         private Image m_BarFill;
         private Text m_BarLabel;
 
@@ -103,6 +110,25 @@ namespace RaidDemo.UI
         }
 
         /// <summary>
+        /// 是否接受输入。
+        /// </summary>
+        /// <remarks>
+        /// 主菜单状态下必须关掉：本组件自己是轮询 Tab 键的，
+        /// 若不加这道开关，玩家在主菜单按下 Tab 就会在主菜单底下弹出一个背包面板，
+        /// 而光标状态也会被它抢走。
+        /// </remarks>
+        public bool InputEnabled { get; set; } = true;
+
+        /// <summary>关闭界面。已经关闭时不做任何事。由装配层在战局结束时调用。</summary>
+        public void Close()
+        {
+            if (m_IsOpen)
+            {
+                SetVisible(false);
+            }
+        }
+
+        /// <summary>
         /// 初始化界面。
         /// </summary>
         /// <param name="router">命令路由。</param>
@@ -110,7 +136,6 @@ namespace RaidDemo.UI
         /// <param name="loadout">角色携带物。</param>
         /// <param name="eventBus">事件总线。</param>
         /// <param name="backpackContainerId">主背包的容器 ID。</param>
-        /// <param name="lootContainerId">战利品容器的容器 ID。</param>
         /// <param name="ammoPouchContainerId">弹药挂的容器 ID。</param>
         /// <param name="encumbranceProfile">负重配置，用于显示承载上限。</param>
         /// <param name="setCursorLock">光标锁定开关。界面需要解锁光标才能用鼠标拖拽。</param>
@@ -120,7 +145,6 @@ namespace RaidDemo.UI
             PlayerLoadout loadout,
             EventBus eventBus,
             int backpackContainerId,
-            int lootContainerId,
             int ammoPouchContainerId,
             EncumbranceProfile encumbranceProfile,
             Action<bool> setCursorLock)
@@ -130,7 +154,6 @@ namespace RaidDemo.UI
             m_Loadout = loadout;
             m_EventBus = eventBus;
             m_BackpackContainerId = backpackContainerId;
-            m_LootContainerId = lootContainerId;
             m_AmmoPouchContainerId = ammoPouchContainerId;
             m_EncumbranceProfile = encumbranceProfile;
             m_SetCursorLock = setCursorLock;
@@ -140,6 +163,81 @@ namespace RaidDemo.UI
             m_EventBus.Subscribe<EncumbranceChangedEvent>(_ => RefreshWeightBar());
             RefreshAll();
             SetVisible(false);
+        }
+
+        /// <summary>
+        /// 当前展示的战利品容器 ID，0 表示没有。
+        /// </summary>
+        /// <remarks>
+        /// 暴露给装配层用于提示与调试。界面自己不判断「能不能搜刮」——
+        /// 那是战局规则，属于逻辑层。
+        /// </remarks>
+        public int LootContainerId
+        {
+            get { return m_LootContainerId; }
+        }
+
+        /// <summary>
+        /// 打开指定战利品容器。
+        /// </summary>
+        /// <param name="containerId">容器 ID。</param>
+        /// <param name="displayName">容器显示名，用于标题。</param>
+        /// <remarks>
+        /// <para>打开动作包含「顺便把界面也显示出来」：搜刮读条完成之后玩家期待的
+        /// 就是能立刻搬东西，若还要再按一次 Tab，读条的意义会被这次多余操作冲淡。</para>
+        ///
+        /// <para>换一个容器时会重建视图而不是复用：视图与容器是一一对应的，
+        /// 复用需要把内部状态全部重绑，出错风险远高于重建一个小小的网格面板。</para>
+        /// </remarks>
+        public void OpenLootContainer(int containerId, string displayName)
+        {
+            if (containerId <= 0)
+            {
+                return;
+            }
+
+            if (!m_Registry.TryGetGrid(containerId, out var grid))
+            {
+                return;
+            }
+
+            if (m_LootContainerId != containerId)
+            {
+                DestroyLootView();
+                m_LootContainerId = containerId;
+                var title = string.IsNullOrEmpty(displayName) ? "战利品" : $"战利品：{displayName}";
+                m_LootView = CreateGridView(
+                    (RectTransform)m_Root.transform,
+                    grid,
+                    containerId,
+                    title,
+                    m_LootAnchorTopLeft);
+            }
+
+            SetVisible(true);
+        }
+
+        /// <summary>
+        /// 关闭战利品面板。
+        /// </summary>
+        /// <remarks>
+        /// 只销毁界面，容器里的物品留在原处：搜刮的产物是「物品换了位置」，
+        /// 而不是「界面被关掉了」。这条区别决定了再打开一次箱子时东西还在不在。
+        /// </remarks>
+        public void CloseLootContainer()
+        {
+            DestroyLootView();
+            m_LootContainerId = 0;
+        }
+
+        /// <summary>销毁战利品视图。没有视图时不做任何事。</summary>
+        private void DestroyLootView()
+        {
+            if (m_LootView != null)
+            {
+                Destroy(m_LootView.gameObject);
+                m_LootView = null;
+            }
         }
 
         private void OnDestroy()
@@ -155,7 +253,7 @@ namespace RaidDemo.UI
 
         private void Update()
         {
-            if (m_Router == null)
+            if (m_Router == null || !InputEnabled)
             {
                 return;
             }

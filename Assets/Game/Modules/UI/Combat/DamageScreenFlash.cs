@@ -66,6 +66,23 @@ namespace RaidDemo.UI
             get { return m_Remaining > 0f; }
         }
 
+        /// <summary>
+        /// 立刻清除闪烁。
+        /// </summary>
+        /// <remarks>
+        /// 战局结束时必须调用：结算界面会把 timeScale 设为 0，
+        /// 而本组件此前用 deltaTime 推进，时间一停就永远停在「最红的那一帧」，
+        /// 结果是结算界面被一层红屏盖住——看起来像渲染出错。
+        /// </remarks>
+        public void ClearImmediate()
+        {
+            m_Remaining = 0f;
+            if (m_OverlayHost != null)
+            {
+                m_OverlayHost.SetActive(false);
+            }
+        }
+
         private void OnDestroy()
         {
             m_Subscription?.Dispose();
@@ -79,7 +96,9 @@ namespace RaidDemo.UI
                 return;
             }
 
-            m_Remaining -= Time.deltaTime;
+            // 用不受 timeScale 影响的步长：战局结束时世界会冻结，
+            // 但受击红屏必须继续淡出，否则它会永远留在画面上。
+            m_Remaining -= Time.unscaledDeltaTime;
             if (m_Remaining <= 0f)
             {
                 m_Remaining = 0f;

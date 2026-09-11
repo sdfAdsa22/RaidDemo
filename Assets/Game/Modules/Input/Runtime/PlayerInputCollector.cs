@@ -45,6 +45,17 @@ namespace RaidDemo.Input
         [SerializeField] private string m_PreviousWeaponActionName = "Previous";
 
         /// <summary>
+        /// 交互动作名称（搜刮战利品、以后还会用于开门与拾取）。
+        /// </summary>
+        /// <remarks>
+        /// 交互与射击的性质不同：射击是持续状态，交互是**一次性动作**——
+        /// 按下的那一帧提交一次意图，之后由逻辑层决定要读条多久。
+        /// 读条时长属于游戏规则，不能交给输入系统里的 Hold 交互去决定，
+        /// 否则「搜刮要两秒」这条规则就被埋进了输入资产里，改数值要动资产而不是代码。
+        /// </remarks>
+        [SerializeField] private string m_InteractActionName = "Interact";
+
+        /// <summary>
         /// 摄像机引用，用于把屏幕坐标转换为世界坐标。
         /// 未指定时自动使用 Camera.main，便于灰盒场景快速搭建。
         /// </summary>
@@ -115,6 +126,10 @@ namespace RaidDemo.Input
 
         /// <summary>切换到上一把武器。绑定在鼠标滚轮下滚。</summary>
         private InputAction m_PreviousWeaponAction;
+
+        /// <summary>交互动作。绑定在键盘 E 上。</summary>
+        private InputAction m_InteractAction;
+
         private bool m_IsInitialized;
 
         /// <summary>
@@ -138,6 +153,9 @@ namespace RaidDemo.Input
 
         /// <summary>脚本化切换武器输入：+1 / -1 / 0。</summary>
         public int ScriptedWeaponSwitch { get; set; }
+
+        /// <summary>脚本化交互输入。</summary>
+        public bool ScriptedWantsToInteract { get; set; }
 
         /// <summary>是否启用脚本化输入。启用后真实设备输入被忽略。</summary>
         public bool UseScriptedInput { get; set; }
@@ -243,6 +261,7 @@ namespace RaidDemo.Input
             m_ReloadAction?.Enable();
             m_NextWeaponAction?.Enable();
             m_PreviousWeaponAction?.Enable();
+            m_InteractAction?.Enable();
         }
 
         private void OnDisable()
@@ -253,6 +272,7 @@ namespace RaidDemo.Input
             m_ReloadAction?.Disable();
             m_NextWeaponAction?.Disable();
             m_PreviousWeaponAction?.Disable();
+            m_InteractAction?.Disable();
         }
 
         /// <summary>
@@ -289,74 +309,6 @@ namespace RaidDemo.Input
         }
 
         /// <summary>
-        /// 读取本帧的战斗输入。
-        /// </summary>
-        /// <param name="wantsToFire">本帧是否按住射击键。</param>
-        /// <param name="wantsToReload">本帧是否刚按下换弹键。</param>
-        /// <remarks>
-        /// 两个输入的性质不同：射击是**持续**状态（全自动武器需要按住期间每帧都提交意图），
-        /// 换弹是**一次性**动作（只在按下的那一帧提交一次）。
-        /// 把它们区分开，是为了避免按住换弹键时命令每帧重复派发。
-        /// </remarks>
-        public void ReadCombatIntent(out bool wantsToFire, out bool wantsToReload)
-        {
-            Initialize();
-
-            if (UseScriptedInput)
-            {
-                wantsToFire = ScriptedWantsToFire;
-                wantsToReload = ScriptedWantsToReload;
-                return;
-            }
-
-            if (!m_IsInitialized)
-            {
-                wantsToFire = false;
-                wantsToReload = false;
-                return;
-            }
-
-            wantsToFire = m_AttackAction != null && m_AttackAction.IsPressed();
-            wantsToReload = m_ReloadAction != null && m_ReloadAction.WasPressedThisFrame();
-        }
-
-        /// <summary>
-        /// 读取本帧的切换武器输入。
-        /// </summary>
-        /// <returns>+1 表示切到下一把，-1 表示上一把，0 表示本帧没有切换。</returns>
-        /// <remarks>
-        /// 滚轮与数字键共用同一对动作：滚轮上滚与数字键 2 都是"下一个"。
-        /// 用同一对动作而不是各建一套，是为了让"切武器"这件事只有一条输入通路。
-        /// </remarks>
-        public int ReadWeaponSwitch()
-        {
-            Initialize();
-
-            if (UseScriptedInput)
-            {
-                return ScriptedWeaponSwitch;
-            }
-
-            if (!m_IsInitialized)
-            {
-                return 0;
-            }
-
-            if (m_NextWeaponAction != null && m_NextWeaponAction.WasPressedThisFrame())
-            {
-                return 1;
-            }
-
-            if (m_PreviousWeaponAction != null && m_PreviousWeaponAction.WasPressedThisFrame())
-            {
-                return -1;
-            }
-
-            return 0;
-        }
-
-
-        /// <summary>
         /// 解析输入动作。允许重复调用，未配置资产时不会抛异常，
         /// 便于在尚未接好引用的灰盒场景中安全运行。
         /// </summary>
@@ -380,6 +332,7 @@ namespace RaidDemo.Input
             m_ReloadAction = map.FindAction(m_ReloadActionName, false);
             m_NextWeaponAction = map.FindAction(m_NextWeaponActionName, false);
             m_PreviousWeaponAction = map.FindAction(m_PreviousWeaponActionName, false);
+            m_InteractAction = map.FindAction(m_InteractActionName, false);
 
             if (m_MoveAction == null)
             {

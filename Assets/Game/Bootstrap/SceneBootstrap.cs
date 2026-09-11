@@ -33,6 +33,12 @@ namespace RaidDemo.Bootstrap
         /// <summary>玩家初始朝向（度）。0 度指向世界 X 轴正方向。</summary>
         [SerializeField] private float m_PlayerSpawnFacingDegrees;
 
+        /// <summary>玩家碰撞体半径（米）。与场景生成器里创建胶囊时用的值保持一致。</summary>
+        private const float PlayerBodyRadius = 0.4f;
+
+        /// <summary>玩家身高（米）。用于移动碰撞的胶囊扫掠。</summary>
+        private const float PlayerBodyHeight = 1.8f;
+
         /// <summary>玩家表现层组件。</summary>
         [SerializeField] private PlayerMotor m_PlayerMotor;
 
@@ -51,9 +57,6 @@ namespace RaidDemo.Bootstrap
         /// <summary>主背包的网格尺寸（列 x 行）。</summary>
         [SerializeField] private Vector2Int m_BackpackSize = new Vector2Int(5, 5);
 
-        /// <summary>灰盒战利品箱的网格尺寸（列 x 行）。</summary>
-        [SerializeField] private Vector2Int m_LootContainerSize = new Vector2Int(6, 5);
-
         /// <summary>弹药挂的格数。固定为一行，横向排列。</summary>
         [SerializeField] private int m_AmmoPouchCells = 5;
 
@@ -71,7 +74,6 @@ namespace RaidDemo.Bootstrap
         private EncumbranceProfile m_EncumbranceProfile;
         private InventoryScreenController m_InventoryScreen;
         private int m_BackpackContainerId;
-        private int m_LootContainerId;
         private int m_AmmoPouchContainerId;
 
         /// <summary>上一帧的负重状态。只有它发生变化时才重新计算移动修正并广播事件。</summary>
@@ -116,6 +118,14 @@ namespace RaidDemo.Bootstrap
             // 释放订阅。AI 调度器订阅了伤害事件，漏掉这一步会在退出播放模式时留下悬挂引用。
             m_WeaponNoiseSubscription?.Dispose();
             m_WeaponNoiseSubscription = null;
+            m_KillSubscription?.Dispose();
+            m_KillSubscription = null;
+            m_RaidEndedSubscription?.Dispose();
+            m_RaidEndedSubscription = null;
+            m_LootSearchSubscription?.Dispose();
+            m_LootSearchSubscription = null;
+            m_ExtractionSubscription?.Dispose();
+            m_ExtractionSubscription = null;
             m_AiDirector?.Dispose();
             ServiceLocatorHolder.Clear();
             m_Services?.Clear();
@@ -123,7 +133,9 @@ namespace RaidDemo.Bootstrap
 
         private void Update()
         {
-            if (m_MoveHandler == null)
+            // 主菜单状态下战局逻辑一律不推进：菜单只是「站在地图上的一个界面」，
+            // 此时角色不该移动、敌人不该思考、计时不该走。
+            if (m_MoveHandler == null || !m_RaidActive)
             {
                 return;
             }
@@ -138,6 +150,7 @@ namespace RaidDemo.Bootstrap
             // 这里只在应用有焦点时维持锁定，避免与操作系统的焦点切换互相抢控制权。
             // 背包界面打开时不抢光标：那时玩家需要鼠标来拖拽物品。
             if (!inventoryOpen
+                && m_RaidActive
                 && m_InputCollector != null
                 && Application.isFocused
                 && Cursor.lockState != CursorLockMode.Locked)
@@ -184,6 +197,7 @@ namespace RaidDemo.Bootstrap
             UpdateEncumbrance();
             UpdateCombat(Time.deltaTime, inputBlocked);
             UpdateAi(Time.deltaTime, inputBlocked);
+            UpdateRaid(Time.deltaTime, inputBlocked);
         }
 
         /// <summary>
@@ -194,6 +208,11 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public void Initialize()
         {
+            // 编辑器在失去焦点时会停掉帧循环，而本项目大量依赖「后台跑着」的开发方式：
+            // 自动化验证、录制演示、切到别的窗口看日志，都会因此得到一个时间不走的假象。
+            // 显式要求后台继续运行，把这个坑堵在源头。
+            Application.runInBackground = true;
+
             m_Services = new ServiceLocator();
             m_EventBus = new EventBus();
             m_CommandRouter = new CommandRouter();
@@ -212,17 +231,51 @@ namespace RaidDemo.Bootstrap
             }
 
             var spawnFacing = Vector2F.FromDegrees(m_PlayerSpawnFacingDegrees);
+
+            // 移动碰撞：没有它，玩家能直接穿过集装箱与厂房隔断，
+            // 地图上的掩体对玩家来说就等于不存在。
+            // 实现放在表现层（要用 PhysX），模拟层只认识接口。
+            var collisionWorld = m_PlayerMotor != null
+                ? new PhysicsMovementCollisionService(
+                    m_PlayerMotor.transform,
+                    PlayerBodyHeight,
+                    skin: 0.02f)
+                : null;
+
             var simulator = new PlayerMovementSimulator(
                 m_MovementProfile,
                 new Vector2F(m_PlayerSpawnPosition.x, m_PlayerSpawnPosition.y),
-                spawnFacing);
+                spawnFacing,
+                collisionWorld,
+                PlayerBodyRadius);
 
             m_MoveHandler = new PlayerMoveCommandHandler(simulator, m_EventBus);
             m_CommandRouter.Register(m_MoveHandler);
 
             InitializeInventory();
             InitializeCombat();
-            InitializeAi();
+
+            // 流程状态决定这一局是否真的开始。主菜单状态下不生成敌人、不抽掉落、不开始计时，
+            // 但地图与背包仍然装配完成——这样菜单背景就是真实的战局场景，
+            // 玩家点「出击」之后看到的画面与菜单里看到的是同一个地方。
+            var flow = RaidFlowController.Ensure();
+            if (flow.State == RaidFlowController.FlowState.InRaid)
+            {
+                InitializeAi();
+                InitializeRaid();
+                m_RaidActive = true;
+                flow.HideScreens();
+            }
+            else
+            {
+                // 战局未开始：禁止背包界面响应按键，否则在主菜单里按 Tab 会弹出背包面板。
+                m_InventoryScreen.InputEnabled = false;
+                if (m_CombatHud != null)
+                {
+                    m_CombatHud.SetVisible(false);
+                }
+                flow.ShowMainMenu();
+            }
 
             // 表现层需要在事件总线就绪之后重新订阅，否则 OnEnable 阶段拿不到服务。
             if (m_PlayerMotor != null)
@@ -249,117 +302,5 @@ namespace RaidDemo.Bootstrap
             }
         }
 
-        /// <summary>
-        /// 确保准星组件存在。
-        /// </summary>
-        /// <remarks>
-        /// 准星在运行时创建而非烘焙进场景，原因是它属于纯表现层元素，
-        /// 没有需要美术调整的序列化状态，放在运行时创建可以让场景文件保持干净。
-        /// </remarks>
-        private void EnsureCrosshair()
-        {
-            if (m_Crosshair != null)
-            {
-                return;
-            }
-
-            var host = new GameObject("AimCrosshair");
-            host.transform.SetParent(transform, worldPositionStays: false);
-            m_Crosshair = host.AddComponent<AimCrosshair>();
-        }
-
-        /// <summary>
-        /// 更新准星位置。
-        /// </summary>
-        /// <remarks>
-        /// 准星位置由世界瞄准点反投影回屏幕得到，与角色朝向同源，
-        /// 因此不会出现"准星在一个地方、角色朝另一个地方"的偏差。
-        /// </remarks>
-        private void UpdateCrosshair()
-        {
-            if (m_Crosshair == null || m_InputCollector == null || m_CameraController == null)
-            {
-                return;
-            }
-
-            var worldAim = m_InputCollector.AimWorldPosition;
-            if (worldAim.IsNearlyZero)
-            {
-                m_Crosshair.Hide();
-                return;
-            }
-
-            var cam = m_CameraController.GetComponent<Camera>();
-            if (cam == null)
-            {
-                m_Crosshair.Hide();
-                return;
-            }
-
-            // 瞄准点位于角色所在高度，反投影时使用相同高度，避免透视造成的偏移。
-            var world = new Vector3(worldAim.X, m_PlayerMotor.transform.position.y, worldAim.Y);
-            var screen = cam.WorldToScreenPoint(world);
-
-            if (screen.z < 0f)
-            {
-                // 点在相机背后，此时不应绘制准星。
-                m_Crosshair.Hide();
-                return;
-            }
-
-            m_Crosshair.SetScreenPosition(new Vector2(screen.x, screen.y));
-        }
-
-        private void OnApplicationFocus(bool hasFocus)
-        {
-            // 编辑器下失去焦点时释放光标，避免开发过程中无法操作其他窗口。
-            // 发行构建中窗口失去焦点并不是常见场景，保持锁定更符合预期。
-#if UNITY_EDITOR
-            if (m_InputCollector != null)
-            {
-                m_InputCollector.SetCursorLock(hasFocus);
-            }
-#endif
-        }
-
-        /// <summary>读取本帧输入。</summary>
-        private void CollectInput()
-        {
-            if (m_InputCollector == null)
-            {
-                m_PendingMoveIntent = Vector2F.Zero;
-                m_PendingLookDirection = Vector2F.Zero;
-                m_PendingWantsToSprint = false;
-                return;
-            }
-
-            m_PendingMoveIntent = m_InputCollector.ReadMoveIntent(out var sprint);
-            m_PendingLookDirection = m_InputCollector.LookDirection;
-            m_PendingWantsToSprint = sprint;
-        }
-
-        /// <summary>
-        /// 把输入意图封装成命令并交给命令路由。
-        /// </summary>
-        /// <remarks>
-        /// 这是整个项目最关键的架构约束的落点：输入不直接驱动移动，
-        /// 而是先变成命令经统一入口执行。联机时只需把这里的
-        /// 本地执行替换为网络发送，模拟逻辑无需改动。
-        /// </remarks>
-        private void DispatchMoveCommand()
-        {
-            var intent = new PlayerMoveIntent(
-                m_InputCollector != null ? m_InputCollector.PlayerId : 0,
-                m_PendingMoveIntent,
-                m_PendingLookDirection,
-                m_PendingWantsToSprint,
-                ++m_CommandSequence);
-
-            var result = m_CommandRouter.Dispatch(intent);
-            if (!result.Success)
-            {
-                Debug.LogWarning($"[RaidDemo] 移动命令被拒绝：{result.Code} - {result.Message}", this);
-            }
-        }
     }
 }

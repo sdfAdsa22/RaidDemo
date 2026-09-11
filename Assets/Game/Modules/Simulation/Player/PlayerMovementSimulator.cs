@@ -23,6 +23,12 @@ namespace RaidDemo.Simulation
 
         private PlayerMoveState m_State;
 
+        /// <summary>移动碰撞世界。为 null 时不做碰撞修正（灰盒早期与纯逻辑测试会用到）。</summary>
+        private readonly IMovementCollisionWorld m_CollisionWorld;
+
+        /// <summary>移动体半径（米），传给碰撞世界做胶囊扫掠。</summary>
+        private readonly float m_BodyRadius;
+
         /// <summary>
         /// 创建模拟器。
         /// </summary>
@@ -32,10 +38,26 @@ namespace RaidDemo.Simulation
         public PlayerMovementSimulator(
             PlayerMovementProfile profile,
             Vector2F initialPosition = default,
-            Vector2F initialFacing = default)
+            Vector2F initialFacing = default,
+            IMovementCollisionWorld collisionWorld = null,
+            float bodyRadius = 0.4f)
         {
             m_Profile = profile ?? throw new System.ArgumentNullException(nameof(profile));
             m_State = PlayerMoveState.CreateInitial(initialPosition, initialFacing, profile.MaxStamina);
+            m_CollisionWorld = collisionWorld;
+            m_BodyRadius = bodyRadius > 0f ? bodyRadius : 0.4f;
+        }
+
+        /// <summary>移动体半径（米）。</summary>
+        public float BodyRadius
+        {
+            get { return m_BodyRadius; }
+        }
+
+        /// <summary>当前使用的碰撞世界；为 null 表示不做碰撞修正。</summary>
+        public IMovementCollisionWorld CollisionWorld
+        {
+            get { return m_CollisionWorld; }
         }
 
         /// <summary>当前移动状态的只读副本。</summary>
@@ -96,13 +118,37 @@ namespace RaidDemo.Simulation
             if (hasMoveInput)
             {
                 var direction = moveDirection.Normalized;
-                m_State.Position += direction * (speed * deltaTime);
+                var desired = direction * (speed * deltaTime);
+                m_State.Position += ResolveCollision(desired);
             }
 
             m_State.CurrentSpeed = speed;
             m_State.IsSprinting = speed >= m_Profile.SprintSpeedThreshold;
 
             UpdateStamina(deltaTime, sprinting);
+        }
+
+        /// <summary>
+        /// 把期望位移交给碰撞世界修正。
+        /// </summary>
+        /// <param name="desired">期望位移。</param>
+        /// <returns>实际可执行的位移。</returns>
+        /// <remarks>
+        /// <para>碰撞世界为 null 时原样返回，让「没有碰撞」的世界与改动前的行为逐位一致——
+        /// 这一点很重要：现有的一批移动测试断言的就是纯数学推进的结果。</para>
+        ///
+        /// <para>实现返回 false（被完全挡住）时使用它给出的零位移，而不是退回期望位移：
+        /// 退回等于允许穿墙，那正是这次改动要修的问题。</para>
+        /// </remarks>
+        private Vector2F ResolveCollision(Vector2F desired)
+        {
+            if (m_CollisionWorld == null)
+            {
+                return desired;
+            }
+
+            m_CollisionWorld.TryResolveMove(m_State.Position, desired, m_BodyRadius, out var resolved);
+            return resolved;
         }
 
         /// <summary>

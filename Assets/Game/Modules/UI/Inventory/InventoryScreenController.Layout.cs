@@ -56,19 +56,17 @@ namespace RaidDemo.UI
             var backpack = m_Loadout.Backpack;
             m_BackpackView = CreateGridView(rootRect, backpack, m_BackpackContainerId, "主背包", new Vector2(280f, 56f));
 
-            if (m_Registry.TryGetGrid(m_LootContainerId, out var loot))
+            // 弹药挂夹在背包与战利品面板之间：它是随身物品的一部分，
+            // 放在背包正下方符合「背包里的东西」这个心理分组。
+            //
+            // 战利品面板在这里**只算位置、不创建**：M5 的容器散布在地图上，
+            // 只有玩家搜刮读条完成后才需要它出现（见 OpenLootContainer）。
+            // 固定创建一块空面板会让界面在没开箱子时也占着半个屏幕。
+            m_LootAnchorTopLeft = new Vector2(280f, 56f + (backpack.Height * InventoryGridView.CellSize) + 20f);
+            if (m_Registry.TryGetGrid(m_AmmoPouchContainerId, out var pouch))
             {
-                // 弹药挂夹在背包与战利品箱之间：它是随身物品的一部分，
-                // 放在背包正下方符合"背包里的东西"这个心理分组。
-                var pouchTop = 56f + (backpack.Height * InventoryGridView.CellSize) + 20f;
-                if (m_Registry.TryGetGrid(m_AmmoPouchContainerId, out var pouch))
-                {
-                    m_AmmoPouchView = CreateGridView(rootRect, pouch, m_AmmoPouchContainerId, "弹药挂", new Vector2(280f, pouchTop));
-                    pouchTop += (pouch.Height * InventoryGridView.CellSize) + 22f + 24f;
-                }
-
-                var lootTop = pouchTop;
-                m_LootView = CreateGridView(rootRect, loot, m_LootContainerId, "战利品箱", new Vector2(280f, lootTop));
+                m_AmmoPouchView = CreateGridView(rootRect, pouch, m_AmmoPouchContainerId, "弹药挂", m_LootAnchorTopLeft);
+                m_LootAnchorTopLeft += new Vector2(0f, (pouch.Height * InventoryGridView.CellSize) + 22f + 24f);
             }
         }
 
@@ -215,6 +213,11 @@ namespace RaidDemo.UI
             if (!visible)
             {
                 CancelDrag();
+
+                // 关闭界面即结束这次搜刮：战利品面板随之销毁，
+                // 想再搬东西就得重新走到箱子前读条。这样「开箱成本」对每次搜刮都成立，
+                // 而不是开一次之后就能无限次免费取用。
+                CloseLootContainer();
             }
         }
         /// <summary>装备槽的中文名。</summary>

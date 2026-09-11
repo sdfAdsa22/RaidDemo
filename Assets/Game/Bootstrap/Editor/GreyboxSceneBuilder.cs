@@ -1,51 +1,68 @@
-using System.Collections.Generic;
 using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.AI;
-using UnityEngine.SceneManagement;
 
 namespace RaidDemo.Bootstrap.Editor
 {
     /// <summary>
-    /// 灰盒测试场景生成器。
+    /// 灰盒测试场景生成器（入口部分）。
     /// </summary>
     /// <remarks>
-    /// 场景由脚本生成而非手工搭建，原因有三个：
+    /// <para>场景由脚本生成而非手工搭建，原因有三个：
     /// 一是可重复，任何人执行同一个菜单命令都能得到完全一致的场景；
     /// 二是便于版本控制，生成脚本本身是文本，而场景文件是复杂 YAML，冲突极难处理；
-    /// 三是调整布局只需改常量，不必在编辑器里逐个拖动对象。
+    /// 三是调整布局只需改常量，不必在编辑器里逐个拖动对象。</para>
     ///
-    /// 本工具只在编辑器中运行，不参与游戏构建。
+    /// <para><b>文件拆分</b>：本类按职责拆成三个 partial 文件，
+    /// 既是为了遵守项目「单文件不超过 400 行」的规定，也让改动的影响范围一目了然：</para>
+    /// <list type="bullet">
+    /// <item><description>本文件：入口流程、光照、地面、玩家、启动对象；</description></item>
+    /// <item><description><c>GreyboxSceneBuilder.Factory</c>：几何体工厂（方块、墙、坡道、材质）；</description></item>
+    /// <item><description><c>GreyboxSceneBuilder.Layout</c>：地图分区布局（厂房、堆场、装卸平台、撤离点、战利品）。</description></item>
+    /// </list>
+    ///
+    /// <para>本工具只在编辑器中运行，不参与游戏构建。</para>
     /// </remarks>
-    public static class GreyboxSceneBuilder
+    public static partial class GreyboxSceneBuilder
     {
         /// <summary>生成场景的输出路径（仓库相对路径）。</summary>
         private const string ScenePath = "Assets/Game/Content/Scenes/GreyboxRaid.unity";
 
-        /// <summary>地面边长。</summary>
+        /// <summary>地面边长（米）。</summary>
+        /// <remarks>
+        /// 60x60 是权衡后的尺寸：AI 视距只有 9 米、武器射程 8~12 米，
+        /// 地图再大就只是让玩家在空地上跑，搜刮节奏反而变差。尺寸属于打磨项，
+        /// 先把闭环跑通更重要。
+        /// </remarks>
         private const float GroundSize = 60f;
 
-        /// <summary>外围围墙高度。</summary>
+        /// <summary>外围围墙高度（米）。</summary>
         private const float WallHeight = 4f;
 
-        /// <summary>围墙厚度。</summary>
+        /// <summary>外围围墙厚度（米）。</summary>
         private const float WallThickness = 0.8f;
 
-        /// <summary>集装箱标准尺寸。</summary>
-        private static readonly Vector3 ContainerSize = new Vector3(6f, 3f, 2.5f);
-
-        /// <summary>玩家出生点。</summary>
-        private static readonly Vector3 PlayerSpawn = Vector3.zero;
+        /// <summary>
+        /// 玩家出生点。
+        /// </summary>
+        /// <remarks>
+        /// 选在地图中央偏西的空地：往西是主厂房、往东是集装箱堆场、往南是装卸平台，
+        /// 三个方向都有内容可去，玩家一出生就能看清自己有哪些选择。
+        /// 刻意不放在任何撤离点旁边——出生就能撤离等于没有风险。
+        /// </remarks>
+        private static readonly Vector3 PlayerSpawn = new Vector3(-4f, 0f, 0f);
 
         /// <summary>角色身高（米）。灰盒阶段用于确定身体与头部的位置。</summary>
         private const float PlayerHeight = 1.8f;
 
-        /// <summary>角色身体半径。</summary>
+        /// <summary>角色身体半径（米）。</summary>
         private const float PlayerRadius = 0.4f;
 
-        /// <summary>相机俯角（度）。</summary>
+        /// <summary>
+        /// 相机俯角（度）。
+        /// </summary>
         /// <remarks>
         /// 62 度对应参考实现的接近正俯视的视角：能清晰读出地面平面布局与掩体关系，
         /// 同时保留少量立体感用于判断高低差。45 度过于接近第三人称，不是本项目的目标视角。
@@ -57,7 +74,7 @@ namespace RaidDemo.Bootstrap.Editor
         /// </summary>
         /// <remarks>
         /// 该值直接决定玩家在画面中的视觉大小。距离 24 时角色仅占屏幕高度约 6%，
-        /// 观感上"人太小、看不清在做什么"；收紧到 13 之后角色占比约 11%，
+        /// 观感上「人太小、看不清在做什么」；收紧到 13 之后角色占比约 11%，
         /// 既能看清角色与朝向，仍保留足够的战场视野。
         ///
         /// 调整本值时必须同步考虑地面可视范围：距离越近，可见的战场越小。
@@ -69,6 +86,29 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>相机视野（垂直角度）。</summary>
         private const float CameraFieldOfView = 55f;
 
+        /// <summary>
+        /// 一局战局时长（秒）。
+        /// </summary>
+        /// <remarks>
+        /// 8 分钟：足够搜两三个区域加一次交火，又不至于长到让「再来一局」变得沉重。
+        /// 该值同时写入场景里的启动对象，联调时可以直接在 Inspector 里改，不必重新生成场景。
+        /// </remarks>
+        private const float RaidDurationSeconds = 480f;
+
+        /// <summary>撤离读秒时长（秒）。进入撤离区后站满这么久才算撤离成功，离开即中断并重置。</summary>
+        private const float ExtractionDurationSeconds = 10f;
+
+        /// <summary>搜刮读条时长（秒）。</summary>
+        /// <remarks>
+        /// 2 秒是「贪婪循环」的成本：它短到不至于让人烦躁，长到足以让玩家在开箱时
+        /// 必须考虑「附近有没有敌人」。没有这条读条，搜刮就没有风险成本。
+        /// </remarks>
+        private const float LootSearchDurationSeconds = 2f;
+
+        /// <summary>搜刮交互的最大距离（米）。</summary>
+        private const float LootSearchRangeMeters = 2.2f;
+
+        /// <summary>生成灰盒测试场景。</summary>
         [MenuItem("RaidDemo/生成灰盒测试场景")]
         public static void BuildScene()
         {
@@ -79,7 +119,12 @@ namespace RaidDemo.Bootstrap.Editor
             CreateLighting();
             CreateGround();
             CreatePerimeterWalls();
-            CreateContainers();
+            CreateFactoryZone();
+            CreateContainerYardZone();
+            CreateLoadingDockZone();
+            CreateOuterRing();
+            CreateExtractionZones();
+            CreateLootContainers();
             CreatePlayer();
             CreateBootstrap();
 
@@ -118,84 +163,19 @@ namespace RaidDemo.Bootstrap.Editor
         /// </remarks>
         private static void CreateGround()
         {
-            var ground = CreateBox("Ground", new Vector3(0f, -0.5f, 0f), new Vector3(GroundSize, 1f, GroundSize));
+            var ground = CreateBox(
+                "Ground",
+                new Vector3(0f, -0.5f, 0f),
+                new Vector3(GroundSize, 1f, GroundSize));
             SetMaterialColor(ground, new Color(0.32f, 0.34f, 0.36f));
 
             // 采集方式显式指定而不是依赖默认值：默认值随包版本变过，
-            // 而"哪些物体参与烘焙"直接决定 AI 能不能绕过集装箱。
+            // 而「哪些物体参与烘焙」直接决定 AI 能不能绕过集装箱。
             var surface = ground.AddComponent<NavMeshSurface>();
             surface.collectObjects = CollectObjects.All;
             surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
         }
 
-        /// <summary>创建四面围墙，把玩家限制在场景内。</summary>
-        private static void CreatePerimeterWalls()
-        {
-            var half = (GroundSize * 0.5f) - (WallThickness * 0.5f);
-            var length = GroundSize;
-
-            var walls = new (string Name, Vector3 Position, Vector3 Size)[]
-            {
-                ("Wall_North", new Vector3(0f, WallHeight * 0.5f, half), new Vector3(length, WallHeight, WallThickness)),
-                ("Wall_South", new Vector3(0f, WallHeight * 0.5f, -half), new Vector3(length, WallHeight, WallThickness)),
-                ("Wall_East", new Vector3(half, WallHeight * 0.5f, 0f), new Vector3(WallThickness, WallHeight, length)),
-                ("Wall_West", new Vector3(-half, WallHeight * 0.5f, 0f), new Vector3(WallThickness, WallHeight, length))
-            };
-
-            var parent = new GameObject("Perimeter").transform;
-            foreach (var (name, position, size) in walls)
-            {
-                var wall = CreateBox(name, position, size);
-                wall.transform.SetParent(parent, worldPositionStays: true);
-                SetMaterialColor(wall, new Color(0.45f, 0.43f, 0.40f));
-            }
-        }
-
-        /// <summary>
-        /// 创建集装箱阵列作为掩体与空间分隔。
-        /// </summary>
-        /// <remarks>
-        /// 布局采用固定数据而非随机生成：灰盒阶段的目的是验证移动与相机手感，
-        /// 布局必须稳定可复现，否则每次生成结果不同会让问题排查失去基准。
-        /// </remarks>
-        private static void CreateContainers()
-        {
-            var parent = new GameObject("Containers").transform;
-
-            var layout = new (Vector3 Position, float YawDegrees)[]
-            {
-                (new Vector3(8f, 0f, 6f), 0f),
-                (new Vector3(-9f, 0f, 7f), 90f),
-                (new Vector3(12f, 0f, -8f), 0f),
-                (new Vector3(-11f, 0f, -6f), 0f),
-                (new Vector3(0f, 0f, 14f), 90f),
-                (new Vector3(-4f, 0f, -15f), 0f),
-                (new Vector3(16f, 0f, 16f), 0f),
-                (new Vector3(-16f, 0f, 15f), 90f),
-                (new Vector3(18f, 0f, -16f), 90f),
-                (new Vector3(-18f, 0f, -17f), 0f)
-            };
-
-            var index = 0;
-            foreach (var (position, yaw) in layout)
-            {
-                index++;
-                var center = position + new Vector3(0f, ContainerSize.y * 0.5f, 0f);
-                var container = CreateBox($"Container_{index:D2}", center, ContainerSize);
-                container.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-                container.transform.SetParent(parent, worldPositionStays: true);
-
-                // 交替使用两种明确的橙色调，便于在斜俯视下区分相邻箱体、判断空间关系。
-                // 注意配色必须是"红 > 绿 > 蓝"的暖色系才能读出集装箱的观感：
-                // 若绿色分量高于红色，物体在 URP 光照下会呈现紫色，与预期完全相反。
-                var containerColor = index % 2 == 0
-                    ? new Color(0.82f, 0.48f, 0.22f)
-                    : new Color(0.68f, 0.38f, 0.18f);
-                SetMaterialColor(container, containerColor);
-            }
-        }
-
-        /// <summary>创建玩家对象，挂载表现层组件。</summary>
         /// <summary>
         /// 创建玩家对象。
         /// </summary>
@@ -270,7 +250,18 @@ namespace RaidDemo.Bootstrap.Editor
                 Object.FindFirstObjectByType<RaidDemo.Presentation.PlayerMotor>();
             serialized.FindProperty("m_InputCollector").objectReferenceValue = collector;
             serialized.FindProperty("m_CameraController").objectReferenceValue = cameraController;
-            serialized.FindProperty("m_PlayerSpawnPosition").vector2Value = Vector2.zero;
+            serialized.FindProperty("m_PlayerSpawnPosition").vector2Value =
+                new Vector2(PlayerSpawn.x, PlayerSpawn.z);
+            serialized.FindProperty("m_ItemCatalog").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<RaidDemo.Data.ItemCatalog>(
+                    "Assets/Game/Content/Items/ItemCatalog.asset");
+
+            // 战局参数写进场景：它们是需要反复调的游戏节奏数值，
+            // 放在 Inspector 里改比每次重新生成场景快得多。
+            serialized.FindProperty("m_RaidDurationSeconds").floatValue = RaidDurationSeconds;
+            serialized.FindProperty("m_ExtractionDurationSeconds").floatValue = ExtractionDurationSeconds;
+            serialized.FindProperty("m_LootSearchDurationSeconds").floatValue = LootSearchDurationSeconds;
+            serialized.FindProperty("m_LootSearchRangeMeters").floatValue = LootSearchRangeMeters;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             var actions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(
@@ -313,42 +304,6 @@ namespace RaidDemo.Bootstrap.Editor
 
             controller.SnapToTarget();
             return cameraObject;
-        }
-
-        /// <summary>创建一个带碰撞体的方块，作为灰盒几何体。</summary>
-        private static GameObject CreateBox(string name, Vector3 center, Vector3 size)
-        {
-            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            box.name = name;
-            box.transform.position = center;
-            box.transform.localScale = size;
-            return box;
-        }
-
-        /// <summary>
-        /// 设置对象的材质颜色。
-        /// </summary>
-        /// <remarks>
-        /// 通过创建材质资产而非直接改 renderer.material，是为了避免在场景中
-        /// 隐式生成匿名材质实例——那会让材质无法被版本控制统一管理。
-        /// </remarks>
-        private static void SetMaterialColor(GameObject target, Color color)
-        {
-            var renderer = target.GetComponent<Renderer>();
-            if (renderer == null)
-            {
-                return;
-            }
-
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null)
-            {
-                return;
-            }
-
-            var material = new Material(shader) { name = $"Greybox_{target.name}" };
-            material.SetColor("_BaseColor", color);
-            renderer.sharedMaterial = material;
         }
 
         /// <summary>确保资源目录存在。</summary>

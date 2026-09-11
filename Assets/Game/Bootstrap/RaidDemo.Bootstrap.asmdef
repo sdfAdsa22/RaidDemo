@@ -11,6 +11,7 @@
         "RaidDemo.Data",
         "RaidDemo.Data.Content",
         "RaidDemo.Inventory",
+        "RaidDemo.Raid",
         "RaidDemo.Combat",
         "RaidDemo.AI",
         "RaidDemo.Diagnostics",

@@ -17,6 +17,9 @@ namespace RaidDemo.UI
     /// </remarks>
     public sealed class CombatHud : MonoBehaviour
     {
+        /// <summary>界面根节点。隐藏它需要拿到画布本身，而不是本组件所在的节点。</summary>
+        private GameObject m_CanvasHost;
+
         /// <summary>界面参考分辨率。</summary>
         private const float ReferenceWidth = 1920f;
 
@@ -71,6 +74,22 @@ namespace RaidDemo.UI
             m_Controller = controller;
             m_Loadout = loadout;
             BuildLayout();
+        }
+
+        /// <summary>
+        /// 显示或隐藏整个战斗界面。
+        /// </summary>
+        /// <param name="visible">是否显示。</param>
+        /// <remarks>
+        /// 主菜单与结算期间隐藏：那时战局尚未开始或已经结束，
+        /// 「生命 --/--、无武器」这类信息没有意义，只会让菜单背后显得杂乱。
+        /// </remarks>
+        public void SetVisible(bool visible)
+        {
+            if (m_CanvasHost != null)
+            {
+                m_CanvasHost.SetActive(visible);
+            }
         }
 
         /// <summary>
@@ -190,6 +209,7 @@ namespace RaidDemo.UI
         {
             var canvasHost = new GameObject("CombatHudCanvas", typeof(Canvas), typeof(CanvasScaler));
             canvasHost.transform.SetParent(transform, worldPositionStays: false);
+            m_CanvasHost = canvasHost;
 
             var canvas = canvasHost.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;

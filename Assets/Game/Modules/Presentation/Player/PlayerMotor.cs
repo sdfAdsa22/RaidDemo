@@ -22,11 +22,32 @@ namespace RaidDemo.Presentation
         /// <summary>高度偏移，使角色模型底部贴合地面。</summary>
         [SerializeField] private float m_GroundOffset;
 
+        /// <summary>
+        /// 是否自动吸附到脚下地面。
+        /// </summary>
+        /// <remarks>
+        /// M5 引入装卸平台与坡道之后，角色不能再假设自己永远站在 y 等于 0 的平面上。
+        /// 关掉它可以回到「固定高度」的旧行为，便于对照排查问题。
+        /// </remarks>
+        [SerializeField] private bool m_SnapToGround = true;
+
+        /// <summary>地面探测的起始高度（米）。探测从角色头顶上方这么高的位置向下打射线。</summary>
+        [SerializeField] private float m_GroundProbeHeight = 4f;
+
         /// <summary>所属玩家编号，用于过滤事件。</summary>
         [SerializeField] private int m_PlayerId;
 
         private EventBus m_EventBus;
         private IDisposable m_Subscription;
+
+        /// <summary>
+        /// 地面射线的复用缓冲。
+        /// </summary>
+        /// <remarks>
+        /// 用 RaycastNonAlloc 而不是 RaycastAll：后者每次调用都会分配一个新数组，
+        /// 而本方法每帧都会执行，长期累积会让 GC 周期性触发，表现为奔跑时轻微卡顿。
+        /// </remarks>
+        private readonly RaycastHit[] m_GroundHits = new RaycastHit[8];
 
         /// <summary>当前模拟位置（水平面）。</summary>
         public Vector2 SimulatedPosition { get; private set; }
@@ -96,7 +117,7 @@ namespace RaidDemo.Presentation
 
         private void ApplyTransform(bool instant)
         {
-            var target = new Vector3(SimulatedPosition.x, m_GroundOffset, SimulatedPosition.y);
+            var target = new Vector3(SimulatedPosition.x, ResolveGroundHeight(), SimulatedPosition.y);
             transform.position = instant ? target : Vector3.Lerp(transform.position, target, 0.5f);
 
             // 坐标轴映射说明（这段映射容易搞错，特此写明推导依据）：
@@ -115,6 +136,66 @@ namespace RaidDemo.Presentation
             // 第二次误以为两个坐标系轴向一一对应而直接使用模拟角度（差 90 度）。
             // 两次都表现为"角色朝向与准星不在一条线上"。
             transform.rotation = Quaternion.Euler(0f, 90f - FacingDegrees, 0f);
+        }
+
+        /// <summary>
+        /// 求模拟位置脚下的地面高度。
+        /// </summary>
+        /// <returns>角色脚底应处的世界高度。</returns>
+        /// <remarks>
+        /// <para>地面高度由射线探测得出，而不是由移动模拟层提供：模拟层要能在无头服务端运行，
+        /// 那里不存在碰撞体。高度属于场景信息，只能由表现层补上。</para>
+        ///
+        /// <para>射线要排除两类「假地面」：角色自己的胶囊，以及站在同一位置的敌人。
+        /// 若不排除，玩家贴着一个敌人时会突然被抬高到对方头顶——
+        /// 在俯视角下看起来像是被弹飞了。取最高命中点而不是最近命中点，
+        /// 是为了在坡道与台面衔接处站在较高的那个面上，避免角色半个身子陷进台体。</para>
+        /// </remarks>
+        private float ResolveGroundHeight()
+        {
+            if (!m_SnapToGround)
+            {
+                return m_GroundOffset;
+            }
+
+            var origin = new Vector3(
+                SimulatedPosition.x,
+                m_GroundProbeHeight,
+                SimulatedPosition.y);
+            var count = Physics.RaycastNonAlloc(
+                origin,
+                Vector3.down,
+                m_GroundHits,
+                m_GroundProbeHeight * 2f,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
+            var best = float.NegativeInfinity;
+            for (var i = 0; i < count; i++)
+            {
+                var hit = m_GroundHits[i];
+                if (hit.collider == null)
+                {
+                    continue;
+                }
+
+                if (hit.collider.transform.IsChildOf(transform))
+                {
+                    continue;
+                }
+
+                if (hit.collider.GetComponentInParent<EnemyAgentView>() != null)
+                {
+                    continue;
+                }
+
+                if (hit.point.y > best)
+                {
+                    best = hit.point.y;
+                }
+            }
+
+            return best > float.NegativeInfinity ? best + m_GroundOffset : m_GroundOffset;
         }
     }
 }
