@@ -66,6 +66,12 @@ namespace RaidDemo.Combat
             get { return m_Weapon.Runtime; }
         }
 
+        /// <summary>当前瞄准角度（度）。表现层用它摆放武器模型。</summary>
+        public float AimDegrees
+        {
+            get { return m_AimDegrees; }
+        }
+
         /// <summary>
         /// 按装备槽的当前内容同步武器。
         /// </summary>

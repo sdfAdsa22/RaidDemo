@@ -1,9 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using RaidDemo.Combat;
 using RaidDemo.Data;
 using RaidDemo.Kernel;
 using RaidDemo.Presentation;
 using RaidDemo.Shared;
+using RaidDemo.UI;
 using UnityEngine;
 
 namespace RaidDemo.Bootstrap
@@ -47,6 +48,13 @@ namespace RaidDemo.Bootstrap
         private CombatTuning m_CombatTuning;
         private PlayerWeapon m_PlayerWeapon;
         private PlayerWeaponController m_WeaponController;
+        private PlayerWeaponView m_WeaponView;
+        private WeaponAudioPlayer m_WeaponAudio;
+        private CombatHud m_CombatHud;
+
+        /// <summary>当前武器在背包里占的格数。用于推算灰盒枪身长度与枪声变体。</summary>
+        private int m_WeaponLengthCells = 2;
+
         private readonly Dictionary<int, CombatTargetView> m_TargetViews = new Dictionary<int, CombatTargetView>();
 
         /// <summary>战斗世界，供调试与测试读取。</summary>
@@ -95,117 +103,8 @@ namespace RaidDemo.Bootstrap
 
             m_EventBus.Subscribe<DamageAppliedEvent>(OnDamageApplied);
 
+            BuildCombatPresentation();
             SpawnTargets();
-        }
-
-        /// <summary>
-        /// 生成一排灰盒靶子。
-        /// </summary>
-        /// <remarks>
-        /// <para>靶子在运行时创建而不是烘焙进场景：灰盒阶段靶子的位置与数量还要反复调整，
-        /// 放在代码里改一个常量就生效，不必每次重新生成场景。</para>
-        /// <para>排成一排是为了方便验证射程与散布——站定不动往一个方向打，
-        /// 就能看出子弹落在哪、打不打得穿护甲。</para>
-        /// </remarks>
-        private void SpawnTargets()
-        {
-            var root = new GameObject("CombatTargets");
-            root.transform.SetParent(transform, worldPositionStays: false);
-
-            var armor = new GreyboxArmorStats(TargetArmorLevel, TargetArmorDurability);
-
-            // 正前方必须有靶子：玩家站定不动往瞄准方向打，就能立刻看到命中反馈。
-            // 如果排成一圈但正中间是空的，第一次试枪会全打空，看起来像射击没生效。
-            for (var i = 0; i < s_TargetLateralOffsets.Length; i++)
-            {
-                CreateTarget(
-                    root.transform,
-                    new Vector3(TargetRangeDistance, 0f, s_TargetLateralOffsets[i]),
-                    armor);
-            }
-
-            CreateTarget(
-                root.transform,
-                new Vector3(TargetRangeDistance + TargetSpacing, 0f, 0f),
-                armor);
-        }
-
-        /// <summary>创建单个靶子。</summary>
-        private void CreateTarget(Transform parent, Vector3 groundPosition, IArmorStats armor)
-        {
-            var host = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            host.name = $"Target_{m_CombatWorld.Count + 1}";
-            host.transform.SetParent(parent, worldPositionStays: false);
-
-            // 胶囊图元的原点在几何中心，因此抬高半个高度才是"站在地面上"。
-            host.transform.position = groundPosition + (Vector3.up * (TargetHeight * 0.5f));
-            host.transform.localScale = new Vector3(0.8f, TargetHeight * 0.5f, 0.8f);
-
-            var view = host.AddComponent<CombatTargetView>();
-            var id = m_CombatWorld.Create(TargetHealth, armor);
-            view.Initialize(id);
-            m_TargetViews[id] = view;
-        }
-
-        /// <summary>命中后让靶子闪一下。</summary>
-        private void OnDamageApplied(DamageAppliedEvent evt)
-        {
-            if (!m_TargetViews.TryGetValue(evt.TargetId, out var view) || view == null)
-            {
-                return;
-            }
-
-            if (evt.WasKilled)
-            {
-                view.MarkDestroyed();
-                return;
-            }
-
-            view.FlashHit();
-        }
-
-        /// <summary>
-        /// 每帧推进战斗：同步武器、更新枪口与瞄准、驱动扳机与换弹。
-        /// </summary>
-        /// <param name="deltaTime">时间步长（秒）。</param>
-        /// <param name="inventoryOpen">背包界面是否打开。打开时不接受射击输入。</param>
-        private void UpdateCombat(float deltaTime, bool inventoryOpen)
-        {
-            if (m_WeaponController == null)
-            {
-                return;
-            }
-
-            SyncEquippedWeapon();
-            m_WeaponController.SetMuzzlePosition(ResolveMuzzlePosition());
-            UpdateCriticalAxis();
-
-            if (inventoryOpen)
-            {
-                // 翻背包时松开扳机。否则关掉背包的瞬间会立刻打出一发，
-                // 而玩家以为自己刚才只是在整理东西。
-                m_WeaponController.SetTriggerHeld(false);
-            }
-            else
-            {
-                CollectCombatInput();
-            }
-
-            m_WeaponController.Tick(deltaTime);
-        }
-
-        /// <summary>把装备槽里的主武器同步到手持武器状态。</summary>
-        private void SyncEquippedWeapon()
-        {
-            var weaponItem = m_Loadout?.Equipment?.Get(EquipmentSlot.PrimaryWeapon);
-            var stats = weaponItem?.Definition?.WeaponStats;
-
-            if (m_WeaponController.SyncEquippedWeapon(stats) && stats != null)
-            {
-                // M1 留下的推迟项 P-08：准星的最大距离改为由当前武器射程决定，
-                // 而不是一个写死的常数。换枪之后准星能标出的范围随之变化。
-                m_InputCollector?.SetMaxAimDistance(stats.RangeMeters);
-            }
         }
 
         /// <summary>取枪口世界坐标。</summary>
