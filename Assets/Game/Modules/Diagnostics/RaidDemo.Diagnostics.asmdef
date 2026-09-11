@@ -1,21 +1,15 @@
 {
-    "name": "RaidDemo.Bootstrap",
-    "rootNamespace": "RaidDemo.Bootstrap",
+    "name": "RaidDemo.Diagnostics",
+    "rootNamespace": "RaidDemo.Diagnostics",
     "references": [
         "RaidDemo.Kernel.Pure",
-        "RaidDemo.Kernel.Unity",
         "RaidDemo.Shared",
-        "RaidDemo.Simulation",
-        "RaidDemo.Input",
-        "RaidDemo.Presentation",
-        "RaidDemo.Data",
-        "RaidDemo.Data.Content",
-        "RaidDemo.Inventory",
         "RaidDemo.Combat",
         "RaidDemo.AI",
-        "RaidDemo.Diagnostics",
+        "RaidDemo.Presentation",
         "RaidDemo.UI",
-        "Unity.AI.Navigation"
+        "Unity.InputSystem",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

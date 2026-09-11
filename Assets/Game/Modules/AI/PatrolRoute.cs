@@ -65,5 +65,30 @@ namespace RaidDemo.AI
         {
             get { return m_Index; }
         }
+
+        /// <summary>
+        /// 把全部路径点复制到调用方提供的列表里。
+        /// </summary>
+        /// <param name="destination">目标列表，会先被清空。</param>
+        /// <returns>复制的路径点数量。</returns>
+        /// <remarks>
+        /// 仅供调试可视化绘制巡逻路线使用，逻辑层自己不调用它。
+        /// 采用"复制到传入的列表"而不是暴露内部集合，理由见 <see cref="AiMovement.CopyWaypoints"/>。
+        /// </remarks>
+        public int CopyPoints(List<Vector2F> destination)
+        {
+            if (destination == null)
+            {
+                return 0;
+            }
+
+            destination.Clear();
+            for (var i = 0; i < m_Points.Count; i++)
+            {
+                destination.Add(m_Points[i]);
+            }
+
+            return destination.Count;
+        }
     }
 }

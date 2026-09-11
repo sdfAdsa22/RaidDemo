@@ -162,7 +162,13 @@ namespace RaidDemo.Presentation
         }
 
         /// <summary>状态到灰盒颜色的对照表。</summary>
-        private static Color ResolveColor(AiStateId state)
+        /// <param name="state">AI 状态。</param>
+        /// <remarks>
+        /// 公开成静态方法而不是留一个私有表：开发者模式也要按同一套颜色画视野锥，
+        /// 两处各写一份迟早会出现"胶囊是红的、扇形还是绿的"这种不一致，
+        /// 而颜色不一致会直接误导调试判断。
+        /// </remarks>
+        public static Color ResolveColor(AiStateId state)
         {
             switch (state)
             {

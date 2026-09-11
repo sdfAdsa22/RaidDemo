@@ -152,6 +152,33 @@ namespace RaidDemo.AI
             m_RepathTimer = 0f;
         }
 
+        /// <summary>
+        /// 把当前尚未走完的路径点复制到调用方提供的列表里。
+        /// </summary>
+        /// <param name="destination">目标列表。会先被清空。</param>
+        /// <returns>复制的路径点数量。</returns>
+        /// <remarks>
+        /// <para>仅供调试可视化读取，逻辑层自己不使用它。</para>
+        /// <para><b>为什么是"复制到传入的列表"而不是对外暴露只读集合：</b>把内部列表包装成
+        /// <c>IReadOnlyList</c> 返回看似安全，但调用方一旦把它转回 <c>List</c> 就能直接改内部状态，
+        /// 而"AI 的路径被界面改坏"这种缺陷极难定位。复制一次的开销只在调试开关打开时发生。</para>
+        /// </remarks>
+        public int CopyWaypoints(List<Vector2F> destination)
+        {
+            if (destination == null)
+            {
+                return 0;
+            }
+
+            destination.Clear();
+            for (var i = 0; i < m_Path.Count; i++)
+            {
+                destination.Add(m_Path[i]);
+            }
+
+            return destination.Count;
+        }
+
         /// <summary>决定本帧是否需要重新寻路，并在需要时执行一次。</summary>
         private void UpdatePath(Vector2F from, Vector2F goal, float deltaTime)
         {

@@ -68,6 +68,12 @@ namespace RaidDemo.Bootstrap
         private float m_RespawnTimer;
         private bool m_PlayerDeathHandled;
 
+        /// <summary>本帧交给 AI 的目标快照。开发者模式读的也是这一份。</summary>
+        private AiTargetInfo m_CurrentAiTarget = AiTargetInfo.None;
+
+        /// <summary>玩家当前的噪音档位。每帧计算，供噪音广播与开发者模式共用。</summary>
+        private MovementNoiseTier m_CurrentNoiseTier = MovementNoiseTier.Silent;
+
         /// <summary>AI 调度器，供调试与测试读取。</summary>
         public AiDirector Ai
         {
@@ -127,6 +133,7 @@ namespace RaidDemo.Bootstrap
             BuildDamageFeedback();
             SpawnEnemies();
             EnablePhysicsAutoSync();
+            BuildDebugTools();
         }
 
         /// <summary>
@@ -267,19 +274,25 @@ namespace RaidDemo.Bootstrap
                 PlayerMaxHealth,
                 playerAlive);
 
-            m_AiDirector.SetTarget(new AiTargetInfo(
+            // 快照只构造一次并交给两个使用者：调度器与开发者模式。
+            // 若两边各构造一份，调试面板显示的位置会比 AI 实际使用的晚一帧，
+            // 看起来就像"AI 在追空气"。
+            m_CurrentAiTarget = new AiTargetInfo(
                 m_PlayerCombatantId,
                 m_MoveHandler != null ? m_MoveHandler.Simulator.State.Position : Vector2F.Zero,
                 m_PlayerTargetView != null ? m_PlayerTargetView.CenterWorldPosition : transform.position,
-                playerAlive));
+                playerAlive);
+            m_AiDirector.SetTarget(m_CurrentAiTarget);
 
             if (playerAlive)
             {
                 m_PlayerDeathHandled = false;
-                BroadcastMovementNoise(deltaTime, inputBlocked);
+                UpdatePlayerNoise(deltaTime, inputBlocked);
             }
             else
             {
+                // 阵亡即静音：噪音是"移动发出的声音"，而尸体不会跑动。
+                m_CurrentNoiseTier = MovementNoiseTier.Silent;
                 HandlePlayerDeath(deltaTime);
             }
 
@@ -295,8 +308,19 @@ namespace RaidDemo.Bootstrap
         /// <para>噪音档位由速度与负重状态共同决定（见 <see cref="MovementNoiseRules"/>）：
         /// 负重超载时即使走得慢，声音也比正常步行大——这是贪婪循环的反馈机制。</para>
         /// </remarks>
-        private void BroadcastMovementNoise(float deltaTime, bool inputBlocked)
+        private void UpdatePlayerNoise(float deltaTime, bool inputBlocked)
         {
+            // 档位每帧都算，但只在采样间隔到时才广播：
+            // 开发者模式要显示"此刻有多吵"，而广播频率必须远低于帧率（理由见下）。
+            var speed = m_MoveHandler != null ? m_MoveHandler.Simulator.State.CurrentSpeed : 0f;
+            var overloaded = m_LastEncumbranceState == EncumbranceState.Overloaded;
+
+            // 打开背包时不广播噪音，面板也应当显示静止——**显示必须与实际广播一致**，
+            // 否则调试时会反复怀疑"明明在跑，为什么旁边的敌人没反应"。
+            m_CurrentNoiseTier = inputBlocked
+                ? MovementNoiseTier.Silent
+                : MovementNoiseRules.Classify(speed, m_MovementProfile.SprintSpeedThreshold, overloaded);
+
             m_NoiseTimer -= deltaTime;
             if (m_NoiseTimer > 0f)
             {
@@ -305,11 +329,7 @@ namespace RaidDemo.Bootstrap
 
             m_NoiseTimer = NoiseBroadcastInterval;
 
-            var speed = m_MoveHandler != null ? m_MoveHandler.Simulator.State.CurrentSpeed : 0f;
-            var overloaded = m_LastEncumbranceState == EncumbranceState.Overloaded;
-            var tier = MovementNoiseRules.Classify(speed, m_MovementProfile.SprintSpeedThreshold, overloaded);
-
-            if (tier == MovementNoiseTier.Silent || inputBlocked)
+            if (m_CurrentNoiseTier == MovementNoiseTier.Silent)
             {
                 return;
             }
@@ -318,7 +338,7 @@ namespace RaidDemo.Bootstrap
             var noise = new MovementNoiseEvent(
                 m_InputCollector != null ? m_InputCollector.PlayerId : 0,
                 position,
-                tier);
+                m_CurrentNoiseTier);
 
             m_EventBus.Publish(noise);
             m_AiDirector.ReportNoise(noise);

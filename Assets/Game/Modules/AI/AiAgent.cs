@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using RaidDemo.Combat;
 using RaidDemo.Shared;
 
@@ -255,6 +256,20 @@ namespace RaidDemo.AI
         public void ResetPath()
         {
             m_Movement.ResetPath();
+        }
+
+        /// <summary>
+        /// 复制当前寻路路径点，供调试可视化绘制。
+        /// </summary>
+        /// <param name="destination">目标列表，会先被清空。</param>
+        /// <returns>路径点数量。</returns>
+        /// <remarks>
+        /// 逻辑层不使用这个方法。它的存在只为让开发者模式能画出"AI 打算怎么绕过去"，
+        /// 因此刻意保持只读（复制而非暴露内部集合，理由见 <see cref="AiMovement.CopyWaypoints"/>）。
+        /// </remarks>
+        public int CopyPathWaypoints(List<Vector2F> destination)
+        {
+            return m_Movement.CopyWaypoints(destination);
         }
 
         /// <summary>刷新本帧的感知快照。</summary>

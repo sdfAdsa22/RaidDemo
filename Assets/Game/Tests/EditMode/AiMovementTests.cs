@@ -126,5 +126,45 @@ namespace RaidDemo.Tests.EditMode
 
             Assert.AreEqual(before + 1, m_Pathfinding.CallCount, "丢弃路径之后应当立刻重新寻路。");
         }
+
+        [Test]
+        public void CopyWaypoints_ExportsPathForDiagnostics()
+        {
+            m_Pathfinding.SetWaypoints(new Vector2F(0f, 5f), new Vector2F(10f, 5f));
+            m_Movement.Step(Vector2F.Zero, new Vector2F(10f, 0f), 2f, 0.1f);
+
+            var exported = new System.Collections.Generic.List<Vector2F>();
+            var count = m_Movement.CopyWaypoints(exported);
+
+            Assert.AreEqual(2, count, "应当导出当前路径上的两个路径点。");
+            Assert.AreEqual(new Vector2F(0f, 5f), exported[0]);
+            Assert.AreEqual(new Vector2F(10f, 5f), exported[1]);
+        }
+
+        [Test]
+        public void CopyWaypoints_ClearsDestinationAndDoesNotAffectInternalPath()
+        {
+            m_Pathfinding.SetWaypoints(new Vector2F(0f, 5f), new Vector2F(10f, 5f));
+            m_Movement.Step(Vector2F.Zero, new Vector2F(10f, 0f), 2f, 0.1f);
+
+            // 传入一个已有内容的列表：导出前必须被清空，否则调试绘制会把两次的结果混在一起。
+            var exported = new System.Collections.Generic.List<Vector2F>
+            {
+                new Vector2F(99f, 99f),
+                new Vector2F(98f, 98f),
+                new Vector2F(97f, 97f),
+            };
+
+            var count = m_Movement.CopyWaypoints(exported);
+            Assert.AreEqual(2, count);
+
+            // 改坏导出结果之后，内部路径必须完好——这正是"复制而不是暴露内部集合"要保证的事。
+            exported.Clear();
+            exported.Add(new Vector2F(-1f, -1f));
+
+            var again = new System.Collections.Generic.List<Vector2F>();
+            Assert.AreEqual(2, m_Movement.CopyWaypoints(again), "内部路径不应当被调用方改坏。");
+            Assert.AreEqual(new Vector2F(0f, 5f), again[0]);
+        }
     }
 }
