@@ -28,7 +28,15 @@ namespace RaidDemo.Presentation
         /// <summary>圆弧距离角色脚底的高度（米）。</summary>
         private const float Height = 2.35f;
 
-        /// <summary>圆弧覆盖的角度范围（度）。留出缺口，读起来更像一条进度条而不是一个圈。</summary>
+        /// <summary>
+        /// 圆弧覆盖的角度范围（度）。
+        /// </summary>
+        /// <remarks>
+        /// 留出缺口，读起来更像一条进度条而不是一个圈。
+        /// 缺口开在**正下方**，因此圆弧是向上拱起的拱形，
+        /// 而不是向下垂的碗形——拱形悬在角色头顶更像"体力条"，
+        /// 碗形则像是挂在角色身下的东西。
+        /// </remarks>
         private const float SweepDegrees = 260f;
 
         /// <summary>用于绘制圆弧的线段数。越多越圆滑，36 段在灰盒阶段已经看不出折角。</summary>
@@ -37,20 +45,14 @@ namespace RaidDemo.Presentation
         /// <summary>线条宽度（米）。</summary>
         private const float LineWidth = 0.06f;
 
-        /// <summary>体力低于该比例时变为警示色。</summary>
-        private const float LowStaminaRatio = 0.3f;
-
         /// <summary>体力满之后圆弧完全淡出所需的秒数。</summary>
         private const float FadeOutSeconds = 0.6f;
 
         /// <summary>满体力时的透明度。0 表示完全隐藏。</summary>
         private const float HiddenAlpha = 0f;
 
-        /// <summary>正常状态下的弧度颜色。</summary>
-        private static readonly Color FillColor = new Color(0.35f, 0.85f, 0.95f, 0.95f);
-
-        /// <summary>体力偏低时的弧度颜色。</summary>
-        private static readonly Color LowColor = new Color(1f, 0.65f, 0.25f, 0.95f);
+        /// <summary>正常状态下的弧度颜色。白色在灰盒与各种底色上都最清楚。</summary>
+        private static readonly Color FillColor = new Color(1f, 1f, 1f, 0.95f);
 
         /// <summary>力竭时的弧度颜色。</summary>
         private static readonly Color ExhaustedColor = new Color(1f, 0.3f, 0.3f, 0.95f);
@@ -158,7 +160,11 @@ namespace RaidDemo.Presentation
             for (var i = 0; i < total; i++)
             {
                 var t = total > 1 ? (float)i / (total - 1) : 0f;
-                var degrees = -90f - (SweepDegrees * 0.5f) + (SweepDegrees * clamped * t);
+
+                // 以正上方（90 度）为中心，向两侧各展开一半；
+                // 角度递减，因此填充从**左下**起、经顶部、长到右下，
+                // 与普通进度条的"从左往右"一致。
+                var degrees = 90f + (SweepDegrees * 0.5f) - (SweepDegrees * clamped * t);
                 var radians = degrees * Mathf.Deg2Rad;
                 line.SetPosition(i, new Vector3(Mathf.Cos(radians) * Radius, Mathf.Sin(radians) * Radius, 0f));
             }
@@ -171,7 +177,7 @@ namespace RaidDemo.Presentation
 
             var color = m_IsExhausted
                 ? ExhaustedColor
-                : ratio <= LowStaminaRatio ? LowColor : FillColor;
+                : FillColor;
 
             // 透明度跟随可见度：满体力时整条圆弧淡出，而不是突然消失。
             color.a *= m_Visibility;
