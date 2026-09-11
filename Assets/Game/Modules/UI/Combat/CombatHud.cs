@@ -23,8 +23,13 @@ namespace RaidDemo.UI
         /// <summary>界面参考高度。</summary>
         private const float ReferenceHeight = 1080f;
 
-        /// <summary>面板到屏幕右下角的边距（像素）。</summary>
-        /// <remarks>取 56 而不是贴边的 20~30：HUD 压在最角落时容易被玩家忽略，也容易被屏幕边框切掉。</remarks>
+        /// <summary>面板到屏幕左下角的边距（像素）。</summary>
+        /// <remarks>
+        /// <para>取 56 而不是贴边的 20~30：HUD 压在最角落时容易被玩家忽略，也容易被屏幕边框切掉。</para>
+        /// <para>情报放在**左下角**而不是右下角：右下角在 Game 视图"Play Maximized"等
+        /// 显示模式下容易贴近窗口边缘被裁掉，而左下角在灰盒场景里也是空的
+        /// （背包面板居中，不会覆盖到这里）。</para>
+        /// </remarks>
         private const float Margin = 56f;
 
         /// <summary>面板宽度（像素）。</summary>
@@ -170,10 +175,10 @@ namespace RaidDemo.UI
             var backHost = new GameObject("ReloadBarBack", typeof(RectTransform), typeof(Image));
             var backRect = (RectTransform)backHost.transform;
             backRect.SetParent(parent, worldPositionStays: false);
-            backRect.anchorMin = new Vector2(1f, 0f);
-            backRect.anchorMax = new Vector2(1f, 0f);
-            backRect.pivot = new Vector2(1f, 0f);
-            backRect.anchoredPosition = new Vector2(-Margin, Margin + 14f);
+            backRect.anchorMin = new Vector2(0f, 0f);
+            backRect.anchorMax = new Vector2(0f, 0f);
+            backRect.pivot = new Vector2(0f, 0f);
+            backRect.anchoredPosition = new Vector2(Margin, Margin + 14f);
             backRect.sizeDelta = new Vector2(PanelWidth, BarHeight);
 
             var backImage = backHost.GetComponent<Image>();
@@ -210,19 +215,19 @@ namespace RaidDemo.UI
             var rect = (RectTransform)host.transform;
             rect.SetParent(parent, worldPositionStays: false);
 
-            // 固定尺寸 + 右对齐锚点：右边缘钉在距屏幕右缘 Margin 处，
-            // 文字向左展开。宽度取足够大，避免任何情况下发生换行。
-            rect.anchorMin = new Vector2(1f, 0f);
-            rect.anchorMax = new Vector2(1f, 0f);
-            rect.pivot = new Vector2(1f, 0f);
-            rect.anchoredPosition = new Vector2(-Margin, bottom);
+            // 固定尺寸 + 左对齐锚点：左边缘钉在距屏幕左缘 Margin 处，文字向右展开。
+            // 宽度取足够大，避免任何情况下发生换行。
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(0f, 0f);
+            rect.pivot = new Vector2(0f, 0f);
+            rect.anchoredPosition = new Vector2(Margin, bottom);
             rect.sizeDelta = new Vector2(PanelWidth, height);
 
             var text = host.GetComponent<Text>();
             text.font = UiFontProvider.Get(fontSize);
             text.fontSize = fontSize;
             text.text = content;
-            text.alignment = TextAnchor.LowerRight;
+            text.alignment = TextAnchor.LowerLeft;
             text.color = color;
 
             // 溢出显示而不是换行：文字一旦略宽于矩形，默认的自动换行会把后半段
