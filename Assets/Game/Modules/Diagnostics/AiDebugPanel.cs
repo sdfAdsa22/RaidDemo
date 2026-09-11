@@ -154,7 +154,7 @@ namespace RaidDemo.Diagnostics
             return string.Format(
                 System.Globalization.CultureInfo.InvariantCulture,
                 "参数：必定发现 {0:F0} 米　警惕到 {1:F0} 米　视角 {2:F0}°　听觉 {3:F0}/{4:F0}/{5:F0} 米\n" +
-                "　　　反应：必定 {6:F1}s／警惕确认 {7:F1}s　记忆 {8:F1}s",
+                "　　　反应：必定 {6:F1}s／警惕确认 {7:F1}s　记忆 {8:F1}s　枪声＝武器射程",
                 profile.GuaranteedDetectionDistance,
                 profile.ViewDistanceMeters,
                 profile.ViewAngleDegrees,
@@ -193,15 +193,15 @@ namespace RaidDemo.Diagnostics
         }
 
         /// <summary>噪音档位的中文名。</summary>
-        private static string DescribeNoiseTier(MovementNoiseTier tier)
+        private static string DescribeNoiseTier(NoiseTier tier)
         {
             switch (tier)
             {
-                case MovementNoiseTier.Walk:
+                case NoiseTier.Walk:
                     return "步行";
-                case MovementNoiseTier.Sprint:
+                case NoiseTier.Sprint:
                     return "奔跑";
-                case MovementNoiseTier.Overloaded:
+                case NoiseTier.Overloaded:
                     return "超载";
                 default:
                     return "静止";

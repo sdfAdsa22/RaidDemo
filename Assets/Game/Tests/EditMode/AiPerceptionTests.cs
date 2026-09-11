@@ -25,9 +25,9 @@ namespace RaidDemo.Tests.EditMode
             {
                 ViewAngleDegrees = 100f,
                 ViewDistanceMeters = 20f,
-                HearingRadiusWalk = 8f,
-                HearingRadiusSprint = 18f,
-                HearingRadiusOverloaded = 26f,
+                HearingRadiusWalk = 4f,
+                HearingRadiusSprint = 8f,
+                HearingRadiusOverloaded = 12f,
             };
         }
 
@@ -137,23 +137,27 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void Hearing_RadiusFollowsTier()
         {
-            Assert.AreEqual(0f, m_Profile.HearingRadiusFor(MovementNoiseTier.Silent), "静止应当完全静默。");
-            Assert.AreEqual(8f, m_Profile.HearingRadiusFor(MovementNoiseTier.Walk));
-            Assert.AreEqual(18f, m_Profile.HearingRadiusFor(MovementNoiseTier.Sprint));
-            Assert.AreEqual(26f, m_Profile.HearingRadiusFor(MovementNoiseTier.Overloaded));
+            Assert.AreEqual(0f, m_Profile.HearingRadiusFor(NoiseTier.Silent), "静止应当完全静默。");
+            Assert.AreEqual(4f, m_Profile.HearingRadiusFor(NoiseTier.Walk));
+            Assert.AreEqual(8f, m_Profile.HearingRadiusFor(NoiseTier.Sprint));
+            Assert.AreEqual(12f, m_Profile.HearingRadiusFor(NoiseTier.Overloaded));
+            Assert.AreEqual(
+                0f,
+                m_Profile.HearingRadiusFor(NoiseTier.Gunshot),
+                "枪声不走档位表：它的半径由武器射程决定（见 WeaponFiredEvent.NoiseRadiusMeters）。");
         }
 
         [Test]
         public void Hearing_SprintTravelsFurtherThanWalk()
         {
-            var noise = new Vector2F(12f, 0f);
+            var noise = new Vector2F(7f, 0f);
 
             Assert.IsTrue(
-                AISensor.CanHear(Vector2F.Zero, noise, MovementNoiseTier.Sprint, m_Profile),
-                "12 米处在奔跑噪音（18 米）范围内。");
+                AISensor.CanHear(Vector2F.Zero, noise, m_Profile.HearingRadiusFor(NoiseTier.Sprint)),
+                "7 米处在奔跑噪音（8 米）范围内。");
             Assert.IsFalse(
-                AISensor.CanHear(Vector2F.Zero, noise, MovementNoiseTier.Walk, m_Profile),
-                "12 米处超出了步行噪音（8 米）范围。");
+                AISensor.CanHear(Vector2F.Zero, noise, m_Profile.HearingRadiusFor(NoiseTier.Walk)),
+                "7 米处超出了步行噪音（4 米）范围。");
         }
 
         [Test]
@@ -165,7 +169,7 @@ namespace RaidDemo.Tests.EditMode
                 sprintSpeedThreshold: 4.5f,
                 isOverloaded: true);
 
-            Assert.AreEqual(MovementNoiseTier.Overloaded, tier, "超载移动应当按超载档计噪。");
+            Assert.AreEqual(NoiseTier.Overloaded, tier, "超载移动应当按超载档计噪。");
         }
 
         [Test]
@@ -177,7 +181,7 @@ namespace RaidDemo.Tests.EditMode
                 isOverloaded: true);
 
             Assert.AreEqual(
-                MovementNoiseTier.Silent,
+                NoiseTier.Silent,
                 tier,
                 "站着不动必须静音，否则玩家无法通过停下来摆脱追踪。");
         }

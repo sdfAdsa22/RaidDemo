@@ -114,6 +114,8 @@ namespace RaidDemo.Bootstrap
         private void OnDestroy()
         {
             // 释放订阅。AI 调度器订阅了伤害事件，漏掉这一步会在退出播放模式时留下悬挂引用。
+            m_WeaponNoiseSubscription?.Dispose();
+            m_WeaponNoiseSubscription = null;
             m_AiDirector?.Dispose();
             ServiceLocatorHolder.Clear();
             m_Services?.Clear();

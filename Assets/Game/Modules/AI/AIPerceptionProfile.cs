@@ -203,17 +203,19 @@ namespace RaidDemo.AI
         /// </summary>
         /// <param name="tier">噪音档位。</param>
         /// <returns>可听半径（米）。静音返回 0。</returns>
-        public float HearingRadiusFor(MovementNoiseTier tier)
+        public float HearingRadiusFor(NoiseTier tier)
         {
             switch (tier)
             {
-                case MovementNoiseTier.Walk:
+                case NoiseTier.Walk:
                     return HearingRadiusWalk;
-                case MovementNoiseTier.Sprint:
+                case NoiseTier.Sprint:
                     return HearingRadiusSprint;
-                case MovementNoiseTier.Overloaded:
+                case NoiseTier.Overloaded:
                     return HearingRadiusOverloaded;
                 default:
+                    // 枪声不走这张表：它的半径由**武器射程**决定（见 WeaponFiredEvent.NoiseRadiusMeters），
+                    // 因此手枪比步枪安静。档位在这里只是归类用的标签。
                     return 0f;
             }
         }

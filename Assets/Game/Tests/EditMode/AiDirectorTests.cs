@@ -30,10 +30,7 @@ namespace RaidDemo.Tests.EditMode
             var far = m_Fixture.SpawnAgent(new Vector2F(25f, 0f));
 
             // 奔跑档的可听半径默认 8 米：近处 AI 听得到，25 米外的听不到。
-            m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
-                sourceId: 0,
-                position: Vector2F.Zero,
-                tier: MovementNoiseTier.Sprint));
+            m_Fixture.ReportMovementNoise(Vector2F.Zero, NoiseTier.Sprint);
 
             m_Fixture.Advance(0.1f);
 
@@ -47,10 +44,7 @@ namespace RaidDemo.Tests.EditMode
             // 11 米处：奔跑（8 米）听不到，超载（12 米）听得到。
             var far = m_Fixture.SpawnAgent(new Vector2F(11f, 0f));
 
-            m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
-                sourceId: 0,
-                position: Vector2F.Zero,
-                tier: MovementNoiseTier.Sprint));
+            m_Fixture.ReportMovementNoise(Vector2F.Zero, NoiseTier.Sprint);
 
             m_Fixture.Advance(0.1f);
 
@@ -59,10 +53,7 @@ namespace RaidDemo.Tests.EditMode
                 far.CurrentState,
                 "前置条件：11 米超出奔跑档（8 米），此时它应当还没有反应。");
 
-            m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
-                sourceId: 0,
-                position: Vector2F.Zero,
-                tier: MovementNoiseTier.Overloaded));
+            m_Fixture.ReportMovementNoise(Vector2F.Zero, NoiseTier.Overloaded);
 
             m_Fixture.Advance(0.1f);
 
@@ -70,6 +61,46 @@ namespace RaidDemo.Tests.EditMode
                 AiStateId.Investigate,
                 far.CurrentState,
                 "超载档（12 米）应当能惊动奔跑档（8 米）听不到的距离。");
+        }
+
+        [Test]
+        public void Noise_GunshotRadiusComesFromTheWeapon_NotFromTheTierTable()
+        {
+            // 10 米处的听者：手枪枪声（8 米）够不着，步枪枪声（12 米）够得着。
+            // 这条用例锁定"枪声半径来自武器射程"这件事——它是数据驱动的，
+            // 而不是查档位表（对枪声本来就没有档位半径）。
+            var listener = m_Fixture.SpawnAgent(new Vector2F(10f, 0f));
+
+            m_Fixture.ReportGunshot(Vector2F.Zero, radiusMeters: 8f);
+
+            m_Fixture.Advance(0.1f);
+
+            Assert.AreEqual(
+                AiStateId.Patrol,
+                listener.CurrentState,
+                "前置条件：10 米超出 8 米的手枪枪声范围，此时它应当还没有反应。");
+
+            m_Fixture.ReportGunshot(Vector2F.Zero, radiusMeters: 12f);
+
+            m_Fixture.Advance(0.1f);
+
+            Assert.AreEqual(
+                AiStateId.Investigate,
+                listener.CurrentState,
+                "12 米的步枪枪声应当惊动 10 米处的敌人——同一把枪打得到多远，就吵到多远。");
+        }
+
+        [Test]
+        public void Noise_ShooterDoesNotHearItsOwnShot()
+        {
+            var shooter = m_Fixture.SpawnAgent(new Vector2F(0f, 0f));
+
+            // 声源标识与 AI 自己的单位标识一致：它不应当因为自己的枪声而去调查。
+            m_Fixture.ReportGunshot(Vector2F.Zero, radiusMeters: 12f, sourceId: shooter.CombatantId);
+
+            m_Fixture.Advance(0.2f);
+
+            Assert.AreEqual(AiStateId.Patrol, shooter.CurrentState, "AI 不应当被自己的枪声惊动。");
         }
 
         [Test]

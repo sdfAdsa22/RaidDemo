@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using RaidDemo.AI;
+using RaidDemo.Combat;
 using RaidDemo.Kernel;
 using RaidDemo.Presentation;
 using RaidDemo.Shared;
@@ -42,6 +43,12 @@ namespace RaidDemo.Diagnostics
         private static readonly Color ReferenceRingColor = new Color(0.45f, 0.62f, 0.9f, 0.32f);
         private static readonly Color SightLineColor = new Color(1f, 0.95f, 0.6f, 0.9f);
 
+        /// <summary>枪声圈的显示时长（秒）。比一次点射的间隔略长，便于看清。</summary>
+        private const float GunshotFlashSeconds = 0.4f;
+
+        /// <summary>枪声圈的颜色。刻意用高亮度，与其他圈区分开。</summary>
+        private static readonly Color GunshotRingColor = new Color(1f, 0.96f, 0.8f, 0.95f);
+
         private static readonly Color WalkRingColor = new Color(0.55f, 0.95f, 0.55f, 0.6f);
         private static readonly Color SprintRingColor = new Color(1f, 0.72f, 0.3f, 0.7f);
         private static readonly Color OverloadedRingColor = new Color(1f, 0.35f, 0.3f, 0.8f);
@@ -54,6 +61,10 @@ namespace RaidDemo.Diagnostics
         private AiDebugLabels m_Labels;
         private AiDebugPanel m_Panel;
         private IAiDebugContext m_Context;
+        private System.IDisposable m_WeaponNoiseSubscription;
+        private Vector3 m_GunshotPosition;
+        private float m_GunshotRadius;
+        private float m_GunshotFlashRemaining;
         private bool m_WorldVisible;
         private bool m_PanelVisible;
 
@@ -106,6 +117,10 @@ namespace RaidDemo.Diagnostics
             m_Panel = gameObject.AddComponent<AiDebugPanel>();
             m_Panel.Initialize(context, transform, eventBus);
 
+            // 枪声是全图最吵的声源（默认 20 米），但它是瞬时的：听者只会看到"AI 突然朝那边走"。
+            // 开火后短暂画一圈，才能把"这一枪惊动了多远"直接摆到眼前。
+            m_WeaponNoiseSubscription = eventBus?.Subscribe<WeaponFiredEvent>(OnWeaponFired);
+
             // 默认全关：调试工具的初始状态必须是"不存在"。
             SetWorldVisible(false);
             SetPanelVisible(false);
@@ -132,6 +147,8 @@ namespace RaidDemo.Diagnostics
 
         private void OnDestroy()
         {
+            m_WeaponNoiseSubscription?.Dispose();
+            m_WeaponNoiseSubscription = null;
             m_Shapes?.Dispose();
             m_Shapes = null;
         }
@@ -139,6 +156,11 @@ namespace RaidDemo.Diagnostics
         private void Update()
         {
             HandleToggleKeys();
+
+            if (m_GunshotFlashRemaining > 0f)
+            {
+                m_GunshotFlashRemaining -= Time.deltaTime;
+            }
 
             if (m_Context == null || (!m_WorldVisible && !m_PanelVisible))
             {
@@ -185,6 +207,7 @@ namespace RaidDemo.Diagnostics
             m_Shapes.BeginFrame();
 
             DrawPlayerNoiseRings();
+            DrawGunshotRing();
 
             var entries = m_Snapshot.Entries;
             for (var i = 0; i < entries.Count; i++)
@@ -227,6 +250,30 @@ namespace RaidDemo.Diagnostics
             }
 
             m_Shapes.DrawCircle(center, radius, ResolveNoiseColor(m_Snapshot.PlayerNoiseTier));
+        }
+
+        /// <summary>刚开过枪时，在枪口位置画一圈枪声半径。</summary>
+        private void DrawGunshotRing()
+        {
+            if (m_GunshotFlashRemaining <= 0f || m_GunshotRadius <= 0f)
+            {
+                return;
+            }
+
+            var fade = m_GunshotFlashRemaining / GunshotFlashSeconds;
+            var color = GunshotRingColor;
+            color.a *= fade;
+
+            m_Shapes.DrawCircle(m_GunshotPosition, m_GunshotRadius, color);
+        }
+
+        /// <summary>记录一次枪声，用于下一帧起短暂画出它的可听范围。</summary>
+        private void OnWeaponFired(WeaponFiredEvent evt)
+        {
+            m_GunshotPosition = new Vector3(evt.Origin.x, 0f, evt.Origin.z);
+            // 半径取自开火方：手枪 8 米、步枪 12 米，画出来就能直接对比不同武器的暴露范围。
+            m_GunshotRadius = evt.NoiseRadiusMeters;
+            m_GunshotFlashRemaining = GunshotFlashSeconds;
         }
 
         /// <summary>绘制单个 AI 的视野锥、视线、路线、路径与记忆点。</summary>
@@ -331,15 +378,15 @@ namespace RaidDemo.Diagnostics
         }
 
         /// <summary>噪音档位对应的高亮颜色：越吵越红。</summary>
-        private static Color ResolveNoiseColor(MovementNoiseTier tier)
+        private static Color ResolveNoiseColor(NoiseTier tier)
         {
             switch (tier)
             {
-                case MovementNoiseTier.Walk:
+                case NoiseTier.Walk:
                     return WalkRingColor;
-                case MovementNoiseTier.Sprint:
+                case NoiseTier.Sprint:
                     return SprintRingColor;
-                case MovementNoiseTier.Overloaded:
+                case NoiseTier.Overloaded:
                     return OverloadedRingColor;
                 default:
                     return ReferenceRingColor;

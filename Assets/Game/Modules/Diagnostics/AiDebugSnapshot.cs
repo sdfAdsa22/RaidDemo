@@ -62,7 +62,7 @@ namespace RaidDemo.Diagnostics
         public AiTargetInfo Target { get; private set; }
 
         /// <summary>玩家当前的噪音档位。</summary>
-        public MovementNoiseTier PlayerNoiseTier { get; private set; }
+        public NoiseTier PlayerNoiseTier { get; private set; }
 
         /// <summary>玩家当前档位对应的可听半径（米）。</summary>
         public float PlayerNoiseRadiusMeters { get; private set; }

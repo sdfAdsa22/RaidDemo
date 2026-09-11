@@ -56,8 +56,14 @@ namespace RaidDemo.AI
         /// <summary>停火后每秒回落的散布（度/秒）。</summary>
         public float SpreadRecoveryPerSecond { get; set; } = 5f;
 
-        /// <summary>有效射程（米）。</summary>
-        public float RangeMeters { get; set; } = 32f;
+        /// <summary>
+        /// 有效射程（米）。同时也是这把枪的枪声半径。
+        /// </summary>
+        /// <remarks>
+        /// 取 12 米与玩家的 AK-74 一致：AI 实际上只在 6 米内开火（受必定发现距离限制），
+        /// 射程写得更远只会让它的枪声范围无端变大，把别的 AI 从很远的地方引过来。
+        /// </remarks>
+        public float RangeMeters { get; set; } = 12f;
 
         /// <summary>
         /// 创建一把默认的灰盒 AI 步枪。

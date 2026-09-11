@@ -163,7 +163,9 @@ namespace RaidDemo.AI
                 origin,
                 endPoint,
                 didHit,
-                targetId));
+                targetId,
+                // 与玩家同一规则：枪声半径 = 武器射程。
+                weapon.RangeMeters));
         }
 
         /// <summary>对命中目标结算伤害。与玩家走同一条结算路径。</summary>

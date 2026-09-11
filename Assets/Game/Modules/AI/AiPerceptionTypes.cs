@@ -122,7 +122,7 @@ namespace RaidDemo.AI
         public Vector2F NoisePosition;
 
         /// <summary>噪音档位。</summary>
-        public MovementNoiseTier NoiseTier;
+        public NoiseTier NoiseTier;
 
         /// <summary>自上一帧以来是否挨过打。</summary>
         public bool WasDamaged;
@@ -142,7 +142,7 @@ namespace RaidDemo.AI
         {
             HeardNoise = false;
             NoisePosition = Vector2F.Zero;
-            NoiseTier = MovementNoiseTier.Silent;
+            NoiseTier = NoiseTier.Silent;
             WasDamaged = false;
             DamageSourcePosition = Vector2F.Zero;
             DamageSourceId = 0;

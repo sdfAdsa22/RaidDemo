@@ -203,5 +203,27 @@ namespace RaidDemo.Tests.EditMode
                 Director.Tick(stepSeconds);
             }
         }
+
+        /// <summary>
+        /// 发一次**移动**噪音：半径按档位表取自感知参数。
+        /// </summary>
+        /// <param name="position">声源位置。</param>
+        /// <param name="tier">档位。</param>
+        /// <param name="sourceId">声源标识。</param>
+        public void ReportMovementNoise(Vector2F position, NoiseTier tier, int sourceId = 0)
+        {
+            Director.ReportNoise(new NoiseEvent(sourceId, position, tier, Profile.HearingRadiusFor(tier)));
+        }
+
+        /// <summary>
+        /// 发一次**枪声**：半径由武器射程给出，而不是档位表。
+        /// </summary>
+        /// <param name="position">枪口位置。</param>
+        /// <param name="radiusMeters">这一枪的可听半径（步枪 12 米、手枪 8 米）。</param>
+        /// <param name="sourceId">射手标识。</param>
+        public void ReportGunshot(Vector2F position, float radiusMeters, int sourceId = 0)
+        {
+            Director.ReportNoise(new NoiseEvent(sourceId, position, NoiseTier.Gunshot, radiusMeters));
+        }
     }
 }

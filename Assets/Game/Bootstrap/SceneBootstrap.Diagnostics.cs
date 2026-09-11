@@ -73,7 +73,7 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <inheritdoc />
-        public MovementNoiseTier PlayerNoiseTier
+        public NoiseTier PlayerNoiseTier
         {
             get { return m_CurrentNoiseTier; }
         }

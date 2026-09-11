@@ -20,6 +20,10 @@ namespace RaidDemo.Combat
         /// <param name="endPoint">弹道终点世界坐标（命中点，或未命中时的射程末端）。</param>
         /// <param name="didHit">是否命中任何碰撞体。</param>
         /// <param name="hitTargetId">命中的可受击单位标识，0 表示没有。</param>
+        /// <param name="noiseRadiusMeters">
+        /// 这一枪的可听半径（米）。由开火方按自己的武器提供——枪声是"暴露位置"的主要来源，
+        /// 而不同武器的吵法不同（短管手枪比步枪安静）。
+        /// </param>
         /// <param name="timestamp">事件时间戳（秒）。</param>
         /// <param name="sequence">来源命令序号。</param>
         public WeaponFiredEvent(
@@ -28,6 +32,7 @@ namespace RaidDemo.Combat
             Vector3 endPoint,
             bool didHit,
             int hitTargetId,
+            float noiseRadiusMeters,
             double timestamp = 0d,
             uint sequence = 0u)
         {
@@ -36,6 +41,7 @@ namespace RaidDemo.Combat
             EndPoint = endPoint;
             DidHit = didHit;
             HitTargetId = hitTargetId;
+            NoiseRadiusMeters = noiseRadiusMeters;
             Timestamp = timestamp;
             Sequence = sequence;
         }
@@ -54,6 +60,15 @@ namespace RaidDemo.Combat
 
         /// <summary>命中的可受击单位标识，0 表示没有。</summary>
         public int HitTargetId { get; }
+
+        /// <summary>
+        /// 这一枪的可听半径（米）。
+        /// </summary>
+        /// <remarks>
+        /// 放在事件里而不是让听者去查"是谁开的枪、用的什么武器"：
+        /// 枪声的影响范围是**开火那一刻**的属性，事后再去反查既绕远又容易查错。
+        /// </remarks>
+        public float NoiseRadiusMeters { get; }
 
         /// <inheritdoc />
         public double Timestamp { get; }

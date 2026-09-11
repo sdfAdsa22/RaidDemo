@@ -38,6 +38,6 @@ namespace RaidDemo.Diagnostics
         int PlayerCombatantId { get; }
 
         /// <summary>玩家当前的噪音档位。</summary>
-        MovementNoiseTier PlayerNoiseTier { get; }
+        NoiseTier PlayerNoiseTier { get; }
     }
 }

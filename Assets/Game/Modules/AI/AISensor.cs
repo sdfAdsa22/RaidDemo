@@ -68,27 +68,19 @@ namespace RaidDemo.AI
         /// </summary>
         /// <param name="listenerPosition">听者位置。</param>
         /// <param name="noisePosition">噪音位置。</param>
-        /// <param name="tier">噪音档位。</param>
-        /// <param name="profile">感知参数。</param>
-        /// <remarks>声音不做遮挡判定，理由见 <see cref="MovementNoiseEvent"/> 的注释。</remarks>
+        /// <param name="radiusMeters">这次噪音的可听半径（米），取自 <see cref="NoiseEvent.RadiusMeters"/>。</param>
+        /// <remarks>声音不做遮挡判定，理由见 <see cref="NoiseEvent"/> 的注释。</remarks>
         public static bool CanHear(
             Vector2F listenerPosition,
             Vector2F noisePosition,
-            MovementNoiseTier tier,
-            AIPerceptionProfile profile)
+            float radiusMeters)
         {
-            if (profile == null)
+            if (radiusMeters <= 0f)
             {
                 return false;
             }
 
-            var radius = profile.HearingRadiusFor(tier);
-            if (radius <= 0f)
-            {
-                return false;
-            }
-
-            return Vector2F.SqrDistance(listenerPosition, noisePosition) <= radius * radius;
+            return Vector2F.SqrDistance(listenerPosition, noisePosition) <= radiusMeters * radiusMeters;
         }
 
         /// <summary>由平面位置与眼高计算眼睛的世界坐标。</summary>

@@ -121,12 +121,12 @@ namespace RaidDemo.Bootstrap.Editor
                     "9x19", damage: 18f, roundsPerMinute: 400f, fireMode: WeaponFireMode.Single,
                     burstCount: 1, magazineCapacity: 8, reloadSeconds: 1.8f,
                     baseSpread: 2.5f, spreadPerShot: 0.8f, maxSpread: 6f, spreadRecovery: 5f,
-                    rangeMeters: 25f),
+                    rangeMeters: 8f),
                 ["weapon.rifle.ak74"] = new WeaponSpec(
                     "5.45", damage: 25f, roundsPerMinute: 600f, fireMode: WeaponFireMode.Auto,
                     burstCount: 3, magazineCapacity: 30, reloadSeconds: 2.2f,
                     baseSpread: 1.5f, spreadPerShot: 0.5f, maxSpread: 6f, spreadRecovery: 4f,
-                    rangeMeters: 40f),
+                    rangeMeters: 12f),
             };
 
         /// <summary>

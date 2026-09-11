@@ -277,6 +277,9 @@ namespace RaidDemo.Combat
                 endPoint,
                 didHit,
                 targetId,
+                // 枪声半径 = 武器射程：本项目里"打得到多远"与"多远处能听见"是同一个数字，
+                // 短射程的手枪因此天然比步枪安静。将来加消音器时换成另一个值即可。
+                runtime.Weapon.RangeMeters,
                 0d,
                 m_Sequence));
         }

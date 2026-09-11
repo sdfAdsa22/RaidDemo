@@ -39,7 +39,7 @@ namespace RaidDemo.AI
 
         private bool m_PendingNoise;
         private Vector2F m_PendingNoisePosition;
-        private MovementNoiseTier m_PendingNoiseTier;
+        private NoiseTier m_PendingNoiseTier;
 
         private bool m_PendingDamage;
         private Vector2F m_PendingDamageSource;
@@ -228,7 +228,7 @@ namespace RaidDemo.AI
         }
 
         /// <summary>接收一次噪音刺激，下一帧统一消费。</summary>
-        public void EnqueueNoise(Vector2F position, MovementNoiseTier tier)
+        public void EnqueueNoise(Vector2F position, NoiseTier tier)
         {
             m_PendingNoise = true;
             m_PendingNoisePosition = position;

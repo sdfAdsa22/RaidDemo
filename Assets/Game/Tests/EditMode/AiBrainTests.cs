@@ -48,10 +48,11 @@ namespace RaidDemo.Tests.EditMode
             var agent = m_Fixture.SpawnAgent();
             m_Fixture.Probe.Miss();
 
-            m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
+            m_Fixture.Director.ReportNoise(new NoiseEvent(
                 sourceId: 0,
                 position: new Vector2F(7f, 0f),
-                tier: MovementNoiseTier.Sprint));
+                tier: NoiseTier.Sprint,
+                radiusMeters: m_Fixture.Profile.HearingRadiusSprint));
 
             m_Fixture.Advance(0.1f);
 
@@ -80,10 +81,11 @@ namespace RaidDemo.Tests.EditMode
             var agent = m_Fixture.SpawnAgent();
             m_Fixture.Probe.Miss();
 
-            m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
+            m_Fixture.Director.ReportNoise(new NoiseEvent(
                 sourceId: 0,
                 position: new Vector2F(3f, 0f),
-                tier: MovementNoiseTier.Walk));
+                tier: NoiseTier.Walk,
+                radiusMeters: m_Fixture.Profile.HearingRadiusWalk));
             m_Fixture.Advance(0.1f);
             Assert.AreEqual(AiStateId.Investigate, agent.CurrentState, "前置条件：应当先进入调查。");
 

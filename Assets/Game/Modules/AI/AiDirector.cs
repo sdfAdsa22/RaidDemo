@@ -191,7 +191,7 @@ namespace RaidDemo.AI
         /// 但"听到之后做什么"留给状态机：两者分开之后，
         /// 调整听觉半径不会影响任何行为逻辑。
         /// </remarks>
-        public void ReportNoise(in MovementNoiseEvent noise)
+        public void ReportNoise(in NoiseEvent noise)
         {
             for (var i = 0; i < m_Agents.Count; i++)
             {
@@ -201,7 +201,14 @@ namespace RaidDemo.AI
                     continue;
                 }
 
-                if (AISensor.CanHear(agent.Position, noise.Position, noise.Tier, Profile))
+                // 声源自己不需要被告知"自己发出了声音"：它已经在处理更确切的信息
+                // （自己开火、自己在跑）。否则 AI 每次开枪都会给自己塞一条噪音。
+                if (agent.CombatantId == noise.SourceId)
+                {
+                    continue;
+                }
+
+                if (AISensor.CanHear(agent.Position, noise.Position, noise.RadiusMeters))
                 {
                     agent.EnqueueNoise(noise.Position, noise.Tier);
                 }
