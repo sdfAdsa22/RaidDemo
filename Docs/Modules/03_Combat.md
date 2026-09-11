@@ -13,7 +13,7 @@
 | --- | --- |
 | 交付物 | 武器数据、射击链路（单发/连发/全自动）、射线弹道、散布、换弹与弹药消耗、护甲等级减伤与耐久、受击反馈、灰盒靶子、**战斗信息界面、灰盒武器模型、程序化枪声** |
 | 完成判据 | 8 项伤害测试全绿，能与靶子交火 |
-| 实际结果 | 全工程 **218 项 EditMode 测试全绿**，其中 M3 新增 42 项（伤害结算 15、武器运行时 13、战斗命令链路 14）；射击链路已用运行时真实射线验证 |
+| 实际结果 | 全工程 **236 项 EditMode 测试全绿**，其中 M3 期间新增 60 项（伤害结算 15、武器运行时 13、战斗命令链路 14、弹药挂与双击优先级 13、切换武器 5）；射击链路已用运行时真实射线验证 |
 
 **本阶段不做**：枪械音效与复杂 VFX（M7）、武器改装（P-01）、多武器快捷切换、AI 使用武器（M4）、瞄准镜。
 
@@ -283,20 +283,36 @@ public sealed class CombatTuning
 ### 9.2 武器运行时（纯逻辑）
 
 ```csharp
-public enum FireMode { Single, Burst, Auto }
-
 public sealed class WeaponRuntime
 {
+    public IWeaponStats Weapon { get; }
     public int MagazineAmmo { get; }
+    public bool IsMagazineFull { get; }
     public bool IsReloading { get; }
-    public float CurrentSpread { get; }
+    public bool IsReloadReady { get; }
+    public float ReloadProgress01 { get; }
+    public float CurrentSpreadDegrees { get; }
 
-    public FireAttempt TryFire(float aimDegrees, float deltaTime);
     public void Tick(float deltaTime);
+    public TriggerState UpdateTrigger(bool held, out float spreadOffsetDegrees);
     public bool TryBeginReload(out string failureCode);
-    public void CompleteReload(int availableAmmo, out int consumed);
+    public int CompleteReload(int availableAmmo);
+    public void RefillMagazine();
 }
 ```
+
+> **与设计草案的两处差异，原因值得记下来：**
+>
+> 1. **射击入口是 `UpdateTrigger(bool held, ...)` 而不是 `TryFire(aimDegrees, deltaTime)`。**
+>    因为单发 / 连发 / 全自动三种模式的差别不在"这一发怎么打"，而在**扳机的按下、按住与松开**
+>    分别意味着什么。把扳机状态作为参数传入，三种模式才有同一套入口。
+>
+> 2. **`CompleteReload` 直接返回装入数量，而不是用 `out` 参数。**
+>    扣弹药与补弹匣必须是同一次决策，返回实际装入量让调用方没有机会把两者算错
+>    ——用 `out` 参数时很容易写出"扣了 30 发但只装上 12 发"的代码。
+>
+> `FireMode` 枚举改名为 `WeaponFireMode` 并移到了 `RaidDemo.Data`：
+> 它需要被内容层的武器资产序列化，放在战斗层会让内容层反向依赖战斗层。
 
 ### 9.3 引擎能力边界
 
@@ -358,8 +374,7 @@ public readonly struct HitInfo
 | 编号 | 事项 | 结论 |
 | --- | --- | --- |
 | P-13 | **正式音效素材**与复杂开火 VFX | M7。注意：灰盒阶段的程序化枪声**不在推迟范围内**——它是反馈信号而不是装饰，见 13.5 |
-| P-14 | 多武器快捷切换（数字键 1 / 2） | 输入资产已存在 Previous / Next 动作，但 M3 不做，避免与背包操作争抢 |
-| P-14 | 多武器快捷切换（数字键 1 / 2 / 鼠标滚轮） | **已实现**：滚轮上滚与数字键 2 为"下一把"，下滚与数字键 1 为"上一把"；只有两个武器槽时等价于主副互换 |
+| P-14 ✅ | 多武器快捷切换 | **已完成（M3）**：滚轮上滚与数字键 2 为"下一把"，下滚与数字键 1 为"上一把"；只有两个武器槽时等价于主副互换。弹匣状态按武器分别保留 |
 | P-15 | 弹道下坠与飞行时间 | 明确不做（见第 2 节设计前提） |
 
 ---
@@ -397,6 +412,8 @@ public readonly struct HitInfo
 | `HitInfo` 的 `TargetCenterHeight` 改为 `TargetCenter`（三维坐标） | 暴击需要方向性，只给高度不够 |
 | `IItemDefinition` 新增 `WeaponStats` / `AmmoStats` / `ArmorStats` 三个访问器 | 战斗层需要从物品定义读到战斗参数，而 `IItemDefinition` 是纯数据契约，不能暴露 `ItemBehavior` 资产类型 |
 | 新增 `PlayerWeaponController` | 开火与换弹共用同一个武器运行时，时间只能在**一处**推进。若两个处理器各自 Tick 一次，武器的冷却与换弹会以两倍速度推进 |
+| `WeaponRuntime` 的射击入口由 `TryFire(角度, 时间)` 改为 `UpdateTrigger(扳机是否按住, out 散布偏移)` | 单发 / 连发 / 全自动的区别在于"扳机的按下、按住、松开各意味着什么"，而不在于"这一发怎么打"。统一成扳机状态之后，三种模式共用同一入口 |
+| `FireMode` 改名 `WeaponFireMode` 并移入 `RaidDemo.Data` | 内容层的武器资产需要序列化它；留在战斗层会让内容层反向依赖战斗层 |
 
 ### 13.3 换弹完成后按住扳机会立即续射
 

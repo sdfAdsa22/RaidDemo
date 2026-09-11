@@ -21,8 +21,15 @@ namespace RaidDemo.Presentation
         /// <summary>弹道留存的时长（秒）。</summary>
         private const float TracerLifetime = 0.05f;
 
-        /// <summary>池中最多同时存在的弹道数量。</summary>
-        private const int MaxTracers = 24;
+        /// <summary>池中保留的闲置弹道上限。</summary>
+        /// <remarks>
+        /// 全自动武器每秒打出十发以上，同时存在的弹道通常不超过二十几条；
+        /// 留到 32 足够覆盖高峰，又不会让闲置对象长期占着内存。
+        /// </remarks>
+        private const int PoolCapacity = 32;
+
+        /// <summary>预热数量。弹道是开火瞬间就要用的东西，首次使用的分配尖峰会直接影响手感。</summary>
+        private const int PoolPrewarm = 8;
 
         /// <summary>弹道线条的宽度（米）。</summary>
         private const float TracerWidth = 0.03f;
@@ -41,9 +48,28 @@ namespace RaidDemo.Presentation
         }
 
         private readonly List<TracerInstance> m_Active = new List<TracerInstance>();
-        private readonly Stack<LineRenderer> m_Pool = new Stack<LineRenderer>();
+        private ObjectPool<LineRenderer> m_Pool;
 
         private IDisposable m_Subscription;
+
+        /// <summary>累计创建的弹道数量，供调试与性能观测使用。</summary>
+        public int TotalCreated
+        {
+            get { return m_Pool?.TotalCreated ?? 0; }
+        }
+
+        private void Awake()
+        {
+            // 用 Kernel 的通用对象池，而不是在本类里手写一个：
+            // 弹道不是唯一需要复用的东西（M5 的掉落物、M7 的特效都要），
+            // 复用的策略只应该有一份实现。
+            m_Pool = new ObjectPool<LineRenderer>(
+                CreateLine,
+                maxSize: PoolCapacity,
+                prewarmCount: PoolPrewarm,
+                onTake: line => line.gameObject.SetActive(true),
+                onRelease: line => line.gameObject.SetActive(false));
+        }
 
         /// <summary>
         /// 绑定事件总线。由启动层在事件总线就绪后调用。
@@ -63,6 +89,11 @@ namespace RaidDemo.Presentation
         private void OnDestroy()
         {
             m_Subscription?.Dispose();
+
+            // 在 OnDestroy 而不是 OnDisable 里释放池：Awake 只会执行一次，
+            // 若在 OnDisable 里把池置空，组件被禁用再启用之后就再也没有池可用了。
+            m_Pool?.Dispose();
+            m_Pool = null;
         }
 
         private void Update()
@@ -76,8 +107,7 @@ namespace RaidDemo.Presentation
                     continue;
                 }
 
-                tracer.Line.gameObject.SetActive(false);
-                m_Pool.Push(tracer.Line);
+                m_Pool.Release(tracer.Line);
                 m_Active.RemoveAt(i);
             }
         }
@@ -93,8 +123,6 @@ namespace RaidDemo.Presentation
             // 玩家看到的才是"子弹从我这打到准星指的地方"。
             line.SetPosition(0, ProjectToGround(evt.Origin));
             line.SetPosition(1, ProjectToGround(evt.EndPoint));
-            line.gameObject.SetActive(true);
-
             m_Active.Add(new TracerInstance { Line = line, Remaining = TracerLifetime });
         }
 
@@ -107,20 +135,22 @@ namespace RaidDemo.Presentation
         /// <summary>取一条可用的线段渲染器，池空时创建新的。</summary>
         private LineRenderer Rent()
         {
-            if (m_Pool.Count > 0)
-            {
-                return m_Pool.Pop();
-            }
-
-            // 池的上限只是限制同时存在的线段数量，超过时复用最早的那一条，
-            // 避免极端情况下无限增长。
-            if (m_Active.Count >= MaxTracers)
+            // 同时存在的弹道超过池容量时，复用最早的那一条。
+            // 极端情况下（例如射速被调得极高）这会让个别弹道提前消失，
+            // 但比无限增长导致的内存尖峰更容易接受。
+            if (m_Active.Count >= PoolCapacity)
             {
                 var oldest = m_Active[0];
                 m_Active.RemoveAt(0);
                 return oldest.Line;
             }
 
+            return m_Pool.Get();
+        }
+
+        /// <summary>创建一条新的弹道线段。</summary>
+        private LineRenderer CreateLine()
+        {
             var host = new GameObject("Tracer");
             host.transform.SetParent(transform, worldPositionStays: false);
             var line = host.AddComponent<LineRenderer>();
