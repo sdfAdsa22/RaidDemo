@@ -190,5 +190,29 @@ namespace RaidDemo.Inventory
         {
             Array.Clear(m_Slots, 0, m_Slots.Length);
         }
+
+        /// <summary>
+        /// 交换两个槽位上的物品。
+        /// </summary>
+        /// <param name="a">第一个槽位。</param>
+        /// <param name="b">第二个槽位。</param>
+        /// <returns>确实发生了交换返回 true；两个槽位相同时返回 false。</returns>
+        /// <remarks>
+        /// 用于切换武器：本项目只区分"当前手持的"（主武器槽）与"备用的"（副武器槽），
+        /// 因此切换武器就是交换这两个槽位，不需要额外的"当前武器"状态。
+        /// 交换永远不会失败——两边都是已经装备好的物品。
+        /// </remarks>
+        public bool Swap(EquipmentSlot a, EquipmentSlot b)
+        {
+            if (a == b)
+            {
+                return false;
+            }
+
+            var temp = m_Slots[(int)a];
+            m_Slots[(int)a] = m_Slots[(int)b];
+            m_Slots[(int)b] = temp;
+            return true;
+        }
     }
 }

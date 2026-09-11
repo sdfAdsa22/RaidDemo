@@ -21,6 +21,7 @@ namespace RaidDemo.Simulation
             Vector2F facing,
             float speed,
             float stamina,
+            float maxStamina,
             bool isSprinting,
             bool isExhausted,
             double timestamp = 0d,
@@ -31,6 +32,7 @@ namespace RaidDemo.Simulation
             Facing = facing;
             Speed = speed;
             Stamina = stamina;
+            MaxStamina = maxStamina;
             IsSprinting = isSprinting;
             IsExhausted = isExhausted;
             Timestamp = timestamp;
@@ -51,6 +53,16 @@ namespace RaidDemo.Simulation
 
         /// <summary>当前体力值。</summary>
         public float Stamina { get; }
+
+        /// <summary>
+        /// 体力上限。
+        /// </summary>
+        /// <remarks>
+        /// 事件里带上上限，订阅方就不需要再去查配置。
+        /// 体力条这类表现层元素本来就只关心"占满值的百分之多少"，
+        /// 让它自己去别处找上限只会多一条依赖。
+        /// </remarks>
+        public float MaxStamina { get; }
 
         /// <summary>是否正在奔跑。</summary>
         public bool IsSprinting { get; }

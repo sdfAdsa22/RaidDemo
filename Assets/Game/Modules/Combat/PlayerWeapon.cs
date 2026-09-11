@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RaidDemo.Data;
 using RaidDemo.Kernel;
 
@@ -14,10 +15,26 @@ namespace RaidDemo.Combat
     /// </remarks>
     public sealed class PlayerWeapon
     {
+        /// <summary>一把武器各自的运行时状态。</summary>
+        /// <remarks>
+        /// 弹匣与"弹匣里装的是哪种弹"都必须按武器分别保存，
+        /// 否则切枪会重置换弹状态——打空 A、切到 B、再切回 A，A 的弹匣就白送一满，
+        /// 这是一个能被玩家立刻发现的漏洞。
+        /// </remarks>
+        private sealed class WeaponState
+        {
+            public WeaponRuntime Runtime;
+            public float LoadedPenetration;
+        }
+
         private readonly DeterministicRandom m_Random;
 
+        /// <summary>按武器参数缓存的运行时状态。键是 ScriptableObject 资产的引用。</summary>
+        private readonly Dictionary<IWeaponStats, WeaponState> m_States =
+            new Dictionary<IWeaponStats, WeaponState>(4);
+
         private IWeaponStats m_Stats;
-        private WeaponRuntime m_Runtime;
+        private WeaponState m_Current;
 
         /// <summary>创建手持武器状态。</summary>
         /// <param name="random">散布用的确定性随机数。</param>
@@ -29,13 +46,13 @@ namespace RaidDemo.Combat
         /// <summary>当前是否装备了武器。</summary>
         public bool IsEquipped
         {
-            get { return m_Runtime != null; }
+            get { return m_Current != null; }
         }
 
         /// <summary>当前武器运行时。未装备时为 null。</summary>
         public WeaponRuntime Runtime
         {
-            get { return m_Runtime; }
+            get { return m_Current?.Runtime; }
         }
 
         /// <summary>当前武器参数。未装备时为 null。</summary>
@@ -51,7 +68,10 @@ namespace RaidDemo.Combat
         /// 这一项让"带什么子弹"成为真实选择：装满穿甲弹之后，
         /// 在打空并重新装填之前，每一发都按穿甲弹的穿透力结算。
         /// </remarks>
-        public float LoadedPenetration { get; private set; }
+        public float LoadedPenetration
+        {
+            get { return m_Current != null ? m_Current.LoadedPenetration : 0f; }
+        }
 
         /// <summary>
         /// 装备一把武器。传入 null 表示卸下。
@@ -62,19 +82,24 @@ namespace RaidDemo.Combat
         {
             if (stats == null)
             {
-                var had = m_Runtime != null;
+                var had = m_Current != null;
                 Clear();
                 return had;
             }
 
-            if (ReferenceEquals(stats, m_Stats) && m_Runtime != null)
+            if (ReferenceEquals(stats, m_Stats) && m_Current != null)
             {
                 return false;
             }
 
+            if (!m_States.TryGetValue(stats, out var state))
+            {
+                state = new WeaponState { Runtime = new WeaponRuntime(stats, m_Random) };
+                m_States[stats] = state;
+            }
+
             m_Stats = stats;
-            m_Runtime = new WeaponRuntime(stats, m_Random);
-            LoadedPenetration = 0f;
+            m_Current = state;
             return true;
         }
 
@@ -82,15 +107,17 @@ namespace RaidDemo.Combat
         public void Clear()
         {
             m_Stats = null;
-            m_Runtime = null;
-            LoadedPenetration = 0f;
+            m_Current = null;
         }
 
         /// <summary>记录弹匣内弹药的穿透力。</summary>
         /// <param name="penetration">穿透力。</param>
         public void SetLoadedPenetration(float penetration)
         {
-            LoadedPenetration = penetration < 0f ? 0f : penetration;
+            if (m_Current != null)
+            {
+                m_Current.LoadedPenetration = penetration < 0f ? 0f : penetration;
+            }
         }
     }
 }

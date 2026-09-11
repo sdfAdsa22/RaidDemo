@@ -54,6 +54,8 @@ namespace RaidDemo.Bootstrap
             m_CommandRouter.Register<InventorySortIntent>(new InventorySortCommandHandler(context));
             m_CommandRouter.Register<InventoryEquipIntent>(new InventoryEquipCommandHandler(context));
             m_CommandRouter.Register<InventoryUnequipIntent>(new InventoryUnequipCommandHandler(context));
+            m_CommandRouter.Register<PlayerSwitchWeaponIntent>(
+                new WeaponSwitchCommandHandler(m_Loadout.Equipment, m_EventBus));
 
             var uiHost = new GameObject("InventoryScreen");
             uiHost.transform.SetParent(transform, worldPositionStays: false);

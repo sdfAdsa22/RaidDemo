@@ -88,6 +88,7 @@ namespace RaidDemo.Simulation
                 state.Facing,
                 state.CurrentSpeed,
                 state.Stamina,
+                m_Simulator.MaxStamina,
                 state.IsSprinting,
                 state.IsExhausted));
         }

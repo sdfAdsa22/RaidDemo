@@ -38,6 +38,12 @@ namespace RaidDemo.Input
         /// <summary>换弹动作名称。</summary>
         [SerializeField] private string m_ReloadActionName = "Reload";
 
+        /// <summary>切换到下一把武器的动作名称。</summary>
+        [SerializeField] private string m_NextWeaponActionName = "Next";
+
+        /// <summary>切换到上一把武器的动作名称。</summary>
+        [SerializeField] private string m_PreviousWeaponActionName = "Previous";
+
         /// <summary>
         /// 摄像机引用，用于把屏幕坐标转换为世界坐标。
         /// 未指定时自动使用 Camera.main，便于灰盒场景快速搭建。
@@ -103,6 +109,12 @@ namespace RaidDemo.Input
 
         /// <summary>换弹动作。只在按下的那一帧生效。</summary>
         private InputAction m_ReloadAction;
+
+        /// <summary>切换到下一把武器。绑定在鼠标滚轮上滚。</summary>
+        private InputAction m_NextWeaponAction;
+
+        /// <summary>切换到上一把武器。绑定在鼠标滚轮下滚。</summary>
+        private InputAction m_PreviousWeaponAction;
         private bool m_IsInitialized;
 
         /// <summary>
@@ -123,6 +135,9 @@ namespace RaidDemo.Input
 
         /// <summary>脚本化输入是否请求换弹。</summary>
         public bool ScriptedWantsToReload { get; set; }
+
+        /// <summary>脚本化切换武器输入：+1 / -1 / 0。</summary>
+        public int ScriptedWeaponSwitch { get; set; }
 
         /// <summary>是否启用脚本化输入。启用后真实设备输入被忽略。</summary>
         public bool UseScriptedInput { get; set; }
@@ -226,6 +241,8 @@ namespace RaidDemo.Input
             m_SprintAction?.Enable();
             m_AttackAction?.Enable();
             m_ReloadAction?.Enable();
+            m_NextWeaponAction?.Enable();
+            m_PreviousWeaponAction?.Enable();
         }
 
         private void OnDisable()
@@ -234,6 +251,8 @@ namespace RaidDemo.Input
             m_SprintAction?.Disable();
             m_AttackAction?.Disable();
             m_ReloadAction?.Disable();
+            m_NextWeaponAction?.Disable();
+            m_PreviousWeaponAction?.Disable();
         }
 
         /// <summary>
@@ -301,6 +320,41 @@ namespace RaidDemo.Input
             wantsToReload = m_ReloadAction != null && m_ReloadAction.WasPressedThisFrame();
         }
 
+        /// <summary>
+        /// 读取本帧的切换武器输入。
+        /// </summary>
+        /// <returns>+1 表示切到下一把，-1 表示上一把，0 表示本帧没有切换。</returns>
+        /// <remarks>
+        /// 滚轮与数字键共用同一对动作：滚轮上滚与数字键 2 都是"下一个"。
+        /// 用同一对动作而不是各建一套，是为了让"切武器"这件事只有一条输入通路。
+        /// </remarks>
+        public int ReadWeaponSwitch()
+        {
+            Initialize();
+
+            if (UseScriptedInput)
+            {
+                return ScriptedWeaponSwitch;
+            }
+
+            if (!m_IsInitialized)
+            {
+                return 0;
+            }
+
+            if (m_NextWeaponAction != null && m_NextWeaponAction.WasPressedThisFrame())
+            {
+                return 1;
+            }
+
+            if (m_PreviousWeaponAction != null && m_PreviousWeaponAction.WasPressedThisFrame())
+            {
+                return -1;
+            }
+
+            return 0;
+        }
+
 
         /// <summary>
         /// 解析输入动作。允许重复调用，未配置资产时不会抛异常，
@@ -324,6 +378,8 @@ namespace RaidDemo.Input
             m_SprintAction = map.FindAction(m_SprintActionName, false);
             m_AttackAction = map.FindAction(m_AttackActionName, false);
             m_ReloadAction = map.FindAction(m_ReloadActionName, false);
+            m_NextWeaponAction = map.FindAction(m_NextWeaponActionName, false);
+            m_PreviousWeaponAction = map.FindAction(m_PreviousWeaponActionName, false);
 
             if (m_MoveAction == null)
             {

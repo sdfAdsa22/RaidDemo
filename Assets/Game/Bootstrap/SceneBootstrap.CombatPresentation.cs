@@ -48,6 +48,16 @@ namespace RaidDemo.Bootstrap
             hudHost.transform.SetParent(transform, worldPositionStays: false);
             m_CombatHud = hudHost.AddComponent<CombatHud>();
             m_CombatHud.Initialize(m_WeaponController, m_Loadout);
+
+            // 弧形体力槽：挂在角色上方，面向相机。
+            if (m_PlayerMotor != null)
+            {
+                var arcHost = new GameObject("StaminaArcView");
+                arcHost.transform.SetParent(transform, worldPositionStays: false);
+                var arc = arcHost.AddComponent<StaminaArcView>();
+                var viewCamera = m_CameraController != null ? m_CameraController.GetComponent<Camera>() : Camera.main;
+                arc.Initialize(m_PlayerMotor.transform, viewCamera, m_EventBus);
+            }
         }
 
         /// <summary>
@@ -151,6 +161,18 @@ namespace RaidDemo.Bootstrap
             m_WeaponController.SetMuzzlePosition(ResolveMuzzlePosition());
             UpdateCriticalAxis();
             UpdateWeaponView();
+
+            // 滚轮切换武器。界面打开时不响应，避免整理背包时误切。
+            var switchDirection = m_InputCollector != null && !inventoryOpen
+                ? m_InputCollector.ReadWeaponSwitch()
+                : 0;
+            if (switchDirection != 0)
+            {
+                m_CommandRouter.Dispatch(new PlayerSwitchWeaponIntent(
+                    m_InputCollector.PlayerId,
+                    switchDirection,
+                    ++m_CommandSequence));
+            }
 
             if (inventoryOpen)
             {

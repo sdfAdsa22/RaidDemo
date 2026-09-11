@@ -44,6 +44,12 @@ namespace RaidDemo.Simulation
         /// <summary>当前体力值。</summary>
         public float Stamina => m_State.Stamina;
 
+        /// <summary>体力上限。供体力条等表现层元素换算比例。</summary>
+        public float MaxStamina
+        {
+            get { return m_Profile.MaxStamina; }
+        }
+
         /// <summary>是否处于力竭状态。</summary>
         public bool IsExhausted => m_State.IsExhausted;
 
