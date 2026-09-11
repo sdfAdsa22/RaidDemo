@@ -17,11 +17,27 @@ namespace RaidDemo.AI
     {
         // ── 视觉 ──────────────────────────────────────────────
 
-        /// <summary>视野锥的全角（度）。110 度意味着左右各 55 度。</summary>
-        public float ViewAngleDegrees = 110f;
+        /// <summary>
+        /// 视野锥的全角（度）。60 度意味着左右各 30 度。
+        /// </summary>
+        /// <remarks>
+        /// 注意它**只在 6~9 米的"警惕"区间起作用**：6 米内忽略角度，
+        /// 超过 <see cref="ViewDistanceMeters"/> 则什么都看不见（见 <see cref="ClassifySighting"/>）。
+        /// </remarks>
+        public float ViewAngleDegrees = 60f;
 
-        /// <summary>视距（米）。超出这个距离的目标即使无遮挡也看不见。</summary>
-        public float ViewDistanceMeters = 22f;
+        /// <summary>视觉距离上限（米）。超出这个距离的目标即使无遮挡也看不见。</summary>
+        public float ViewDistanceMeters = 9f;
+
+        /// <summary>
+        /// 必定发现距离（米）。
+        /// </summary>
+        /// <remarks>
+        /// <para>在这个距离内**忽略朝向**：只要视线无遮挡就一定发现。
+        /// 依据是"贴到几米内，人不可能注意不到背后有人"。</para>
+        /// <para>仍然保留遮挡判定——隔着集装箱不该被发现，否则掩体失去意义。</para>
+        /// </remarks>
+        public float GuaranteedDetectionDistance = 6f;
 
         /// <summary>
         /// 眼睛相对脚底的高度（米）。
@@ -34,14 +50,18 @@ namespace RaidDemo.AI
 
         // ── 听觉 ──────────────────────────────────────────────
 
-        /// <summary>步行噪音的可听半径（米）。</summary>
-        public float HearingRadiusWalk = 8f;
+        /// <summary>步行噪音的可听半径（米）。正常走路只有在贴得很近时才会被察觉。</summary>
+        public float HearingRadiusWalk = 4f;
 
         /// <summary>奔跑噪音的可听半径（米）。这是玩家最容易踩到的一档。</summary>
-        public float HearingRadiusSprint = 18f;
+        /// <remarks>
+        /// 刻意保持在**略大于视觉上限（9 米）**：听觉因此才有独立价值——
+        /// 玩家会先被"引过来"，而不是每次都已经被看见了才被发现。
+        /// </remarks>
+        public float HearingRadiusSprint = 10f;
 
         /// <summary>超载移动的可听半径（米）。贪心的额外代价。</summary>
-        public float HearingRadiusOverloaded = 26f;
+        public float HearingRadiusOverloaded = 12f;
 
         // ── 记忆 ──────────────────────────────────────────────
 
@@ -53,8 +73,14 @@ namespace RaidDemo.AI
         /// <summary>巡逻移动速度（米/秒）。刻意慢于玩家步行速度：巡逻是可以被绕开的。</summary>
         public float PatrolSpeed = 2f;
 
-        /// <summary>到达路径点后原地观察的时长（秒）。</summary>
-        public float WaypointScanSeconds = 2.5f;
+        /// <summary>
+        /// 到达路径点后原地观察的时长（秒）。
+        /// </summary>
+        /// <remarks>
+        /// 视野锥收窄到 60 度之后盲区变大，观察时间相应加长，
+        /// 否则巡逻会退化成"沿着路线盲走"。
+        /// </remarks>
+        public float WaypointScanSeconds = 3f;
 
         /// <summary>到达路径点后的扫描转向速度（度/秒）。</summary>
         public float ScanTurnSpeedDegreesPerSecond = 90f;
@@ -72,14 +98,65 @@ namespace RaidDemo.AI
         /// <summary>交战时的移动速度（米/秒）。</summary>
         public float EngageSpeed = 3.2f;
 
-        /// <summary>期望交战距离（米）。太近会后退，太远会推进。</summary>
-        public float PreferredEngageDistance = 8f;
+        /// <summary>
+        /// 期望交战距离（米）。太远会推进，太近会后退。
+        /// </summary>
+        /// <remarks>
+        /// 必须明显小于 <see cref="GuaranteedDetectionDistance"/>：AI 只有站进必定发现距离
+        /// 才能看见目标并开火。取 5.5 米（小于 6 米）是为了留出站位死区。
+        /// </remarks>
+        public float PreferredEngageDistance = 5.5f;
 
-        /// <summary>交战距离容差（米）。落在期望距离正负这么宽以内就不再调整站位。</summary>
-        public float EngageDistanceTolerance = 2.5f;
+        /// <summary>
+        /// 交战距离容差（米）。落在期望距离正负这么宽以内就不再调整站位。
+        /// </summary>
+        /// <remarks>
+        /// 实现里取它的一半作为实际死区。取 1.0 是**被 6 米必定发现距离反推出来的**：
+        /// 站位一旦超过 6 米，AI 就会陷入"看得见但不该开火"的尴尬状态，
+        /// 只能站着不动。5.5 ± 0.5 保证了它始终站在必定发现距离以内。
+        /// </remarks>
+        public float EngageDistanceTolerance = 1f;
 
-        /// <summary>发现目标后的反应时间（秒）。没有它，AI 会在出现的瞬间命中，体感像作弊。</summary>
+        /// <summary>
+        /// 非视觉来源进入交战时的反应时间（秒）。
+        /// </summary>
+        /// <remarks>
+        /// 用于"遭到攻击"这类情形：被打中时必须立刻反应，不能套用 2 秒的观察时间。
+        /// 必定发现与警惕确认各有自己的时间（见 <see cref="GuaranteedReactionSeconds"/>
+        /// 与 <see cref="AlertConfirmSeconds"/>）。
+        /// </remarks>
         public float ReactionSeconds = 0.4f;
+
+        /// <summary>
+        /// 必定发现之后的开火延迟（秒）。
+        /// </summary>
+        /// <remarks>
+        /// 玩家在 6 米内被"一定发现"是规则，但**发现不等于立刻开火**：
+        /// 两秒的窗口让贴脸遭遇仍有转身、换位或抢先开枪的机会。
+        /// </remarks>
+        public float GuaranteedReactionSeconds = 2f;
+
+        /// <summary>
+        /// 警惕升级为交战所需的持续观察时长（秒）。
+        /// </summary>
+        /// <remarks>
+        /// 6~9 米内的目标只会引起怀疑：AI 会停下当前动作、转向目标、缓慢逼近并盯着看。
+        /// 只有连续观察满这段时间仍然没有跟丢，才升级为交战。
+        /// 这段时间也是玩家"侧身躲开或者拉开距离"的机会窗口。
+        /// </remarks>
+        public float AlertConfirmSeconds = 5f;
+
+        /// <summary>警惕状态下的靠近速度（米/秒）。慢于调查速度：此时还不确定。</summary>
+        public float AlertSpeed = 2.5f;
+
+        /// <summary>
+        /// 警惕状态下与目标保持的距离（米）。
+        /// </summary>
+        /// <remarks>
+        /// 取 7 米：落在 6~9 米的警惕区间之内、必定发现距离之外。
+        /// 于是 AI 会"盯着你但不动手"，直到观察时间走完或你主动进入 6 米。
+        /// </remarks>
+        public float AlertHoldDistance = 7f;
 
         /// <summary>开火所需的对准容差（度）。枪口偏得太多时不开火。</summary>
         public float AimToleranceDegrees = 7f;
@@ -139,6 +216,41 @@ namespace RaidDemo.AI
         }
 
         /// <summary>
+        /// 按距离与朝向给一次视觉观测分档（不含遮挡判定）。
+        /// </summary>
+        /// <param name="observerPosition">观察者位置。</param>
+        /// <param name="facing">观察者朝向（单位向量）。</param>
+        /// <param name="targetPosition">目标位置。</param>
+        /// <returns>观测档位。遮挡需要调用方另外用射线确认。</returns>
+        /// <remarks>
+        /// <para>判定顺序体现了整套设计的意图：**先看距离，再看角度**。</para>
+        /// <list type="number">
+        /// <item><description>距离 ≤ <see cref="GuaranteedDetectionDistance"/>：必定发现，**不看朝向**。</description></item>
+        /// <item><description>距离 ≤ <see cref="ViewDistanceMeters"/> 且在视野锥内：警惕。</description></item>
+        /// <item><description>其余：看不见。</description></item>
+        /// </list>
+        /// <para>把这条规则收敛到参数对象上，AI 与开发者模式的"为什么看不见"因此共用
+        /// 同一份判定，不会出现两边结论不一致的情况。</para>
+        /// </remarks>
+        public SightingTier ClassifySighting(Vector2F observerPosition, Vector2F facing, Vector2F targetPosition)
+        {
+            var distance = Vector2F.Distance(observerPosition, targetPosition);
+            if (distance <= GuaranteedDetectionDistance)
+            {
+                return SightingTier.Guaranteed;
+            }
+
+            if (distance > ViewDistanceMeters)
+            {
+                return SightingTier.None;
+            }
+
+            return IsInsideViewCone(observerPosition, facing, targetPosition)
+                ? SightingTier.Suspected
+                : SightingTier.None;
+        }
+
+        /// <summary>
         /// 目标是否落在视野锥内（只算角度与距离，不含遮挡）。
         /// </summary>
         /// <param name="observerPosition">观察者位置。</param>
@@ -181,6 +293,32 @@ namespace RaidDemo.AI
             if (ViewDistanceMeters <= 0f)
             {
                 return "ViewDistanceMeters 必须大于 0。";
+            }
+
+            if (GuaranteedDetectionDistance <= 0f || GuaranteedDetectionDistance > ViewDistanceMeters)
+            {
+                return "GuaranteedDetectionDistance 必须大于 0 且不超过 ViewDistanceMeters，否则两种档位会互相包含。";
+            }
+
+            if (PreferredEngageDistance + (EngageDistanceTolerance * 0.5f) > GuaranteedDetectionDistance)
+            {
+                return "期望交战距离加上一半容差不能超过必定发现距离：" +
+                       "否则 AI 会停在'看得见但不该开火'的位置上，站在那儿不开枪。";
+            }
+
+            if (AlertHoldDistance <= GuaranteedDetectionDistance || AlertHoldDistance > ViewDistanceMeters)
+            {
+                return "AlertHoldDistance 必须落在必定发现距离与视觉上限之间，否则警惕状态会站错位置。";
+            }
+
+            if (AlertConfirmSeconds <= 0f)
+            {
+                return "AlertConfirmSeconds 必须大于 0，否则警惕没有任何观察过程。";
+            }
+
+            if (GuaranteedReactionSeconds < 0f)
+            {
+                return "GuaranteedReactionSeconds 不能为负。";
             }
 
             if (HearingRadiusWalk < 0f || HearingRadiusSprint < HearingRadiusWalk

@@ -22,7 +22,7 @@ namespace RaidDemo.AI
     /// 而 AI 的决策只在 Tick 里发生。入队保证了「一次 Tick 对应一次完整决策」，
     /// 否则同一帧内连续两声噪音会让状态机在一帧里迁移两次，日志与表现都会跳帧。</para>
     /// </remarks>
-    public sealed class AiAgent
+    public sealed partial class AiAgent
     {
         private readonly AiDirector m_Director;
         private readonly CombatantState m_Combatant;
@@ -92,6 +92,7 @@ namespace RaidDemo.AI
                 new IState<AiContext>[]
                 {
                     new PatrolState(),
+                    new AlertState(),
                     new InvestigateState(),
                     new EngageState(),
                     new RetreatState(),
@@ -252,26 +253,6 @@ namespace RaidDemo.AI
             return m_Combatant.Heal(amount);
         }
 
-        /// <summary>丢弃当前移动路径。状态切换时由状态调用。</summary>
-        public void ResetPath()
-        {
-            m_Movement.ResetPath();
-        }
-
-        /// <summary>
-        /// 复制当前寻路路径点，供调试可视化绘制。
-        /// </summary>
-        /// <param name="destination">目标列表，会先被清空。</param>
-        /// <returns>路径点数量。</returns>
-        /// <remarks>
-        /// 逻辑层不使用这个方法。它的存在只为让开发者模式能画出"AI 打算怎么绕过去"，
-        /// 因此刻意保持只读（复制而非暴露内部集合，理由见 <see cref="AiMovement.CopyWaypoints"/>）。
-        /// </remarks>
-        public int CopyPathWaypoints(List<Vector2F> destination)
-        {
-            return m_Movement.CopyWaypoints(destination);
-        }
-
         /// <summary>刷新本帧的感知快照。</summary>
         private void UpdateSnapshot(float now, in AiTargetInfo target)
         {
@@ -298,74 +279,47 @@ namespace RaidDemo.AI
             if (!target.Exists)
             {
                 // 目标不存在（阵亡或撤离）时清空记忆：否则 AI 会一直去调查一个空位置。
+                // 两个视觉标记由 ClearTransient 统一清掉，这里不必重复写。
                 m_Memory.Clear();
-                m_Snapshot.SeesTarget = false;
                 return;
             }
 
             var profile = m_Director.Profile;
-            var visible = profile.IsInsideViewCone(m_Position, Facing, target.Position)
-                          && AISensor.HasLineOfSight(
-                              m_Director.Probe,
-                              AISensor.ToEyePosition(m_Position, profile.EyeHeightMeters),
-                              target.CenterWorld,
-                              target.CombatantId,
-                              profile.ViewDistanceMeters);
+            var tier = profile.ClassifySighting(m_Position, Facing, target.Position);
 
-            m_Snapshot.SeesTarget = visible;
-            if (visible)
+            // 默认按"非视觉来源"计反应时间（遭到攻击等）。下面的分档会覆盖它。
+            m_Snapshot.EngagementReactionSeconds = profile.ReactionSeconds;
+            if (tier == SightingTier.None)
             {
+                return;
+            }
+
+            // 两档都要做遮挡判定：6 米内可以忽略朝向，但隔着集装箱不算发现。
+            var hasLineOfSight = AISensor.HasLineOfSight(
+                m_Director.Probe,
+                AISensor.ToEyePosition(m_Position, profile.EyeHeightMeters),
+                target.CenterWorld,
+                target.CombatantId,
+                profile.ViewDistanceMeters);
+
+            if (tier == SightingTier.Guaranteed)
+            {
+                m_Snapshot.SeesTarget = hasLineOfSight;
+                m_Snapshot.EngagementReactionSeconds = profile.GuaranteedReactionSeconds;
+            }
+            else
+            {
+                m_Snapshot.SuspectedTarget = hasLineOfSight;
+
+                // 警惕确认后进入交战是"观察已经完成"的结果，因此立刻开火，不再叠加反应时间。
+                m_Snapshot.EngagementReactionSeconds = 0f;
+            }
+
+            if (m_Snapshot.SeesTarget || m_Snapshot.SuspectedTarget)
+            {
+                // 警惕也要刷新记忆：AI 虽然还不确定，但它知道你在那个位置。
+                // 少了这一步，玩家侧身躲进掩体后 AI 会立刻"忘记"，警惕就失去了追查的意义。
                 m_Memory.Remember(target.Position, now);
-            }
-        }
-
-        /// <summary>执行本帧意图：移动与转向。</summary>
-        private void ApplyIntent(float deltaTime)
-        {
-            var profile = m_Director.Profile;
-            var moved = false;
-            var moveDirection = Vector2F.Zero;
-
-            if (m_Intent.HasMoveGoal)
-            {
-                var result = m_Movement.Step(m_Position, m_Intent.MoveGoal, ResolveSpeed(), deltaTime);
-                m_Position = result.Position;
-                moved = result.Moved;
-                moveDirection = result.Direction;
-            }
-
-            var desiredFacing = m_Intent.Facing;
-            if (desiredFacing.IsNearlyZero && moved)
-            {
-                // 状态没有指定朝向时面向移动方向，这是最不需要解释的默认行为。
-                desiredFacing = moveDirection;
-            }
-
-            if (desiredFacing.IsNearlyZero)
-            {
-                return;
-            }
-
-            m_FacingDegrees = AiAngles.StepTowards(
-                m_FacingDegrees,
-                AiAngles.ToDegrees(desiredFacing),
-                profile.TurnSpeedDegreesPerSecond * deltaTime);
-        }
-
-        /// <summary>按当前状态取移动速度。</summary>
-        private float ResolveSpeed()
-        {
-            var profile = m_Director.Profile;
-            switch (m_Machine.CurrentId)
-            {
-                case AiStateId.Investigate:
-                    return profile.InvestigateSpeed;
-                case AiStateId.Engage:
-                    return profile.EngageSpeed;
-                case AiStateId.Retreat:
-                    return profile.RetreatSpeed;
-                default:
-                    return profile.PatrolSpeed;
             }
         }
 

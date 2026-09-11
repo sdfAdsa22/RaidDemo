@@ -153,14 +153,17 @@ namespace RaidDemo.Diagnostics
 
             return string.Format(
                 System.Globalization.CultureInfo.InvariantCulture,
-                "参数：视距 {0:F0} 米　视角 {1:F0}°　记忆 {2:F1}s　听觉 {3:F0}/{4:F0}/{5:F0} 米　反应 {6:F2}s",
+                "参数：必定发现 {0:F0} 米　警惕到 {1:F0} 米　视角 {2:F0}°　听觉 {3:F0}/{4:F0}/{5:F0} 米\n" +
+                "　　　反应：必定 {6:F1}s／警惕确认 {7:F1}s　记忆 {8:F1}s",
+                profile.GuaranteedDetectionDistance,
                 profile.ViewDistanceMeters,
                 profile.ViewAngleDegrees,
-                profile.MemorySeconds,
                 profile.HearingRadiusWalk,
                 profile.HearingRadiusSprint,
                 profile.HearingRadiusOverloaded,
-                profile.ReactionSeconds);
+                profile.GuaranteedReactionSeconds,
+                profile.AlertConfirmSeconds,
+                profile.MemorySeconds);
         }
 
         /// <summary>每个 AI 一行。</summary>

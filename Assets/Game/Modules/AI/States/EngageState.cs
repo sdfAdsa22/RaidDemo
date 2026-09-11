@@ -35,7 +35,11 @@ namespace RaidDemo.AI
         public void Enter(AiContext context)
         {
             var profile = context.Profile;
-            m_ReactionRemaining = profile.ReactionSeconds;
+
+            // 反应时间来自感知：必定发现要等 2 秒，警惕确认后立刻开火，
+            // 遭到攻击等非视觉来源用较短的反应时间。三种情况的取值理由见
+            // AiPerceptionSnapshot.EngagementReactionSeconds 的注释。
+            m_ReactionRemaining = context.Snapshot.EngagementReactionSeconds;
             m_BurstRemaining = profile.FireBurstSeconds;
             m_PauseRemaining = 0f;
         }

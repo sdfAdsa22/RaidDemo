@@ -56,6 +56,12 @@ namespace RaidDemo.AI
                 return new AiTransition(AiStateId.Engage, "调查中遭到攻击");
             }
 
+            if (snapshot.SuspectedTarget)
+            {
+                // 调查途中真的看到了可疑身影：从"照着线索找"切换成"盯着它看"。
+                return new AiTransition(AiStateId.Alert, "调查中发现可疑目标");
+            }
+
             if (snapshot.HeardNoise)
             {
                 // 新动静覆盖旧线索，并把调查计时与到达标记一并重置。

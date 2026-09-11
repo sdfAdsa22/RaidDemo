@@ -28,8 +28,9 @@ namespace RaidDemo.Tests.EditMode
         {
             m_Profile = new AIPerceptionProfile
             {
-                ViewAngleDegrees = 100f,
-                ViewDistanceMeters = 20f,
+                ViewAngleDegrees = 60f,
+                ViewDistanceMeters = 9f,
+                GuaranteedDetectionDistance = 6f,
                 EyeHeightMeters = 1.45f,
             };
 
@@ -37,15 +38,53 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
-        public void TargetInFront_WithClearLine_IsVisible()
+        public void TargetWithinGuaranteedDistance_IsVisible()
         {
             m_Probe.HitTarget(TargetId);
 
-            var result = Evaluate(new Vector2F(10f, 0f));
+            var result = Evaluate(new Vector2F(5f, 0f));
 
-            Assert.AreEqual(AiDetectionFailure.Visible, result.Failure, "正前方无遮挡时应当判定为可见。");
+            Assert.AreEqual(AiDetectionFailure.Visible, result.Failure, "6 米内无遮挡时应当判定为必定发现。");
             Assert.IsTrue(result.Sees);
-            Assert.AreEqual(10f, result.DistanceMeters, 1e-3f);
+            Assert.AreEqual(5f, result.DistanceMeters, 1e-3f);
+        }
+
+        [Test]
+        public void TargetBehindObserver_ButWithinGuaranteedDistance_IsStillVisible()
+        {
+            m_Probe.HitTarget(TargetId);
+
+            // 背后的目标：6 米内忽略朝向，只要没被挡住就必须发现。
+            var result = Evaluate(new Vector2F(-5f, 0f));
+
+            Assert.AreEqual(
+                AiDetectionFailure.Visible,
+                result.Failure,
+                "必定发现距离内应当忽略朝向：贴到几米内，人不可能注意不到背后有人。");
+        }
+
+        [Test]
+        public void TargetInAlertBand_ReportsSuspected()
+        {
+            m_Probe.HitTarget(TargetId);
+
+            var result = Evaluate(new Vector2F(7.5f, 0f));
+
+            Assert.AreEqual(AiDetectionFailure.Suspected, result.Failure, "6~9 米应当只是起疑，不是直接看见。");
+            Assert.IsTrue(result.IsSuspected);
+            Assert.IsFalse(result.Sees);
+            Assert.AreEqual("警惕中", result.Describe());
+        }
+
+        [Test]
+        public void TargetInAlertBand_ButOutsideCone_IsNotDetected()
+        {
+            m_Probe.HitTarget(TargetId);
+
+            // 警惕区间**受视野锥限制**：背后的可疑动静看不见。
+            var result = Evaluate(new Vector2F(-7.5f, 0f));
+
+            Assert.AreEqual(AiDetectionFailure.OutsideViewCone, result.Failure, "警惕区间仍受 60 度视野锥限制。");
         }
 
         [Test]
@@ -55,7 +94,7 @@ namespace RaidDemo.Tests.EditMode
             // 标识 0 表示只打中了环境（掩体）。
             m_Probe.Result = new HitInfo(0, new Vector3(3f, 1f, 0f), Vector3.zero, 3f);
 
-            var result = Evaluate(new Vector2F(10f, 0f));
+            var result = Evaluate(new Vector2F(5f, 0f));
 
             Assert.AreEqual(AiDetectionFailure.Blocked, result.Failure, "视线被掩体截断时应当报告'被掩体挡住'。");
             Assert.AreEqual("被掩体挡住", result.Describe());
@@ -66,19 +105,21 @@ namespace RaidDemo.Tests.EditMode
         {
             m_Probe.HitTarget(TargetId);
 
-            var result = Evaluate(new Vector2F(25f, 0f));
+            var result = Evaluate(new Vector2F(12f, 0f));
 
             Assert.AreEqual(AiDetectionFailure.OutOfRange, result.Failure, "超出视距时应当报告'超距'，而不是'被挡住'。");
         }
 
         [Test]
-        public void TargetBehindObserver_ReportsOutsideViewCone()
+        public void TargetBeyondViewDistance_BehindObserver_ReportsOutOfRange()
         {
             m_Probe.HitTarget(TargetId);
 
-            var result = Evaluate(new Vector2F(-10f, 0f));
+            // 12 米既超距又在背后：报告的是"超距"——距离判定优先于角度。
+            // 这条用例锁定"先看距离、再看角度"的顺序，避免以后调参时原因标签互相串味。
+            var result = Evaluate(new Vector2F(-12f, 0f));
 
-            Assert.AreEqual(AiDetectionFailure.OutsideViewCone, result.Failure, "背后的目标应当报告'在视野锥外'。");
+            Assert.AreEqual(AiDetectionFailure.OutOfRange, result.Failure, "超出视距时应当报告'超距'。");
         }
 
         [Test]
@@ -86,8 +127,8 @@ namespace RaidDemo.Tests.EditMode
         {
             m_Probe.HitTarget(TargetId);
 
-            // 视野全角 100 度，因此 90 度方向在锥外，且报告的夹角应当接近 90 度。
-            var result = Evaluate(new Vector2F(0f, 10f));
+            // 视野全角 60 度，因此 90 度方向在锥外，且报告的夹角应当接近 90 度。
+            var result = Evaluate(new Vector2F(0f, 7.5f));
 
             Assert.AreEqual(AiDetectionFailure.OutsideViewCone, result.Failure);
             Assert.AreEqual(90f, result.AngleDegrees, 0.5f, "夹角应当如实报告，供面板显示。");
@@ -98,11 +139,11 @@ namespace RaidDemo.Tests.EditMode
         {
             m_Probe.HitTarget(TargetId);
 
-            // 45 度在 100 度视野的半角（50 度）以内。
-            var position = Vector2F.FromDegrees(45f) * 10f;
+            // 25 度在 60 度视野的半角（30 度）以内，距离取警惕区间。
+            var position = Vector2F.FromDegrees(25f) * 7.5f;
             var result = Evaluate(position);
 
-            Assert.AreEqual(AiDetectionFailure.Visible, result.Failure, "锥内目标应当可见。");
+            Assert.AreEqual(AiDetectionFailure.Suspected, result.Failure, "锥内且处于警惕区间的目标应当起疑。");
         }
 
         [Test]
@@ -150,7 +191,8 @@ namespace RaidDemo.Tests.EditMode
 
         private static AiTargetInfo CreateTarget(Vector2F position = default)
         {
-            var actual = position.IsNearlyZero ? new Vector2F(10f, 0f) : position;
+            // 默认放在 5 米处（必定发现距离以内）；需要别的档位时由用例显式传入。
+            var actual = position.IsNearlyZero ? new Vector2F(5f, 0f) : position;
             return new AiTargetInfo(
                 TargetId,
                 actual,

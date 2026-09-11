@@ -30,6 +30,7 @@ namespace RaidDemo.Presentation
 
         private static readonly Color PatrolColor = new Color(0.35f, 0.72f, 0.42f);
         private static readonly Color InvestigateColor = new Color(0.92f, 0.76f, 0.25f);
+        private static readonly Color AlertColor = new Color(1f, 0.58f, 0.16f);
         private static readonly Color EngageColor = new Color(0.88f, 0.32f, 0.26f);
         private static readonly Color RetreatColor = new Color(0.34f, 0.56f, 0.92f);
 
@@ -174,6 +175,8 @@ namespace RaidDemo.Presentation
             {
                 case AiStateId.Investigate:
                     return InvestigateColor;
+                case AiStateId.Alert:
+                    return AlertColor;
                 case AiStateId.Engage:
                     return EngageColor;
                 case AiStateId.Retreat:

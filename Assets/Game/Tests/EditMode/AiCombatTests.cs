@@ -50,8 +50,8 @@ namespace RaidDemo.Tests.EditMode
             var agent = m_Fixture.SpawnAgent();
             m_Fixture.Probe.HitTarget(m_Fixture.PlayerId);
 
-            // 推进足够长的时间以越过反应时间并打完一轮点射。
-            m_Fixture.Advance(2f);
+            // 推进足够长的时间：必定发现后要等 2 秒才开火，之后才轮到点射节奏与射速。
+            m_Fixture.Advance(4f);
 
             Assert.AreEqual(AiStateId.Engage, agent.CurrentState, "前置条件：AI 应当进入交战。");
             Assert.Greater(shots, 0, "交战中的 AI 应当真的开枪——否则玩家面对的是不会还击的靶子。");
@@ -76,7 +76,7 @@ namespace RaidDemo.Tests.EditMode
 
             var agent = m_Fixture.SpawnAgent();
             m_Fixture.Probe.HitTarget(m_Fixture.PlayerId);
-            m_Fixture.Advance(1f);
+            m_Fixture.Advance(4f);
 
             var shotsBeforeLoss = shots;
 
@@ -84,6 +84,7 @@ namespace RaidDemo.Tests.EditMode
             m_Fixture.Probe.Miss();
             m_Fixture.Advance(m_Fixture.Profile.MemorySeconds * 0.5f);
 
+            Assert.Greater(shotsBeforeLoss, 0, "前置条件：失去视线之前应当已经开过枪，否则这条用例等于没测。");
             Assert.AreEqual(shotsBeforeLoss, shots, "看不见目标时不应当继续射击，否则等于透视穿墙。");
         }
 
@@ -98,17 +99,33 @@ namespace RaidDemo.Tests.EditMode
                 RoundsPerMinute = 600f,
             };
 
+            var shots = 0;
+            m_Fixture.Bus.Subscribe<WeaponFiredEvent>(evt =>
+            {
+                if (evt.ShooterId != 0)
+                {
+                    shots++;
+                }
+            });
+
             var agent = m_Fixture.SpawnAgent(weapon: weapon, reserveAmmo: 40);
             m_Fixture.Probe.HitTarget(m_Fixture.PlayerId);
 
-            m_Fixture.Advance(3f);
+            // 2 秒必定发现反应 + 点射节奏：给足时间打完弹匣并完成一次换弹。
+            m_Fixture.Advance(10f);
 
-            // 把状态一并写进断言消息：这个用例失败时最难回答的问题是
-            // "它到底没开枪，还是开了枪但没换弹"，而这两者的排查方向完全不同。
-            var diagnosis = $"状态={agent.CurrentState}，弹匣={agent.MagazineAmmo}，备弹={agent.ReserveAmmo}";
+            // 不直接断言"此刻弹匣里有子弹"：那一刻可能刚好又打空。
+            // 改成断言**弹药守恒**——打出的每一发都只能来自初始弹匣或某次换弹，
+            // 这个等式一旦不成立就说明换弹账目错了（正是 M4 期间踩过的那个坑）。
+            var remaining = agent.MagazineAmmo + agent.ReserveAmmo;
+            var expected = 4 + 40 - shots;
 
-            Assert.Less(agent.ReserveAmmo, 40, $"换弹应当消耗 AI 自带的备弹。{diagnosis}");
-            Assert.Greater(agent.MagazineAmmo, 0, $"换弹完成后弹匣里应当有子弹。{diagnosis}");
+            Assert.Greater(shots, 4, $"至少要打出超过一个弹匣的子弹，才能证明换弹发生过。状态={agent.CurrentState}");
+            Assert.Less(agent.ReserveAmmo, 40, "换弹应当消耗 AI 自带的备弹。");
+            Assert.AreEqual(
+                expected,
+                remaining,
+                $"弹药守恒被破坏：射出 {shots} 发后应当还剩 {expected} 发，实际 {remaining} 发。");
         }
 
         [Test]
@@ -125,7 +142,7 @@ namespace RaidDemo.Tests.EditMode
 
             var agent = m_Fixture.SpawnAgent();
             m_Fixture.Probe.HitTarget(m_Fixture.PlayerId);
-            m_Fixture.Advance(1f);
+            m_Fixture.Advance(4f);
 
             m_Fixture.World.TryGet(agent.CombatantId, out var state);
             state.SetHealth(0f);
@@ -133,6 +150,7 @@ namespace RaidDemo.Tests.EditMode
 
             m_Fixture.Advance(3f);
 
+            Assert.Greater(shotsAtDeath, 0, "前置条件：阵亡之前应当已经开过枪。");
             Assert.IsFalse(agent.IsAlive, "生命归零后 AI 应当被判定为死亡。");
             Assert.AreEqual(shotsAtDeath, shots, "尸体不应当继续开枪。");
         }

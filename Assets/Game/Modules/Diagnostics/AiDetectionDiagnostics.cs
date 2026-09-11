@@ -18,6 +18,9 @@ namespace RaidDemo.Diagnostics
         /// <summary>看得见。</summary>
         Visible = 0,
 
+        /// <summary>起疑：距离落在警惕区间、处于视野锥内且无遮挡，但还没有近到必定发现。</summary>
+        Suspected,
+
         /// <summary>没有目标：玩家尚未登记，或已阵亡 / 撤离。</summary>
         NoTarget,
 
@@ -59,6 +62,12 @@ namespace RaidDemo.Diagnostics
             get { return Failure == AiDetectionFailure.Visible; }
         }
 
+        /// <summary>是否处于警惕档（还看得见但距离不够近）。</summary>
+        public bool IsSuspected
+        {
+            get { return Failure == AiDetectionFailure.Suspected; }
+        }
+
         /// <summary>中文短标签，直接显示在界面上。</summary>
         public string Describe()
         {
@@ -66,6 +75,8 @@ namespace RaidDemo.Diagnostics
             {
                 case AiDetectionFailure.Visible:
                     return "可见";
+                case AiDetectionFailure.Suspected:
+                    return "警惕中";
                 case AiDetectionFailure.NoTarget:
                     return "无目标（未登记或已阵亡）";
                 case AiDetectionFailure.OutOfRange:
@@ -132,14 +143,15 @@ namespace RaidDemo.Diagnostics
                     AiAngles.ToDegrees(toTarget)))
                 : 0f;
 
-            if (distance > profile.ViewDistanceMeters)
+            // 分档复用 AI 自己的判定，避免"面板说警惕、AI 已经开火"这类矛盾。
+            var tier = profile.ClassifySighting(observerPosition, facing, target.Position);
+            if (tier == SightingTier.None)
             {
-                return new AiDetectionResult(AiDetectionFailure.OutOfRange, distance, angle);
-            }
-
-            if (!profile.IsInsideViewCone(observerPosition, facing, target.Position))
-            {
-                return new AiDetectionResult(AiDetectionFailure.OutsideViewCone, distance, angle);
+                // 看不见的原因只有两种：太远，或者不在视野锥里。
+                // 距离 ≤ 必定发现距离时不可能落到这里（那已经是"必定发现"档）。
+                return distance > profile.ViewDistanceMeters
+                    ? new AiDetectionResult(AiDetectionFailure.OutOfRange, distance, angle)
+                    : new AiDetectionResult(AiDetectionFailure.OutsideViewCone, distance, angle);
             }
 
             var sees = AISensor.HasLineOfSight(
@@ -149,8 +161,13 @@ namespace RaidDemo.Diagnostics
                 target.CombatantId,
                 profile.ViewDistanceMeters);
 
+            if (!sees)
+            {
+                return new AiDetectionResult(AiDetectionFailure.Blocked, distance, angle);
+            }
+
             return new AiDetectionResult(
-                sees ? AiDetectionFailure.Visible : AiDetectionFailure.Blocked,
+                tier == SightingTier.Guaranteed ? AiDetectionFailure.Visible : AiDetectionFailure.Suspected,
                 distance,
                 angle);
         }

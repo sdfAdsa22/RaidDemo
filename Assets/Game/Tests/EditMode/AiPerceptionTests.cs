@@ -199,5 +199,20 @@ namespace RaidDemo.Tests.EditMode
         {
             Assert.IsNull(new AIPerceptionProfile().Validate(), "默认参数必须合法，否则每次启动都会报配置错误。");
         }
+
+        [Test]
+        public void Profile_Validate_RejectsEngagementDistanceOutsideGuaranteedRange()
+        {
+            // 期望交战距离一旦超过必定发现距离，AI 会停在"看得见但不该开火"的位置上站着不开枪。
+            // 这是一条很容易在调参时踩到的规则，因此让配置校验直接拦下来。
+            var broken = new AIPerceptionProfile
+            {
+                GuaranteedDetectionDistance = 6f,
+                PreferredEngageDistance = 8f,
+                EngageDistanceTolerance = 2f,
+            };
+
+            Assert.IsNotNull(broken.Validate(), "站位距离超出必定发现距离时应当被校验拦下。");
+        }
     }
 }

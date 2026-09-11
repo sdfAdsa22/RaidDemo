@@ -60,6 +60,11 @@ namespace RaidDemo.AI
                 return new AiTransition(AiStateId.Engage, "巡逻中遭到攻击");
             }
 
+            if (snapshot.SuspectedTarget)
+            {
+                return new AiTransition(AiStateId.Alert, "巡逻中发现可疑目标");
+            }
+
             if (snapshot.HeardNoise)
             {
                 context.RememberThreat(snapshot.NoisePosition);

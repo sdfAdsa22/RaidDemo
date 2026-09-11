@@ -29,7 +29,7 @@ namespace RaidDemo.Tests.EditMode
             var near = m_Fixture.SpawnAgent(new Vector2F(0f, 0f));
             var far = m_Fixture.SpawnAgent(new Vector2F(25f, 0f));
 
-            // 奔跑档的可听半径默认 18 米：近处 AI 听得到，25 米外的听不到。
+            // 奔跑档的可听半径默认 10 米：近处 AI 听得到，25 米外的听不到。
             m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
                 sourceId: 0,
                 position: Vector2F.Zero,
@@ -44,7 +44,20 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void Noise_OverloadedTravelsFurthest()
         {
-            var far = m_Fixture.SpawnAgent(new Vector2F(24f, 0f));
+            // 11 米处：奔跑（10 米）听不到，超载（12 米）听得到。
+            var far = m_Fixture.SpawnAgent(new Vector2F(11f, 0f));
+
+            m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
+                sourceId: 0,
+                position: Vector2F.Zero,
+                tier: MovementNoiseTier.Sprint));
+
+            m_Fixture.Advance(0.1f);
+
+            Assert.AreEqual(
+                AiStateId.Patrol,
+                far.CurrentState,
+                "前置条件：11 米超出奔跑步行档（10 米），此时它应当还没有反应。");
 
             m_Fixture.Director.ReportNoise(new MovementNoiseEvent(
                 sourceId: 0,
@@ -56,7 +69,7 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(
                 AiStateId.Investigate,
                 far.CurrentState,
-                "超载（26 米）应当能惊动步行（8 米）与奔跑（18 米）都听不到的距离。");
+                "超载档（12 米）应当能惊动奔跑档（10 米）听不到的距离。");
         }
 
         [Test]

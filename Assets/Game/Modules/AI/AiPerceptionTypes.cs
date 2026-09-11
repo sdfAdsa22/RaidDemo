@@ -4,6 +4,27 @@ using UnityEngine;
 namespace RaidDemo.AI
 {
     /// <summary>
+    /// 一次视觉观测的档位。
+    /// </summary>
+    /// <remarks>
+    /// 分档的依据是距离，且**两档的行为完全不同**：
+    /// 必定发现会直接进入交战（但有开火延迟），警惕只会让 AI 停下来盯着你看。
+    /// 把分档放在参数对象上统一计算，是为了让 AI 与开发者模式用同一套判定，
+    /// 不会出现"面板说警惕、AI 却已经开火"的矛盾。
+    /// </remarks>
+    public enum SightingTier
+    {
+        /// <summary>看不见。</summary>
+        None = 0,
+
+        /// <summary>警惕：落在警惕区间且处于视野锥内（仍需无遮挡）。</summary>
+        Suspected,
+
+        /// <summary>必定发现：距离足够近，忽略朝向（仍需无遮挡）。</summary>
+        Guaranteed,
+    }
+
+    /// <summary>
     /// AI 的当前目标（当前版本就是玩家）。
     /// </summary>
     /// <remarks>
@@ -76,6 +97,24 @@ namespace RaidDemo.AI
         /// <summary>本帧是否同时满足"在视野锥内"与"无遮挡"。</summary>
         public bool SeesTarget;
 
+        /// <summary>
+        /// 本帧是否只是"起疑"：距离落在警惕区间、处于视野锥内且无遮挡。
+        /// </summary>
+        /// <remarks>
+        /// 警惕与"看见"是**互斥**的两档：位于 6~9 米时只会起疑，不会直接开火。
+        /// </remarks>
+        public bool SuspectedTarget;
+
+        /// <summary>
+        /// 本帧进入交战时应当使用的开火延迟（秒）。
+        /// </summary>
+        /// <remarks>
+        /// 由感知按"目标是怎么被发现的"决定：必定发现要等 2 秒才开火；
+        /// 警惕确认的情况已经观察了 5 秒，进入交战后立刻开火；
+        /// 遭到攻击等非视觉来源使用较短的反应时间。
+        /// </remarks>
+        public float EngagementReactionSeconds;
+
         /// <summary>本帧是否收到了新的噪音刺激。</summary>
         public bool HeardNoise;
 
@@ -107,6 +146,9 @@ namespace RaidDemo.AI
             WasDamaged = false;
             DamageSourcePosition = Vector2F.Zero;
             DamageSourceId = 0;
+            SeesTarget = false;
+            SuspectedTarget = false;
+            EngagementReactionSeconds = 0f;
         }
     }
 
