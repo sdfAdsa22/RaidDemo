@@ -32,6 +32,12 @@ namespace RaidDemo.UI
         /// </remarks>
         public void RebuildLayout(InventoryGrid backpack, int containerId)
         {
+            // 先记住当前打开的战利品容器，并把状态清成「没有打开」。
+            // 重建会销毁它的视图；若状态还留着这个 ID，OpenLootContainer 会以为
+            // 「这个容器已经展示过了」而跳过重建——表现就是面板消失、重搜同一个箱子也不回来。
+            var openLootId = m_LootContainerId;
+            m_LootContainerId = 0;
+
             if (m_CanvasHost != null)
             {
                 Destroy(m_CanvasHost);
@@ -53,6 +59,13 @@ namespace RaidDemo.UI
             BuildLayout();
             RefreshAll();
             SetVisible(wasOpen);
+
+            // 把打开着的战利品面板按原样恢复。标题用网格自己的标签，
+            // 它就是创建容器时写进网格的显示名，不必再去问容器定义。
+            if (wasOpen && openLootId > 0 && m_Registry.TryGetGrid(openLootId, out var loot))
+            {
+                OpenLootContainer(openLootId, loot.Label);
+            }
         }
 
         /// <summary>构建整套界面。</summary>
