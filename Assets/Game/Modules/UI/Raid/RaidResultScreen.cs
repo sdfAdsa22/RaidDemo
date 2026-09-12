@@ -112,7 +112,7 @@ namespace RaidDemo.UI
                 ButtonColor, ButtonHoverColor);
 
             m_MenuButton = RaidScreenFactory.CreateButton(
-                panel, "返回主菜单（Esc）", new Vector2(392f, 588f), new Vector2(320f, 58f),
+                panel, "返回安全屋（Esc）", new Vector2(392f, 588f), new Vector2(320f, 58f),
                 SecondaryButtonColor, SecondaryHoverColor);
 
             SetVisible(false);

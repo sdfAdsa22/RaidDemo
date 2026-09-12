@@ -1,0 +1,255 @@
+using RaidDemo.Data;
+using RaidDemo.Input;
+using RaidDemo.Inventory;
+using RaidDemo.Kernel;
+using RaidDemo.Meta;
+using RaidDemo.Presentation;
+using RaidDemo.Shared;
+using RaidDemo.Simulation;
+using RaidDemo.UI;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace RaidDemo.Bootstrap
+{
+    /// <summary>
+    /// 安全屋的装配入口：局外空间的组合根。
+    /// </summary>
+    /// <remarks>
+    /// <para>它比战局的 <c>SceneBootstrap</c> 轻得多——没有 AI、没有战局会话、没有计时。
+    /// 但**背包与装备那套东西是同一套**：仓库与随身携带物都来自跨场景存活的
+    /// <see cref="MetaProgress"/>，界面、拖拽、命令路由全部复用。</para>
+    ///
+    /// <para>它负责四件事：让玩家能走动、能在设施前按 E、能从出口出击、以及把仓库界面打开。</para>
+    /// </remarks>
+    [DisallowMultipleComponent]
+    public sealed partial class SafeHouseBootstrap : MonoBehaviour
+    {
+        /// <summary>玩家出生点。</summary>
+        [SerializeField] private Vector2 m_PlayerSpawnPosition;
+
+        [SerializeField] private PlayerMotor m_PlayerMotor;
+        [SerializeField] private PlayerInputCollector m_InputCollector;
+        [SerializeField] private TopDownCameraController m_CameraController;
+        [SerializeField] private ItemCatalog m_ItemCatalog;
+
+        private EventBus m_EventBus;
+        private ServiceLocator m_Services;
+        private CommandRouter m_CommandRouter;
+        private PlayerMovementProfile m_MovementProfile;
+        private PlayerMoveCommandHandler m_MoveHandler;
+        private ContainerRegistry m_Registry;
+        private PlayerLoadout m_Loadout;
+        private InventoryScreenController m_InventoryScreen;
+        private int m_BackpackContainerId;
+        private int m_AmmoPouchContainerId;
+        private int m_StashContainerId;
+        private uint m_CommandSequence;
+        private Vector2F m_PendingMove;
+        private Vector2F m_PendingLook;
+        private bool m_PendingSprint;
+        private SafeHouseInteractable m_Nearby;
+        private SafeHouseUI m_Ui;
+
+        /// <summary>初始化顺序与战局一致：服务 → 命令 → 界面 → 表现。</summary>
+        private void Awake()
+        {
+            Application.runInBackground = true;
+
+            m_Services = new ServiceLocator();
+            m_EventBus = new EventBus();
+            m_CommandRouter = new CommandRouter();
+            m_Services.Register(m_EventBus);
+            m_Services.Register(m_CommandRouter);
+            m_Services.Register(new LogService(LogLevel.Info));
+            ServiceLocatorHolder.Set(m_Services);
+
+            m_MovementProfile = new PlayerMovementProfile();
+            var facing = Vector2F.FromDegrees(0f);
+            var simulator = new PlayerMovementSimulator(
+                m_MovementProfile,
+                new Vector2F(m_PlayerSpawnPosition.x, m_PlayerSpawnPosition.y),
+                facing,
+                m_PlayerMotor != null
+                    ? new PhysicsMovementCollisionService(m_PlayerMotor.transform, 1.8f, 0.02f)
+                    : null,
+                0.4f);
+
+            m_MoveHandler = new PlayerMoveCommandHandler(simulator, m_EventBus);
+            m_CommandRouter.Register(m_MoveHandler);
+
+            InitializeInventory();
+
+            if (m_PlayerMotor != null)
+            {
+                m_PlayerMotor.Rebind(m_EventBus);
+                m_PlayerMotor.SnapTo(m_PlayerSpawnPosition, new Vector2(facing.X, facing.Y));
+            }
+
+            if (m_CameraController != null && m_PlayerMotor != null)
+            {
+                m_CameraController.SetTarget(m_PlayerMotor.transform, snap: true);
+            }
+
+            var uiHost = new GameObject("SafeHouseUI");
+            uiHost.transform.SetParent(transform, worldPositionStays: false);
+            m_Ui = uiHost.AddComponent<SafeHouseUI>();
+            m_Ui.Initialize(StartRaid);
+
+            // 启动时先显示极简主菜单（开始 / 退出）；从战局回来时直接进安全屋。
+            var flow = RaidFlowController.Ensure();
+            if (flow.State == RaidFlowController.FlowState.MainMenu)
+            {
+                flow.ShowMainMenu();
+            }
+            else
+            {
+                flow.HideScreens();
+                m_InputCollector?.SetCursorLock(true);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            ServiceLocatorHolder.Clear();
+            m_Services?.Clear();
+        }
+
+        /// <summary>出战：切到战局场景。</summary>
+        private void StartRaid()
+        {
+            RaidFlowController.Ensure().StartRaid();
+        }
+
+        private void Update()
+        {
+            if (m_MoveHandler == null)
+            {
+                return;
+            }
+
+            var uiOpen = (m_InventoryScreen != null && m_InventoryScreen.IsOpen)
+                || (m_Ui != null && m_Ui.IsOpen);
+
+            if (m_InputCollector != null && Application.isFocused && Cursor.lockState != CursorLockMode.Locked && !uiOpen)
+            {
+                m_InputCollector.SetCursorLock(true);
+            }
+
+            if (uiOpen)
+            {
+                m_MoveHandler.ClearIntent();
+            }
+            else
+            {
+                CollectInput();
+            }
+
+            m_MoveHandler.Tick(Time.deltaTime);
+
+            if (m_InputCollector != null && m_PlayerMotor != null)
+            {
+                m_InputCollector.SetOriginPosition(m_PlayerMotor.SimulatedPosition);
+                m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
+            }
+
+            UpdateInteraction(uiOpen);
+        }
+
+        /// <summary>读取输入并派发移动命令。与战局用同一条链路，手感因此完全一致。</summary>
+        private void CollectInput()
+        {
+            if (m_InputCollector == null)
+            {
+                m_PendingMove = Vector2F.Zero;
+                m_PendingLook = Vector2F.Zero;
+                m_PendingSprint = false;
+                return;
+            }
+
+            m_PendingMove = m_InputCollector.ReadMoveIntent(out var sprint);
+            m_PendingLook = m_InputCollector.LookDirection;
+            m_PendingSprint = sprint;
+
+            m_CommandRouter.Dispatch(new PlayerMoveIntent(
+                m_InputCollector.PlayerId,
+                m_PendingMove,
+                m_PendingLook,
+                m_PendingSprint,
+                ++m_CommandSequence));
+        }
+
+        /// <summary>找出最近的可交互设施，并按 E 触发。</summary>
+        private void UpdateInteraction(bool uiOpen)
+        {
+            if (uiOpen || m_PlayerMotor == null)
+            {
+                m_Nearby = null;
+                m_Ui?.SetPrompt(null);
+                return;
+            }
+
+            var simulated = m_PlayerMotor.SimulatedPosition;
+            var position = new Vector2F(simulated.x, simulated.y);
+            m_Nearby = FindNearest(position);
+            m_Ui?.SetPrompt(m_Nearby != null ? $"按 E 与「{m_Nearby.DisplayName}」交互" : null);
+
+            if (m_Nearby == null || m_InputCollector == null || !m_InputCollector.ReadInteractIntent())
+            {
+                return;
+            }
+
+            Activate(m_Nearby);
+        }
+
+        /// <summary>按设施类型分派行为。</summary>
+        private void Activate(SafeHouseInteractable target)
+        {
+            switch (target.Type)
+            {
+                case SafeHouseInteractable.Kind.Stash:
+                    // 打开背包界面，右侧面板显示仓库——与主菜单里的出击准备是同一块界面。
+                    m_InventoryScreen?.SetStashContainer(m_StashContainerId);
+                    m_InventoryScreen?.OpenStash(m_StashContainerId);
+                    break;
+
+                case SafeHouseInteractable.Kind.Exit:
+                    m_Ui?.ShowMap();
+                    break;
+
+                case SafeHouseInteractable.Kind.Merchant:
+                    m_Ui?.ShowHint("商人：交易功能在批次 3 开放");
+                    break;
+
+                default:
+                    m_Ui?.ShowHint("任务板：批次 4 开放");
+                    break;
+            }
+        }
+
+        /// <summary>找出生点周围最近、且在交互距离内的设施。</summary>
+        private SafeHouseInteractable FindNearest(Vector2F position)
+        {
+            var all = UnityEngine.Object.FindObjectsByType<SafeHouseInteractable>(FindObjectsSortMode.None);
+            SafeHouseInteractable nearest = null;
+            var best = float.MaxValue;
+
+            for (var i = 0; i < all.Length; i++)
+            {
+                var candidate = all[i];
+                var dx = candidate.transform.position.x - position.X;
+                var dz = candidate.transform.position.z - position.Y;
+                var squared = (dx * dx) + (dz * dz);
+                if (squared > candidate.RangeMeters * candidate.RangeMeters || squared >= best)
+                {
+                    continue;
+                }
+
+                best = squared;
+                nearest = candidate;
+            }
+
+            return nearest;
+        }
+    }
+}

@@ -27,21 +27,6 @@ namespace RaidDemo.UI
         private static readonly Color ButtonColor = new Color(0.18f, 0.46f, 0.80f);
         private static readonly Color ButtonHoverColor = new Color(0.26f, 0.58f, 0.94f);
 
-        /// <summary>操作说明文本。</summary>
-        /// <remarks>
-        /// 写在代码里而不是做成可配置文本：它与键位绑定是同源的，
-        /// 拆成两份迟早会出现「说明写着 R 装弹、实际改了键」的不一致。
-        /// </remarks>
-        private const string ControlsText =
-            "WASD          移动\n" +
-            "Shift           奔跑（消耗体力）\n" +
-            "鼠标左键     射击\n" +
-            "R                装弹（只从弹药挂取弹）\n" +
-            "滚轮 / 1 2    切换武器\n" +
-            "E                搜刮容器（读条 2 秒）\n" +
-            "Tab             背包（双击快速搬运）\n" +
-            "F1 / F2         开发者可视化与数据面板\n" +
-            "Enter           出击";
 
         private RectTransform m_Root;
         private RaidButtonWidget m_DeployButton;
@@ -80,25 +65,15 @@ namespace RaidDemo.UI
                 ButtonHoverColor);
 
             RaidScreenFactory.CreateLabel(
-                panel, ControlsText, new Vector2(400f, 162f), new Vector2(360f, 300f),
+                panel,
+                "在一块不大的安全屋里，你可以整理仓库、试枪、从出口选地图出击。\n"
+                + "操作说明写在安全屋的墙上；出击前的准备也都在那里完成。",
+                new Vector2(48f, 272f), new Vector2(700f, 80f),
                 17, TextAnchor.UpperLeft, BodyColor);
 
             RaidScreenFactory.CreateLabel(
                 panel,
-                "目标：搜刮物资，然后活着从绿色撤离点离开。贪得越多，风险越大。",
-                new Vector2(48f, 272f), new Vector2(320f, 160f),
-                18, TextAnchor.UpperLeft, BodyColor);
-
-            RaidScreenFactory.CreateLabel(
-                panel,
-                "出击前按 Tab 打开仓库：把装备与弹药拖到身上，再按 Enter 出发。\n"
-                + "阵亡会连身上带的一起丢，所以「带什么出门」就是这一局的赌注。",
-                new Vector2(48f, 420f), new Vector2(700f, 60f),
-                16, TextAnchor.UpperLeft, HintColor);
-
-            RaidScreenFactory.CreateLabel(
-                panel,
-                "单人 · Windows · 一局 8 分钟",
+                "单人 · Windows · 一局 8 分钟　｜　Esc 退出游戏",
                 new Vector2(48f, 500f), new Vector2(700f, 26f),
                 15, TextAnchor.MiddleLeft, HintColor);
 
@@ -136,6 +111,18 @@ namespace RaidDemo.UI
 
             var clicked = hovered && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
             var confirmed = keyboard != null && keyboard.enterKey.wasPressedThisFrame;
+
+            // Esc 退出游戏。编辑器里退出播放模式，构建里真正退出——
+            // 否则在编辑器里点「退出」会毫无反应，看起来像坏了。
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+            {
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
+                return;
+            }
 
             if (clicked || confirmed)
             {

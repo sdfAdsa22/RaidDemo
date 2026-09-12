@@ -36,9 +36,18 @@ namespace RaidDemo.Bootstrap
 
             /// <summary>已结算：战局世界冻结，显示结算面板。</summary>
             Result = 2,
+
+            /// <summary>安全屋：玩家在局外空间里走动、整理装备、选择地图。</summary>
+            SafeHouse = 3,
         }
 
         private static RaidFlowController s_Instance;
+
+        /// <summary>安全屋场景名。启动与结算后都回到这里。</summary>
+        private const string SafeHouseSceneName = "SafeHouse";
+
+        /// <summary>战局场景名。</summary>
+        private const string RaidSceneName = "GreyboxRaid";
 
         private MainMenuScreen m_MenuScreen;
         private RaidResultScreen m_ResultScreen;
@@ -87,10 +96,10 @@ namespace RaidDemo.Bootstrap
             DontDestroyOnLoad(gameObject);
 
             m_MenuScreen = gameObject.AddComponent<MainMenuScreen>();
-            m_MenuScreen.Initialize(StartRaid);
+            m_MenuScreen.Initialize(EnterSafeHouse);
 
             m_ResultScreen = gameObject.AddComponent<RaidResultScreen>();
-            m_ResultScreen.Initialize(StartRaid, ReturnToMenu);
+            m_ResultScreen.Initialize(StartRaid, GoToSafeHouse);
         }
 
         /// <summary>
@@ -114,7 +123,36 @@ namespace RaidDemo.Bootstrap
         {
             State = FlowState.InRaid;
             HideScreens();
-            ReloadScene();
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(RaidSceneName);
+        }
+
+        /// <summary>
+        /// 从主菜单进入安全屋。
+        /// </summary>
+        /// <remarks>
+        /// 不换场景：启动场景就是安全屋，主菜单只是盖在它上面的一层。
+        /// 因此「开始」= 把菜单收起来，玩家立刻站在安全屋里。
+        /// </remarks>
+        public void EnterSafeHouse()
+        {
+            State = FlowState.SafeHouse;
+            HideScreens();
+        }
+
+        /// <summary>
+        /// 回到安全屋。
+        /// </summary>
+        /// <remarks>
+        /// 结算之后的去处是安全屋，而不是主菜单：那里才是玩家整理战利品、
+        /// 决定下一局带什么的地方。主菜单只在启动时出现一次。
+        /// </remarks>
+        public void GoToSafeHouse()
+        {
+            State = FlowState.SafeHouse;
+            HideScreens();
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(SafeHouseSceneName);
         }
 
         /// <summary>返回主菜单：重载场景，让新场景以主菜单状态启动。</summary>
