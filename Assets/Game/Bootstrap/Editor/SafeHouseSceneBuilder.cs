@@ -85,7 +85,22 @@ namespace RaidDemo.Bootstrap.Editor
 
             var bootstrapObject = new GameObject("SafeHouseBootstrap");
             var collector = bootstrapObject.AddComponent<RaidDemo.Input.PlayerInputCollector>();
-            bootstrapObject.AddComponent<RaidDemo.Bootstrap.SafeHouseBootstrap>();
+            var bootstrap = bootstrapObject.AddComponent<RaidDemo.Bootstrap.SafeHouseBootstrap>();
+
+            // 必须显式写入序列化引用：这些字段只由编辑器装配，运行时不会自己去找对象。
+            // 漏掉它们的症状极具迷惑性——相机停在原点朝北看（正好对着墙上的说明牌），
+            // 玩家看起来「没有出生」，而实际上角色就在原点、只是没有相机跟随。
+            var bootstrapSerialized = new SerializedObject(bootstrap);
+            bootstrapSerialized.FindProperty("m_PlayerSpawnPosition").vector2Value =
+                new Vector2(PlayerSpawn.x, PlayerSpawn.z);
+            bootstrapSerialized.FindProperty("m_PlayerMotor").objectReferenceValue =
+                Object.FindFirstObjectByType<RaidDemo.Presentation.PlayerMotor>();
+            bootstrapSerialized.FindProperty("m_InputCollector").objectReferenceValue = collector;
+            bootstrapSerialized.FindProperty("m_CameraController").objectReferenceValue = controller;
+            bootstrapSerialized.FindProperty("m_ItemCatalog").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<RaidDemo.Data.ItemCatalog>(
+                    "Assets/Game/Content/Items/ItemCatalog.asset");
+            bootstrapSerialized.ApplyModifiedPropertiesWithoutUndo();
 
             var actions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(
                 "Assets/InputSystem_Actions.inputactions");
