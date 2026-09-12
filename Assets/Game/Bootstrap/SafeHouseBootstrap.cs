@@ -183,6 +183,7 @@ namespace RaidDemo.Bootstrap
             }
 
             m_WeaponController.SetTriggerHeld(wantsToFire);
+            UpdateWeaponPresentation();
             if (!wantsToFire)
             {
                 return;

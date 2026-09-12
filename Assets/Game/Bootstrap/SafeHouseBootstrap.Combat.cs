@@ -1,4 +1,5 @@
 using RaidDemo.Combat;
+using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
 using RaidDemo.Presentation;
@@ -33,6 +34,15 @@ namespace RaidDemo.Bootstrap
         private PlayerWeaponView m_WeaponView;
         private CombatHud m_CombatHud;
         private int m_PlayerCombatantId;
+
+        /// <summary>上一帧显示在手上的武器，用于判断「换枪了没有」。</summary>
+        private ItemInstance m_LastShownWeapon;
+
+        /// <summary>灰盒枪身长度（格）。步枪更长，手枪更短。</summary>
+        private int m_WeaponLengthCells = 2;
+
+        /// <summary>准星（战局里由场景启动层负责，安全屋同样需要）。</summary>
+        private AimCrosshair m_Crosshair;
 
         /// <summary>装配武器与靶场。</summary>
         private void InitializeCombat()
@@ -71,7 +81,78 @@ namespace RaidDemo.Bootstrap
             m_CombatHud = hudHost.AddComponent<CombatHud>();
             m_CombatHud.Initialize(m_WeaponController, m_Loadout);
 
+            var crosshairHost = new GameObject("AimCrosshair");
+            crosshairHost.transform.SetParent(transform, worldPositionStays: false);
+            m_Crosshair = crosshairHost.AddComponent<AimCrosshair>();
+
             RegisterTargets();
+        }
+
+        /// <summary>
+        /// 把当前武器同步给表现层，并让枪模型与准星跟随。
+        /// </summary>
+        /// <remarks>
+        /// 这里用「每帧比对上一帧的武器」而不是订阅换枪事件：安全屋只关心
+        /// 「手上是什么」，比对一次引用比接一条事件更简单，也不会因为事件名变化而失效。
+        /// </remarks>
+        private void UpdateWeaponPresentation()
+        {
+            var weapon = m_Loadout?.Equipment?.Get(EquipmentSlot.PrimaryWeapon);
+            if (!ReferenceEquals(weapon, m_LastShownWeapon))
+            {
+                m_LastShownWeapon = weapon;
+                m_WeaponLengthCells = weapon != null ? weapon.Definition.GridSize.Width : 2;
+                m_CombatHud?.SetWeapon(
+                    weapon != null ? weapon.Definition.DisplayName : null,
+                    weapon?.Definition?.WeaponStats?.CaliberId);
+            }
+
+            if (m_WeaponView != null && m_PlayerMotor != null && m_WeaponController != null)
+            {
+                m_WeaponView.UpdateView(
+                    m_PlayerMotor.transform.position,
+                    m_WeaponController.AimDegrees,
+                    m_WeaponController.Weapon.IsEquipped,
+                    m_WeaponLengthCells);
+            }
+
+            UpdateCrosshair();
+        }
+
+        /// <summary>把世界瞄准点反投影回屏幕，与战局里同一套算法。</summary>
+        private void UpdateCrosshair()
+        {
+            if (m_Crosshair == null || m_InputCollector == null || m_CameraController == null || m_PlayerMotor == null)
+            {
+                return;
+            }
+
+            var worldAim = m_InputCollector.AimWorldPosition;
+            if (worldAim.IsNearlyZero)
+            {
+                m_Crosshair.Hide();
+                return;
+            }
+
+            var camera = m_CameraController.GetComponent<Camera>();
+            if (camera == null)
+            {
+                m_Crosshair.Hide();
+                return;
+            }
+
+            var screen = camera.WorldToScreenPoint(new Vector3(
+                worldAim.X,
+                m_PlayerMotor.transform.position.y,
+                worldAim.Y));
+
+            if (screen.z < 0f)
+            {
+                m_Crosshair.Hide();
+                return;
+            }
+
+            m_Crosshair.SetScreenPosition(new Vector2(screen.x, screen.y));
         }
 
         /// <summary>把场景里的靶子登记成可受击单位，并挂上伤害数字。</summary>
