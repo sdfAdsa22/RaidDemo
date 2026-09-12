@@ -158,6 +158,13 @@ namespace RaidDemo.Shared
         /// <summary>背包里没有匹配口径的弹药。</summary>
         public const string CombatNoAmmo = "combat_no_ammo";
 
+        /// <summary>
+        /// 阵亡状态下尝试使用武器。
+        /// </summary>
+        /// <remarks>与"没有武器"分开：把阵亡报成"没有武器"会让排查战局问题时
+        /// 往装备丢失的方向查，而真正的原因在别处。</remarks>
+        public const string CombatIncapacitated = "combat_incapacitated";
+
         /// <summary>金币余额不足，交易被拒绝。</summary>
         public const string MetaInsufficientFunds = "meta_insufficient_funds";
 

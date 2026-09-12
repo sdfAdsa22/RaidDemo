@@ -193,6 +193,12 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 阵亡闸门：把"玩家还在不在"每帧写给武器控制器。
+            // 玩家单位尚未登记时（初始化中途）按存活处理，避免先后顺序把玩家锁死；
+            // 战局里 m_PlayerCombatantId 在 Awake 阶段就已分配，正常流程不会走到这一支。
+            var alive = m_PlayerCombatantId == 0 || IsPlayerAlive();
+            m_WeaponController.SetAlive(alive);
+
             SyncEquippedWeapon();
             m_WeaponController.SetMuzzlePosition(ResolveMuzzlePosition());
             UpdateCriticalAxis();
@@ -210,10 +216,10 @@ namespace RaidDemo.Bootstrap
                     ++m_CommandSequence));
             }
 
-            if (inventoryOpen)
+            if (inventoryOpen || !alive)
             {
                 // 翻背包时松开扳机。否则关掉背包的瞬间会立刻打出一发，
-                // 而玩家以为自己刚才只是在整理东西。
+                // 而玩家以为自己刚才只是在整理东西。阵亡同理。
                 m_WeaponController.SetTriggerHeld(false);
             }
             else

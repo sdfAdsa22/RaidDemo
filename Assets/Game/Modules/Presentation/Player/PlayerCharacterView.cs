@@ -23,6 +23,7 @@ namespace RaidDemo.Presentation
     public sealed class PlayerCharacterView : MonoBehaviour
     {
         private static readonly int SpeedId = Animator.StringToHash("Speed");
+        private static readonly int SprintingId = Animator.StringToHash("Sprinting");
         private static readonly int ArmedId = Animator.StringToHash("Armed");
         private static readonly int ShootId = Animator.StringToHash("Shoot");
         private static readonly int DieId = Animator.StringToHash("Die");
@@ -89,20 +90,42 @@ namespace RaidDemo.Presentation
             }
 
             m_Animator.SetFloat(SpeedId, evt.Speed);
+
+            // "是否在奔跑"直接用模拟层的结论，而不是再拿速度和一个阈值比一次：
+            // 阈值会随负重变化（超载时冲刺门槛会降低），在表现层复制一份必然对不上，
+            // 表现为"系统认为你在跑（掉体力、噪音按奔跑算），画面上还在走"。
+            m_Animator.SetBool(SprintingId, evt.IsSprinting);
         }
 
         /// <summary>只有玩家自己的枪声才触发开火动画（敌人的射击由各自的视图处理）。</summary>
         private void OnWeaponFired(WeaponFiredEvent evt)
         {
-            if (m_Animator == null || m_IsDead && !IsLocalPlayer(evt.ShooterId))
+            if (!ShouldPlayShootAnimation(m_Animator != null, m_IsDead, IsLocalPlayer(evt.ShooterId)))
             {
                 return;
             }
 
-            if (IsLocalPlayer(evt.ShooterId))
-            {
-                m_Animator.SetTrigger(ShootId);
-            }
+            m_Animator.SetTrigger(ShootId);
+        }
+
+        /// <summary>
+        /// 判断一次开火是否应该触发开火动画。
+        /// </summary>
+        /// <param name="hasAnimator">角色身上是否找到了动画控制器。</param>
+        /// <param name="isDead">角色是否已阵亡。</param>
+        /// <param name="isLocalPlayer">开火者是不是本地玩家。</param>
+        /// <returns>应该播放开火动画时返回 true。</returns>
+        /// <remarks>
+        /// <para><b>抽成静态方法是为了能测。</b>这里原本写的是
+        /// <c>m_Animator == null || m_IsDead &amp;&amp; !IsLocalPlayer(...)</c>——
+        /// C# 里 <c>&amp;&amp;</c> 的优先级高于 <c>||</c>，于是"本地玩家已阵亡"时整个条件为假、
+        /// 不会提前返回，倒地动画被自己的枪声打断，看起来像"尸体会站起来开枪"。</para>
+        /// <para>这条缺陷不报错、不崩溃，只有进游戏盯着看才会发现；
+        /// 把它变成一行可断言的布尔表达式，是唯一能长期防住它的办法。</para>
+        /// </remarks>
+        public static bool ShouldPlayShootAnimation(bool hasAnimator, bool isDead, bool isLocalPlayer)
+        {
+            return hasAnimator && !isDead && isLocalPlayer;
         }
 
         /// <summary>玩家被击杀时切到倒地动画，并停止后续的状态驱动。</summary>

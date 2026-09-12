@@ -33,6 +33,12 @@ namespace RaidDemo.Combat
         private int m_PlayerId;
         private uint m_Sequence;
 
+        /// <summary>
+        /// 持有者是否存活。
+        /// </summary>
+        /// <remarks>默认存活：安全屋与测试环境没有阵亡概念，由装配层在战局里每帧写入真实状态。</remarks>
+        private bool m_IsAlive = true;
+
         /// <summary>创建控制器。</summary>
         /// <param name="weapon">手持武器状态。</param>
         /// <param name="loadout">角色携带物，换弹时从这里取弹药。</param>
@@ -145,6 +151,29 @@ namespace RaidDemo.Combat
         }
 
         /// <summary>
+        /// 设置持有者是否存活。
+        /// </summary>
+        /// <param name="alive">是否存活。</param>
+        /// <remarks>
+        /// <para><b>为什么存活状态要由外部写入，而不是控制器自己查：</b>控制器不认识战斗世界里的
+        /// "哪个单位是我"——它只负责把武器打出去。让装配层每帧告诉它"玩家还在不在"，
+        /// 控制器就不必为了这一条规则去持有单位标识，职责边界保持不变。</para>
+        /// <para>阵亡时顺手松开扳机：否则"阵亡时正按着左键"的状态会被保留下来，
+        /// 下一局或重新装备武器时会莫名其妙地立刻打出一发。</para>
+        /// </remarks>
+        public void SetAlive(bool alive)
+        {
+            m_IsAlive = alive;
+            if (!alive)
+            {
+                m_TriggerHeld = false;
+            }
+        }
+
+        /// <summary>持有者当前是否存活。</summary>
+        public bool IsAlive => m_IsAlive;
+
+        /// <summary>
         /// 请求换弹。
         /// </summary>
         /// <param name="playerId">发起玩家。</param>
@@ -158,6 +187,12 @@ namespace RaidDemo.Combat
         public bool TryRequestReload(int playerId, uint sequence, out string failureCode)
         {
             failureCode = null;
+            if (!m_IsAlive)
+            {
+                failureCode = CommandCodes.CombatIncapacitated;
+                return false;
+            }
+
             if (!m_Weapon.IsEquipped)
             {
                 failureCode = CommandCodes.CombatNoWeapon;
@@ -198,7 +233,9 @@ namespace RaidDemo.Combat
         /// <param name="deltaTime">时间步长（秒）。</param>
         public void Tick(float deltaTime)
         {
-            if (!m_Weapon.IsEquipped || deltaTime <= 0f)
+            // 阵亡后武器彻底停摆：不再扣扳机、不再推进换弹计时。
+            // 少了这一道闸门时，玩家阵亡动画已经在播"倒地"，人还能继续扫射。
+            if (!m_IsAlive || !m_Weapon.IsEquipped || deltaTime <= 0f)
             {
                 return;
             }

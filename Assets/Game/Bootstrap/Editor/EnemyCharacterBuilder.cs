@@ -27,6 +27,19 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>敌人身高（米），与玩家一致，便于对照视线与弹道。</summary>
         private const float TargetHeight = 1.8f;
 
+        /// <summary>
+        /// 走路与跑步的切换阈值（米/秒）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>这个值必须落在 AI 实际会走出的速度区间里，否则 Run 状态是死代码。</b>
+        /// 上一版取 4.5，而 AI 的速度档位是：巡逻 2、警戒 2.5、调查 3、交战 3.2、撤退 4.2
+        /// （见 <c>AIPerceptionProfile</c>）——**没有任何一个状态能达到 4.5**，
+        /// 于是三个敌人永远停在 Walk 状态，"跑"这个动作一次都不会播。</para>
+        /// <para>取 3.6：交战时（3.2）仍然走路，只有重伤撤退（4.2）才真的跑起来，
+        /// 这正好是想要的表现——远处一个敌人突然开始跑，意味着它快不行了。</para>
+        /// </remarks>
+        public const float RunSpeedThreshold = 3.6f;
+
         private static readonly string[] CharacterNames =
         {
             "Character_Soldier", "Character_Hazmat", "Character_Enemy"
@@ -166,29 +179,28 @@ namespace RaidDemo.Bootstrap.Editor
             EnsureStateLoops(characterName, walk);
             EnsureStateLoops(characterName, run);
 
-            AddTransition(idle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
-            AddTransition(walk, run, 0.12f, ("Speed", AnimatorConditionMode.Greater, 4.5f));
-            AddTransition(run, walk, 0.12f, ("Speed", AnimatorConditionMode.Less, 4.5f));
-            AddTransition(walk, idle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f));
-            AddTransition(run, idle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f));
+            CharacterAnimatorWiring.AddTransition(idle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
+            CharacterAnimatorWiring.AddTransition(walk, run, 0.12f, ("Speed", AnimatorConditionMode.Greater, RunSpeedThreshold));
+            CharacterAnimatorWiring.AddTransition(run, walk, 0.12f, ("Speed", AnimatorConditionMode.Less, RunSpeedThreshold));
+            CharacterAnimatorWiring.AddTransition(walk, idle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f));
+            CharacterAnimatorWiring.AddTransition(run, idle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f));
 
             var toShoot = machine.AddAnyStateTransition(shoot);
             toShoot.hasExitTime = false;
             toShoot.duration = 0.05f;
             toShoot.AddCondition(AnimatorConditionMode.If, 0f, "Shoot");
-            var shootBack = shoot.AddTransition(idle);
-            shootBack.hasExitTime = true;
-            shootBack.exitTime = 1f;
-            shootBack.duration = 0.1f;
+
+            // 开火播完回到"当时的移动状态"：交战中 AI 常常一边拉开距离一边开枪，
+            // 一律回 Idle 会让它每打一枪闪一下站立。三条条件互斥，按顺序判定。
+            CharacterAnimatorWiring.AddExitTransition(shoot, idle, 0.1f, ("Speed", AnimatorConditionMode.Less, 0.2f));
+            CharacterAnimatorWiring.AddExitTransition(shoot, run, 0.1f, ("Speed", AnimatorConditionMode.Greater, RunSpeedThreshold));
+            CharacterAnimatorWiring.AddExitTransition(shoot, walk, 0.1f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
 
             var toHit = machine.AddAnyStateTransition(hit);
             toHit.hasExitTime = false;
             toHit.duration = 0.05f;
             toHit.AddCondition(AnimatorConditionMode.If, 0f, "Hit");
-            var hitBack = hit.AddTransition(idle);
-            hitBack.hasExitTime = true;
-            hitBack.exitTime = 1f;
-            hitBack.duration = 0.1f;
+            CharacterAnimatorWiring.AddExitTransition(hit, idle, 0.1f);
 
             var toDie = machine.AddAnyStateTransition(death);
             toDie.hasExitTime = false;
@@ -244,21 +256,6 @@ namespace RaidDemo.Bootstrap.Editor
             var state = machine.AddState(clipKeys[0]);
             state.motion = ResolveClip(characterName, clipKeys);
             return state;
-        }
-
-        private static void AddTransition(
-            AnimatorState from,
-            AnimatorState to,
-            float duration,
-            params (string Name, AnimatorConditionMode Mode, float Threshold)[] conditions)
-        {
-            var transition = from.AddTransition(to);
-            transition.hasExitTime = false;
-            transition.duration = duration;
-            foreach (var condition in conditions)
-            {
-                transition.AddCondition(condition.Mode, condition.Threshold, condition.Name);
-            }
         }
 
         /// <summary>生成敌人预制体：解包、缩放、落地、挂 Animator、重赋材质。</summary>
@@ -366,7 +363,13 @@ namespace RaidDemo.Bootstrap.Editor
                 }
                 else if (source != null)
                 {
-                    material.SetColor("_BaseColor", source.color);
+                    M7MaterialLibrary.SetColorIfDifferent(material, "_BaseColor", source.color);
+
+                    // `_Color` 是内置渲染管线时代的遗留别名。本项目的材质都基于 URP，
+                    // 渲染只读 `_BaseColor`，但 Unity 保存材质时会把这个属性一起写进文件；
+                    // 不同步的话两个属性会长期不一致（实测出现过 `_BaseColor` 灰蓝、`_Color` 深灰），
+                    // 将来排查配色问题的人会先被这个假象带偏。
+                    M7MaterialLibrary.SetColorIfDifferent(material, "_Color", source.color);
                 }
 
                 renderer.sharedMaterial = material;
@@ -374,5 +377,6 @@ namespace RaidDemo.Bootstrap.Editor
 
             EditorUtility.SetDirty(material);
         }
+
     }
 }

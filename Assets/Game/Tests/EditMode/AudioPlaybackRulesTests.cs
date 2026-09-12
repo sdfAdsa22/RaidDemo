@@ -66,7 +66,7 @@ namespace RaidDemo.Tests.EditMode
             var cadence = new FootstepCadence();
             for (var i = 0; i < 100; i++)
             {
-                Assert.IsFalse(cadence.Advance(0f, 0.02f), "速度为 0 时不应触发脚步。");
+                Assert.IsFalse(cadence.Advance(0f, 0.02f, false), "速度为 0 时不应触发脚步。");
             }
         }
 
@@ -78,7 +78,7 @@ namespace RaidDemo.Tests.EditMode
             // 以 2 米/秒走 3 秒 = 6 米，步幅 0.95 米，因此大约 6 步，而不是按时间算出的十几步。
             for (var i = 0; i < 150; i++)
             {
-                if (cadence.Advance(2f, 0.02f))
+                if (cadence.Advance(2f, 0.02f, false))
                 {
                     steps++;
                 }
@@ -90,8 +90,8 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 奔跑时脚步比步行更密但不失控()
         {
-            var walk = CountSteps(3f, 3f);
-            var sprint = CountSteps(6f, 3f);
+            var walk = CountSteps(3f, 3f, isSprinting: false);
+            var sprint = CountSteps(6f, 3f, isSprinting: true);
 
             Assert.Greater(sprint, walk, "跑得更快时脚步应当更密。");
             Assert.LessOrEqual(sprint / 3f, 5.1f, "再快也不该超过每秒 5 步，否则听起来像机关枪。");
@@ -105,23 +105,36 @@ namespace RaidDemo.Tests.EditMode
             // 先走一小段（不足一个步幅），然后站定。
             for (var i = 0; i < 10; i++)
             {
-                cadence.Advance(2f, 0.02f);
+                cadence.Advance(2f, 0.02f, false);
             }
 
-            cadence.Advance(0f, 0.02f);
+            cadence.Advance(0f, 0.02f, false);
 
             // 再次起步的第一步不应立刻触发——累计距离已经被清零。
-            Assert.IsFalse(cadence.Advance(2f, 0.02f));
+            Assert.IsFalse(cadence.Advance(2f, 0.02f, false));
         }
 
-        private static int CountSteps(float speed, float seconds)
+        [Test]
+        public void 步幅取决于奔跑状态而不是速度阈值()
+        {
+            // 同样的速度、同样的时长，只有"是否奔跑"不同：
+            // 12 米路程，步行步幅 0.95 米约 12 步，奔跑步幅 1.55 米约 7 步。
+            var walk = CountSteps(4f, 3f, isSprinting: false);
+            var sprint = CountSteps(4f, 3f, isSprinting: true);
+
+            Assert.Greater(walk, sprint,
+                "奔跑状态下步幅更长，因此同样距离下脚步应当更稀——这条规则必须跟随逻辑层的判定，" +
+                "而不是表现层自己拿速度去比阈值。");
+        }
+
+        private static int CountSteps(float speed, float seconds, bool isSprinting)
         {
             var cadence = new FootstepCadence();
             var steps = 0;
             var ticks = (int)(seconds / 0.02f);
             for (var i = 0; i < ticks; i++)
             {
-                if (cadence.Advance(speed, 0.02f))
+                if (cadence.Advance(speed, 0.02f, isSprinting))
                 {
                     steps++;
                 }

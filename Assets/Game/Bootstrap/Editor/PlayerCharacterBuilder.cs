@@ -31,9 +31,6 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>角色总身高（米），与玩家胶囊 1.8 米对齐。</summary>
         private const float TargetHeight = 1.72f;
 
-        /// <summary>跑步阈值（米/秒），需与移动配置的冲刺阈值一致。</summary>
-        private const float SprintThreshold = 5f;
-
         /// <summary>
         /// 需要循环播放的剪辑（Kenney 剪辑名是小写、不带模型前缀）。
         /// </summary>
@@ -83,6 +80,13 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>创建动画控制器：Idle / ArmedIdle / Walk / Sprint / Shoot / Die。</summary>
+        /// <remarks>
+        /// <para><b>奔跑用布尔参数而不是速度阈值。</b>冲刺门槛会随负重变化
+        /// （超载时 `PlayerMovementProfile` 会按速度修正系数下调门槛），
+        /// 表现层若自己再写一个固定速度去比，两边迟早对不上——
+        /// 症状是"系统认为你在跑（掉体力、噪音按奔跑算），画面上还在走"。
+        /// 现在动画与脚步都直接使用模拟层给出的 <c>IsSprinting</c>，全工程只剩一个判定点。</para>
+        /// </remarks>
         private static string BuildController()
         {
             var path = ArtFolder + "/PlayerCharacter.controller";
@@ -90,6 +94,7 @@ namespace RaidDemo.Bootstrap.Editor
 
             var controller = AnimatorController.CreateAnimatorControllerAtPath(path);
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
+            controller.AddParameter("Sprinting", AnimatorControllerParameterType.Bool);
             controller.AddParameter("Armed", AnimatorControllerParameterType.Bool);
             controller.AddParameter("Shoot", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Die", AnimatorControllerParameterType.Trigger);
@@ -111,21 +116,35 @@ namespace RaidDemo.Bootstrap.Editor
             EnsureStateLoops(walk);
             EnsureStateLoops(sprint);
 
-            AddTransition(idle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
-            AddTransition(armedIdle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
-            AddTransition(walk, idle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f), ("Armed", AnimatorConditionMode.IfNot, 0f));
-            AddTransition(walk, armedIdle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f), ("Armed", AnimatorConditionMode.If, 0f));
-            AddTransition(walk, sprint, 0.1f, ("Speed", AnimatorConditionMode.Greater, SprintThreshold));
-            AddTransition(sprint, walk, 0.1f, ("Speed", AnimatorConditionMode.Less, SprintThreshold));
-            AddTransition(sprint, armedIdle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f));
-            AddTransition(idle, armedIdle, 0.15f, ("Armed", AnimatorConditionMode.If, 0f));
-            AddTransition(armedIdle, idle, 0.15f, ("Armed", AnimatorConditionMode.IfNot, 0f));
+            CharacterAnimatorWiring.AddTransition(idle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
+            CharacterAnimatorWiring.AddTransition(armedIdle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
+            CharacterAnimatorWiring.AddTransition(walk, idle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f), ("Armed", AnimatorConditionMode.IfNot, 0f));
+            CharacterAnimatorWiring.AddTransition(walk, armedIdle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f), ("Armed", AnimatorConditionMode.If, 0f));
+            // 顺序有意义：Unity 按添加顺序取第一个条件成立的过渡。
+            // "停下来"排在"取消奔跑"前面，否则站定的那一帧会先切回走路再切待机，多一次无谓的过渡。
+            CharacterAnimatorWiring.AddTransition(sprint, armedIdle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f));
+            CharacterAnimatorWiring.AddTransition(walk, sprint, 0.1f, ("Sprinting", AnimatorConditionMode.If, 0f));
+            CharacterAnimatorWiring.AddTransition(sprint, walk, 0.1f,
+                ("Sprinting", AnimatorConditionMode.IfNot, 0f),
+                ("Speed", AnimatorConditionMode.Greater, 0.2f));
+            CharacterAnimatorWiring.AddTransition(idle, armedIdle, 0.15f, ("Armed", AnimatorConditionMode.If, 0f));
+            CharacterAnimatorWiring.AddTransition(armedIdle, idle, 0.15f, ("Armed", AnimatorConditionMode.IfNot, 0f));
 
             var toShoot = machine.AddAnyStateTransition(shoot);
             toShoot.hasExitTime = false;
             toShoot.duration = 0.05f;
             toShoot.AddCondition(AnimatorConditionMode.If, 0f, "Shoot");
-            AddExitTransition(shoot, armedIdle, 0.15f);
+
+            // 开火播完回到"当时的移动状态"，而不是一律回站立：
+            // 追击中每打一枪闪一下站立，在斜俯视下是非常显眼的割裂感。
+            // 三条互斥条件（在走 / 站着持枪 / 站着空手），按顺序判定。
+            CharacterAnimatorWiring.AddExitTransition(shoot, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
+            CharacterAnimatorWiring.AddExitTransition(shoot, armedIdle, 0.15f,
+                ("Speed", AnimatorConditionMode.Less, 0.2f),
+                ("Armed", AnimatorConditionMode.If, 0f));
+            CharacterAnimatorWiring.AddExitTransition(shoot, idle, 0.15f,
+                ("Speed", AnimatorConditionMode.Less, 0.2f),
+                ("Armed", AnimatorConditionMode.IfNot, 0f));
 
             var toDie = machine.AddAnyStateTransition(die);
             toDie.hasExitTime = false;
@@ -175,31 +194,6 @@ namespace RaidDemo.Bootstrap.Editor
             var state = machine.AddState(name);
             state.motion = LoadClip(clipName);
             return state;
-        }
-
-        /// <summary>添加"到达条件后切换"的过渡。</summary>
-        private static void AddTransition(
-            AnimatorState from,
-            AnimatorState to,
-            float duration,
-            params (string Name, AnimatorConditionMode Mode, float Threshold)[] conditions)
-        {
-            var transition = from.AddTransition(to);
-            transition.hasExitTime = false;
-            transition.duration = duration;
-            foreach (var condition in conditions)
-            {
-                transition.AddCondition(condition.Mode, condition.Threshold, condition.Name);
-            }
-        }
-
-        /// <summary>添加"播放完再切换"的过渡（用于开火、死亡这类一次性动作）。</summary>
-        private static void AddExitTransition(AnimatorState from, AnimatorState to, float duration)
-        {
-            var transition = from.AddTransition(to);
-            transition.hasExitTime = true;
-            transition.exitTime = 1f;
-            transition.duration = duration;
         }
 
         /// <summary>从模型文件里按名称取动画剪辑。</summary>

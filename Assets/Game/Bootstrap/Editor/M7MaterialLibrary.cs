@@ -75,6 +75,39 @@ namespace RaidDemo.Bootstrap.Editor
             return material;
         }
 
+        /// <summary>
+        /// 颜色确实变化时才写入。
+        /// </summary>
+        /// <param name="material">目标材质。</param>
+        /// <param name="property">颜色属性名。</param>
+        /// <param name="color">期望值。</param>
+        /// <returns>实际写入返回 true。</returns>
+        /// <remarks>
+        /// <para>构建器应当是幂等的：第二次执行不产生任何改动。
+        /// 反复写同一个颜色会因为浮点表示差异（0.41332123 与 0.41332126）
+        /// 在材质文件里留下一行永远存在的差异，让每次构建的 diff 都变脏。</para>
+        /// <para>属性不存在时静默跳过：不同着色器的颜色属性名不一样
+        /// （URP Lit 用 <c>_BaseColor</c>，内置管线用 <c>_Color</c>），
+        /// 调用方可以两个都试，不必自己判断着色器。</para>
+        /// </remarks>
+        public static bool SetColorIfDifferent(Material material, string property, Color color)
+        {
+            if (material == null || !material.HasProperty(property))
+            {
+                return false;
+            }
+
+            var current = material.GetColor(property);
+            if (current.r == color.r && current.g == color.g &&
+                current.b == color.b && current.a == color.a)
+            {
+                return false;
+            }
+
+            material.SetColor(property, color);
+            return true;
+        }
+
         /// <summary>确保目录存在（AssetDatabase 版本，避免直接操作文件系统）。</summary>
         public static void EnsureFolder(string path)
         {

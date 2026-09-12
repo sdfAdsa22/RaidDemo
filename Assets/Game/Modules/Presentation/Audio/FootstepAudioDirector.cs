@@ -77,7 +77,7 @@ namespace RaidDemo.Presentation
             // 用事件里的时间戳差值当作步长。移动事件每个模拟步都会发布，
             // 因此这个差值就是模拟步长，与逻辑层看到的完全一致。
             var deltaTime = ResolveDeltaTime(evt.Timestamp);
-            if (!m_Cadence.Advance(evt.Speed, deltaTime))
+            if (!m_Cadence.Advance(evt.Speed, deltaTime, evt.IsSprinting))
             {
                 return;
             }

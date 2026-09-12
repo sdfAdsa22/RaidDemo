@@ -120,6 +120,59 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
+        public void 阵亡后按住扳机也不会开火()
+        {
+            m_Controller.SyncEquippedWeapon(m_WeaponStats);
+            PutAmmo(60);
+            ArrangeHit(critical: false);
+
+            var firedCount = 0;
+            using (m_Bus.Subscribe<WeaponFiredEvent>(_ => firedCount++))
+            {
+                m_Controller.SetAlive(false);
+                m_Controller.SetTriggerHeld(true);
+                m_Controller.Tick(1f);
+            }
+
+            Assert.AreEqual(0, firedCount, "阵亡之后不该再打出任何一发——尸体会站起来扫射。");
+        }
+
+        [Test]
+        public void 阵亡时松开扳机_复活后不会残留按住状态()
+        {
+            m_Controller.SyncEquippedWeapon(m_WeaponStats);
+            PutAmmo(60);
+            ArrangeHit(critical: false);
+
+            m_Controller.SetTriggerHeld(true);
+            m_Controller.SetAlive(false);
+            m_Controller.SetAlive(true);
+
+            var firedCount = 0;
+            using (m_Bus.Subscribe<WeaponFiredEvent>(_ => firedCount++))
+            {
+                m_Controller.Tick(1f);
+            }
+
+            Assert.AreEqual(0, firedCount,
+                "阵亡时按住扳机的状态必须被清掉，否则重新站起来会凭空打出一发。");
+        }
+
+        [Test]
+        public void 阵亡后无法换弹()
+        {
+            m_Controller.SyncEquippedWeapon(m_WeaponStats);
+            PutAmmo(60);
+            m_Controller.SetAlive(false);
+
+            var result = m_Router.Dispatch(new PlayerReloadIntent(0));
+
+            Assert.IsFalse(result.Success, "阵亡后不该还能换弹。");
+            Assert.AreEqual(CommandCodes.CombatIncapacitated, result.Code,
+                "失败原因应当是阵亡，而不是「没有武器」——后者会把排查方向带偏。");
+        }
+
+        [Test]
         public void FireWithoutWeapon_ReturnsNoWeaponCode()
         {
             var result = m_Router.Dispatch(new PlayerFireIntent(0, Vector2F.Right));

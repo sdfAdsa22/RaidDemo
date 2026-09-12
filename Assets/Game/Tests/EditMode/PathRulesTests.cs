@@ -134,6 +134,27 @@ namespace RaidDemo.Tests.EditMode
         /// 这个用例锁定该行为，避免后续修改正则时引入大量误报——
         /// 一个满屏误报的检查最终会被人忽略，等同于没有检查。
         /// </remarks>
+        /// <summary>
+        /// Windows 风格的反斜杠路径也要能被识别为测试文件。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="PathRulesVerifier.ToRelativePath"/> 返回平台原生分隔符，
+        /// 而判断依据里写的是 <c>/Tests/</c>。这条用例钉住"先统一分隔符"这个前提，
+        /// 否则"测试代码豁免行数上限"会在 Windows 上静默失效（见 IsTestFile 的注释）。
+        /// </remarks>
+        [Test]
+        public void Verifier_RecognizesWindowsStyleTestPaths()
+        {
+            var separator = (char)92;
+            var windowsPath = $"Assets{separator}Game{separator}Tests{separator}EditMode{separator}SomeTests.cs";
+            var unixPath = "Assets/Game/Tests/EditMode/SomeTests.cs";
+            var productionPath = $"Assets{separator}Game{separator}Bootstrap{separator}SceneBootstrap.cs";
+
+            Assert.IsTrue(PathRulesVerifier.IsTestFile(windowsPath), "反斜杠路径也应被识别为测试文件。");
+            Assert.IsTrue(PathRulesVerifier.IsTestFile(unixPath), "斜杠路径应被识别为测试文件。");
+            Assert.IsFalse(PathRulesVerifier.IsTestFile(productionPath), "生产代码不应被误判为测试文件。");
+        }
+
         [Test]
         public void Verifier_DoesNotFlagUrls()
         {

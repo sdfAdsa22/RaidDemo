@@ -187,9 +187,21 @@ namespace RaidDemo.Tests.EditMode
         }
 
         /// <summary>判断文件是否位于测试目录中（测试代码豁免行数限制）。</summary>
+        /// <remarks>
+        /// <b>必须先统一分隔符。</b><see cref="ToRelativePath"/> 返回的是平台原生分隔符，
+        /// 在 Windows 上是 <c>\</c>，而这里要找的是 <c>/Tests/</c>——
+        /// 不转换的话所有测试文件都逃不过行数上限，"测试代码天然较长、予以豁免"这条规则形同虚设。
+        /// 这个缺陷平时看不出来：它只在某个测试文件真的超过 400 行时才暴露。
+        /// </remarks>
         public static bool IsTestFile(string relativePath)
         {
-            return relativePath.IndexOf(TestPathFragment, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (string.IsNullOrEmpty(relativePath))
+            {
+                return false;
+            }
+
+            var normalized = relativePath.Replace('\\', '/');
+            return normalized.IndexOf(TestPathFragment, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static void AddIfNotExcluded(List<string> target, string file, string[] excludedFileNames)

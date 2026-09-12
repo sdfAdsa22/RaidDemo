@@ -115,9 +115,6 @@ namespace RaidDemo.Presentation
         /// <summary>奔跑步幅（米）。</summary>
         private const float SprintStrideMeters = 1.55f;
 
-        /// <summary>判定为奔跑的速度阈值（米/秒），与移动配置的奔跑档一致。</summary>
-        private const float SprintSpeedThreshold = 3.5f;
-
         /// <summary>两次脚步之间的最小间隔（秒）。</summary>
         private const float MinStepIntervalSeconds = 0.2f;
 
@@ -136,7 +133,14 @@ namespace RaidDemo.Presentation
         /// </summary>
         /// <param name="speedMetersPerSecond">当前水平速度（米/秒）。</param>
         /// <param name="deltaTime">时间步长（秒）。</param>
-        public bool Advance(float speedMetersPerSecond, float deltaTime)
+        /// <param name="isSprinting">
+        /// 模拟层判定的"是否正在奔跑"。
+        /// </param>
+        /// <remarks>
+        /// <b>步幅取决于奔跑状态，而不是速度阈值。</b>冲刺门槛会随负重变化
+        /// （超载时门槛下降），在表现层再拿一个写死的速度去比，必然有一天和逻辑层对不上。
+        /// </remarks>
+        public bool Advance(float speedMetersPerSecond, float deltaTime, bool isSprinting)
         {
             if (deltaTime <= 0f)
             {
@@ -158,9 +162,7 @@ namespace RaidDemo.Presentation
                 return false;
             }
 
-            var stride = speedMetersPerSecond >= SprintSpeedThreshold
-                ? SprintStrideMeters
-                : WalkStrideMeters;
+            var stride = isSprinting ? SprintStrideMeters : WalkStrideMeters;
             if (m_AccumulatedMeters < stride)
             {
                 return false;
