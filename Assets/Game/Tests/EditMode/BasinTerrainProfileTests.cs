@@ -110,8 +110,14 @@ namespace RaidDemo.Tests.EditMode
         public void RampCorridors_ExistOnThreeSidesOnly()
         {
             // 东、西两条坡道与北坡道同高：坡道顶端（土墙外沿）必须与塬面齐平
-            Assert.AreEqual(BasinTerrainProfile.RimHeight, m_Profile.SampleHeight(32f, 0f), Tolerance);
-            Assert.AreEqual(BasinTerrainProfile.RimHeight, m_Profile.SampleHeight(-32f, 0f), Tolerance);
+            Assert.AreEqual(
+                BasinTerrainProfile.RimHeight,
+                m_Profile.SampleHeight(32f, BasinTerrainProfile.EastRampCenterZ),
+                Tolerance);
+            Assert.AreEqual(
+                BasinTerrainProfile.RimHeight,
+                m_Profile.SampleHeight(-32f, BasinTerrainProfile.WestRampCenterZ),
+                Tolerance);
 
             // 南侧没有上坡道：谷底之外是一条平进平出的走廊
             Assert.AreEqual(
@@ -140,8 +146,12 @@ namespace RaidDemo.Tests.EditMode
         /// <summary>判断一个平面点是否落在四条通道内（坡道或谷口）。</summary>
         private static bool IsInsideCorridor(float x, float z)
         {
-            var lateralX = Mathf.Abs(x) <= BasinTerrainProfile.RampHalfWidth;
-            var lateralZ = Mathf.Abs(z) <= BasinTerrainProfile.RampHalfWidth;
+            var lateralX = Mathf.Abs(x - BasinTerrainProfile.NorthRampCenterX)
+                           <= BasinTerrainProfile.RampHalfWidth;
+            var lateralEast = Mathf.Abs(z - BasinTerrainProfile.EastRampCenterZ)
+                              <= BasinTerrainProfile.RampHalfWidth;
+            var lateralWest = Mathf.Abs(z - BasinTerrainProfile.WestRampCenterZ)
+                              <= BasinTerrainProfile.RampHalfWidth;
             var canyon = Mathf.Abs(x - BasinTerrainProfile.SouthCanyonCenterX)
                          <= BasinTerrainProfile.SouthCanyonHalfWidth;
 
@@ -151,8 +161,14 @@ namespace RaidDemo.Tests.EditMode
                 return true;
             }
 
-            // 东、西坡道
-            if (lateralZ && Mathf.Abs(x) >= BasinTerrainProfile.RampInnerHalfExtent)
+            // 东坡道
+            if (lateralEast && x >= BasinTerrainProfile.RampInnerHalfExtent)
+            {
+                return true;
+            }
+
+            // 西坡道
+            if (lateralWest && x <= -BasinTerrainProfile.RampInnerHalfExtent)
             {
                 return true;
             }

@@ -89,10 +89,10 @@ namespace RaidDemo.Bootstrap.Editor
             // 北墙（面向谷内，即朝 -Z）、南墙（朝 +Z）、西墙（朝 +X）、东墙（朝 -X）。
             // 最后一个参数是墙体向外的方向符号：北/东墙朝正轴延伸，南/西墙朝负轴延伸，
             // 瓦片必须贴着坡体一侧摆放，符号写反时瓦片会整排插进谷底。
-            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, half, alongX: true, yaw: 180f, outwardSign: 1f, material);
-            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, -half, alongX: true, yaw: 0f, outwardSign: -1f, material);
-            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, -half, alongX: false, yaw: 90f, outwardSign: -1f, material);
-            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, half, alongX: false, yaw: -90f, outwardSign: 1f, material);
+            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, half, true, 180f, 1f, BasinTerrainProfile.NorthRampCenterX, material);
+            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, -half, true, 0f, -1f, BasinTerrainProfile.SouthCanyonCenterX, material);
+            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, -half, false, 90f, -1f, BasinTerrainProfile.WestRampCenterZ, material);
+            PlaceCliffRow(parent, tiles, scale, spacing, -half, half, half, false, -90f, 1f, BasinTerrainProfile.EastRampCenterZ, material);
         }
 
         /// <summary>载入并测量可用的悬崖瓦片（数量不足时返回空表，由调用方跳过装饰）。</summary>
@@ -134,13 +134,16 @@ namespace RaidDemo.Bootstrap.Editor
             bool alongX,
             float yaw,
             float outwardSign,
+            float gapCenter,
             Material material)
         {
             var index = 0;
             for (var cursor = start + (spacing * 0.5f); cursor <= end - (spacing * 0.5f); cursor += spacing)
             {
                 index++;
-                if (Mathf.Abs(cursor) <= CorridorDecorationGap)
+                // 通道口要留出缺口：坡道的横向中心已经不在原点（东/西坡道分别在 z=25.5 与 -20），
+                // 若仍按「靠近 0 就跳过」判断，瓦片会整排堵在新坡道的入口上。
+                if (Mathf.Abs(cursor - gapCenter) <= CorridorDecorationGap)
                 {
                     continue;
                 }

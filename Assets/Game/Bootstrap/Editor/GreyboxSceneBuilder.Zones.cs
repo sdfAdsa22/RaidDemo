@@ -82,13 +82,16 @@ namespace RaidDemo.Bootstrap.Editor
             CreateFenceLine("Fence_SpawnEast", 3f, -10f, 8f, alongX: false, fenceHeight, fenceThickness, parent);
             CreateFenceLine("Fence_NorthMid", -16f, 18f, 8f, alongX: true, fenceHeight, fenceThickness, parent);
             CreateFenceLine("Fence_DockEast", 16f, -15f, 6f, alongX: false, fenceHeight, fenceThickness, parent);
-            CreateFenceLine("Fence_YardNorth", 20f, 26f, 10f, alongX: true, fenceHeight, fenceThickness, parent);
+            // 这段围栏原本在 (20, 26)，正好压在东坡道走廊上（坡道中心 z=25.5）——
+            // 挪到堆场内部的空档：既保留「把环道切成有拐角的走廊」的作用，也不再堵住坡道。
+            CreateFenceLine("Fence_YardNorth", 14f, 16.5f, 10f, alongX: true, fenceHeight, fenceThickness, parent);
 
             var barriers = new (Vector3 Position, float Yaw)[]
             {
                 (new Vector3(-14f, 0f, 22f), 0f),
                 (new Vector3(6f, 0f, 22f), 0f),
-                (new Vector3(-26f, 0f, -20f), 90f),
+                // 这块掩体原本在 (-26, -20)，同样落在西坡道走廊上（中心 z=-20），向南挪出走廊。
+                (new Vector3(-26f, 0f, -26f), 90f),
                 (new Vector3(26f, 0f, 14f), 90f),
             };
 

@@ -7,7 +7,8 @@
         "RaidDemo.Shared",
         "RaidDemo.Data",
         "RaidDemo.Data.Content",
-        "RaidDemo.Combat"
+        "RaidDemo.Combat",
+        "RaidDemo.Simulation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

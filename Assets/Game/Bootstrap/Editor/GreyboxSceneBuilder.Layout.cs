@@ -122,9 +122,11 @@ namespace RaidDemo.Bootstrap.Editor
         /// </remarks>
         private static readonly (int ZoneId, string DisplayName, Vector2 Center, float GroundY, float Radius)[] s_ExtractionZones =
         {
-            (1, "北坡顶", new Vector2(0f, 34f), BasinTerrainProfile.RimHeight, 2.0f),
-            (2, "东坡顶", new Vector2(34f, 0f), BasinTerrainProfile.RimHeight, 2.0f),
-            (3, "西坡顶", new Vector2(-34f, 0f), BasinTerrainProfile.RimHeight, 2.0f),
+            // 横向位置必须与地形剖面的坡道中心一致，否则玩家爬到顶也踩不到撤离区；
+            // 它们同样必须落在真正的空地上（批次 2 初期东/西坡道撞上集装箱与厂房，撤离点被堵死）。
+            (1, "北坡顶", new Vector2(BasinTerrainProfile.NorthRampCenterX, 34f), BasinTerrainProfile.RimHeight, 2.0f),
+            (2, "东坡顶", new Vector2(34f, BasinTerrainProfile.EastRampCenterZ), BasinTerrainProfile.RimHeight, 2.0f),
+            (3, "西坡顶", new Vector2(-34f, BasinTerrainProfile.WestRampCenterZ), BasinTerrainProfile.RimHeight, 2.0f),
             (4, "南谷口", new Vector2(BasinTerrainProfile.SouthCanyonCenterX, -29.5f), 0f, 2.0f),
         };
 
@@ -161,7 +163,8 @@ namespace RaidDemo.Bootstrap.Editor
             // 外围环道：最远的目标与撤离点附近的补给
             ("safe.rare", new Vector2(-24f, 20f), 0f, 0f),
             ("crate.ammo", new Vector2(22f, -20f), 0f, 0f),
-            ("crate.common", new Vector2(0f, 20f), 0f, 0f),
+            // 这只箱子原本在 (0, 20)，正卡在北坡道（中心 x=0）的中线上；向东挪出走廊。
+            ("crate.common", new Vector2(4.6f, 20.5f), 0f, 0f),
 
         };
 

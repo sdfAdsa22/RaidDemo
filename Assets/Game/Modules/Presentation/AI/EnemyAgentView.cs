@@ -30,13 +30,6 @@ namespace RaidDemo.Presentation
         /// <summary>身体半径（米）。</summary>
         private const float BodyRadius = 0.4f;
 
-        /// <summary>
-        /// 落地采样的搜索半径（米）。必须 ≥ 地图最大高差 + 余量，
-        /// 且必须与 <see cref="NavMeshGroundHeightProvider.SampleHeight"/> 用的半径一致
-        /// （当前地形为下沉盆地，最大高差 6 米，故取 12 米）。
-        /// </summary>
-        private const float GroundSampleRadiusMeters = 12f;
-
         private static readonly Color PatrolColor = new Color(0.35f, 0.72f, 0.42f);
         private static readonly Color InvestigateColor = new Color(0.92f, 0.76f, 0.25f);
         private static readonly Color AlertColor = new Color(1f, 0.58f, 0.16f);
@@ -55,6 +48,9 @@ namespace RaidDemo.Presentation
         private IDisposable m_FireSubscription;
         private AiStateId m_LastState = AiStateId.Patrol;
         private bool m_Destroyed;
+
+        /// <summary>上一次成功采样到的地面高度（米）。采样失败时沿用它，避免单位被瞬移到 0 高度。</summary>
+        private float m_LastGroundHeight;
 
         private static readonly int SpeedId = Animator.StringToHash("Speed");
         private static readonly int ShootId = Animator.StringToHash("Shoot");
@@ -224,29 +220,26 @@ namespace RaidDemo.Presentation
         /// 采样脚下的导航网格高度，让敌人能站在装卸平台上而不是陷进台体里。
         /// </summary>
         /// <param name="position">逻辑层给出的平面位置。</param>
-        /// <returns>脚底应处的世界高度（米）。采样失败时退化为 0，即灰盒地面。</returns>
+        /// <returns>脚底应处的世界高度（米）。</returns>
         /// <remarks>
         /// <para>逻辑层的位置是二维的（它必须能在无头服务端运行），高度属于场景信息，
         /// 因此由表现层补上。这正是「逻辑层只管平面、表现层负责落地」这条分工的落点。</para>
         ///
-        /// <para>采样点要抬到单位当前位置的上方再往下找：若直接拿 y 等于 0 的点去采样，
-        /// 站在平台上时该点位于台体内部，采样要么失败、要么把结果拉回地面，
-        /// 表现为「敌人半个身子埋进台面」，而这在俯视角下很难与「敌人被击倒」区分。
-        /// 抬高采样是为了让探测点脱离台体内部。</para>
+        /// <para><b>采样规则交给 <see cref="NavMeshGroundSampler"/>：</b>它取该平面位置上最低的那层可行走面。
+        /// 早期版本用「单位当前位置 + 2 米」当探测点、12 米大半径搜索，结果是把站在谷底的敌人
+        /// 吸附到旁边的平台或坡道上（现象是"走到箱子旁边就瞬移到上面"）。</para>
         ///
-        /// <para><b>搜索半径必须给足：</b>单位刚出生时脚底还没落地，<c>transform.position.y</c>
-        /// 可能离脚下地面很远（下沉盆地的谷底与出生点相差数米）。半径不够时采样失败、
-        /// 回退成 0，敌人会一直浮在 y=0 的空中，而现象与"地形没做对"几乎无法区分。</para>
+        /// <para>采样失败时保留上一次的高度，而不是回退到 0：回退到 0 会让单位直接跳到塬面高度，
+        /// 在画面上与"被传送"没有区别；保留上次高度则最多停在原地，肉眼几乎看不出来。</para>
         /// </remarks>
         private float ResolveGroundHeight(Vector2F position)
         {
-            var probe = new Vector3(position.X, transform.position.y + 2f, position.Y);
-            if (NavMesh.SamplePosition(probe, out var hit, GroundSampleRadiusMeters, NavMesh.AllAreas))
+            if (NavMeshGroundSampler.TrySample(position, out var height))
             {
-                return hit.position.y;
+                m_LastGroundHeight = height;
             }
 
-            return 0f;
+            return m_LastGroundHeight;
         }
 
         /// <summary>状态到灰盒颜色的对照表。</summary>

@@ -296,6 +296,16 @@ namespace RaidDemo.Bootstrap
                 var host = new GameObject($"Enemy_{agent.CombatantId:D2}");
                 host.transform.SetParent(root.transform, worldPositionStays: false);
 
+                // 移动碰撞：宿主对象必须先存在，PhysX 扫掠才能排除它自己的碰撞体、
+                // 并让胶囊跟随单位当前高度。没有这一步时，AI 在"没有路径"的情况下会直线穿墙。
+                //
+                // 半径取 0.55 而不是胶囊本身的 0.4：敌人模型（含持枪手臂）实测宽约 1.3 米，
+                // 比碰撞胶囊宽得多。用胶囊半径贴墙时手臂会插进墙里，观感就是"穿模"；
+                // 放大到 0.55 之后身体与墙面之间留出约 0.15 米的余量，手臂不再越界。
+                agent.SetMovementCollision(
+                    new PhysicsMovementCollisionService(host.transform, PlayerBodyHeight),
+                    bodyRadius: 0.55f);
+
                 var view = host.AddComponent<EnemyAgentView>();
                 var characterPrefab = m_EnemyCharacterPrefabs != null && m_EnemyCharacterPrefabs.Length > 0
                     ? m_EnemyCharacterPrefabs[i % m_EnemyCharacterPrefabs.Length]

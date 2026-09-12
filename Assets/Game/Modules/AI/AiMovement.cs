@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using RaidDemo.Shared;
+using RaidDemo.Simulation;
 
 namespace RaidDemo.AI
 {
@@ -79,6 +80,22 @@ namespace RaidDemo.AI
         /// <summary>活动范围。默认不限制。</summary>
         public PlayAreaBounds Bounds { get; set; }
 
+        /// <summary>
+        /// 移动碰撞查询。为 null 时不做碰撞修正（无头服务端与单元测试的默认状态）。
+        /// </summary>
+        /// <remarks>
+        /// <para>没有它时，AI 在"没有路径"的情况下会直线穿过墙体与集装箱：
+        /// 寻路失败、路径走完、目标就在眼前，这三种情况都会退回直线推进，
+        /// 而直线推进本身不做任何障碍判断。表现就是"小兵穿模"。</para>
+        ///
+        /// <para>实现由表现层注入（PhysX 胶囊扫掠），逻辑层只认识接口——
+        /// 与玩家的移动碰撞走的是同一条契约。</para>
+        /// </remarks>
+        public IMovementCollisionWorld Collision { get; set; }
+
+        /// <summary>移动体半径（米），仅在启用碰撞查询时使用。</summary>
+        public float BodyRadius { get; set; } = 0.4f;
+
         /// <summary>当前尚未走完的路径点数量。</summary>
         public int PendingWaypointCount
         {
@@ -137,6 +154,15 @@ namespace RaidDemo.AI
             var step = speed * deltaTime;
             var next = step >= distance ? target : from + (direction * step);
             next = Bounds.Clamp(next);
+
+            // 碰撞修正：只改变"这一帧实际能走到哪"，不改变意图。
+            // 被墙挡住时返回的是沿墙滑行后的位移，因此 AI 会贴着掩体绕行而不是原地卡死。
+            if (Collision != null)
+            {
+                var desired = next - from;
+                Collision.TryResolveMove(from, desired, BodyRadius, out var resolved);
+                next = Bounds.Clamp(from + resolved);
+            }
 
             // 到达判定用移动后的位置：否则"这一帧刚好走到终点"会被报成未到达，
             // 调用方要再等一帧，表现为 AI 到点后停一下才切换行为。

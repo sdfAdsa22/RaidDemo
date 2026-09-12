@@ -47,8 +47,14 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>土墙外沿的半宽（米）：土墙从谷底边缘一直爬到这里。</summary>
         public const float WallHalfExtent = 32f;
 
-        /// <summary>南侧土墙外沿（米）。略小于其余三面，用来换取更陡的坡比。</summary>
-        public const float SouthWallHalfExtent = 31.6f;
+        /// <summary>南侧矮丘与东西两面塬面的过渡长度（米）。</summary>
+        /// <remarks>
+        /// 「南侧更低」只应作用在南墙那一段上，而不是整个南半张图。早期实现按 z 是否小于 0 判断，
+        /// 结果东西墙的南半段也被压低 1.5 米，西坡顶的塬面比坡道顶端低了 1.5 米——
+        /// 玩家爬上去要先掉一截，撤离点的门框也会悬在半空。
+        /// 这里改成按「Z 是否主导」加一段平滑过渡，四面墙在转角附近自然衔接。
+        /// </remarks>
+        private const float SouthBlendRun = 6f;
 
         /// <summary>塬面外沿（米）。玩家的可活动范围到此为止，外侧由隐形边界拦住。</summary>
         public const float RimHalfExtent = 36f;
@@ -65,6 +71,34 @@ namespace RaidDemo.Bootstrap.Editor
 
         /// <summary>坡道起点到中心的距离（米）。19 → 32 共 13 米爬升 6 米，坡度约 24.8 度。</summary>
         public const float RampInnerHalfExtent = 19f;
+
+        /// <summary>
+        /// 北坡道的横向中心（X，米）。
+        /// </summary>
+        /// <remarks>正对地图中轴线：这一带只有北侧环道与一个补给箱，是最干净的入口。</remarks>
+        public const float NorthRampCenterX = 0f;
+
+        /// <summary>
+        /// 东坡道的横向中心（Z，米）。
+        /// </summary>
+        /// <remarks>
+        /// <para>刻意避开集装箱堆场（z 从 -6 到 22）与堆场北侧的围栏：坡道走廊一旦压到箱体上，
+        /// 玩家就会被卡在箱子边上、AI 的导航路径也会绕到别处，撤离点等于被堵死
+        /// （批次 2 的东侧坡道最初开在 z=0，正好撞上集装箱）。</para>
+        /// <para>25.5 是堆场北缘与北侧围栏之间的空档：南边离最近的集装箱还有 1.3 米，
+        /// 北边离塬面还有 6.5 米。</para>
+        /// </remarks>
+        public const float EastRampCenterZ = 25.5f;
+
+        /// <summary>
+        /// 西坡道的横向中心（Z，米）。
+        /// </summary>
+        /// <remarks>
+        /// <para>西侧整片是主厂房（x 从 -27 到 -10、z 从 -14 到 14），坡道走廊必然穿过厂房，
+        /// 因此只能落在厂房的南北两侧。选南侧（-20）而不是北侧（+20），
+        /// 是因为北侧还压着唯一的保险柜与一段围栏，南侧只有一块混凝土掩体需要挪开。</para>
+        /// </remarks>
+        public const float WestRampCenterZ = -20f;
 
         /// <summary>南侧谷口走廊的半宽（米）。</summary>
         public const float SouthCanyonHalfWidth = 3f;
@@ -118,17 +152,31 @@ namespace RaidDemo.Bootstrap.Editor
                 return FloorHeight;
             }
 
-            var isSouth = z < 0f;
-            var rimHeight = isSouth ? SouthRimHeight : RimHeight;
-            var wallHalf = isSouth ? SouthWallHalfExtent : WallHalfExtent;
+            var rimHeight = ResolveRimHeight(x, z);
 
-            if (distance >= wallHalf)
+            if (distance >= WallHalfExtent)
             {
                 return SampleApron(distance, rimHeight);
             }
 
-            var t = (distance - ValleyHalfExtent) / (wallHalf - ValleyHalfExtent);
+            var t = (distance - ValleyHalfExtent) / (WallHalfExtent - ValleyHalfExtent);
             return Mathf.Lerp(FloorHeight, rimHeight, t);
+        }
+
+        /// <summary>
+        /// 求某个平面位置对应的塬面高度：北/东/西三面是 <see cref="RimHeight"/>，
+        /// 只有南墙那一段降到 <see cref="SouthRimHeight"/>，转角处用一段平滑过渡衔接。
+        /// </summary>
+        private static float ResolveRimHeight(float x, float z)
+        {
+            if (z >= 0f)
+            {
+                return RimHeight;
+            }
+
+            // 只有「Z 轴主导」的位置才算南墙：|z| 明显大于 |x| 时 z 才是决定距离的那条边。
+            var southWeight = Mathf.Clamp01((Mathf.Abs(z) - Mathf.Abs(x)) / SouthBlendRun);
+            return Mathf.Lerp(RimHeight, SouthRimHeight, southWeight);
         }
 
         /// <summary>塬面平台与外裙：36 米以内保持平坦，之后再缓缓下降。</summary>
@@ -159,8 +207,8 @@ namespace RaidDemo.Bootstrap.Editor
         {
             height = FloorHeight;
 
-            // 北坡道：x ∈ [-3, 3]，z 从 19 爬到 32
-            if (Mathf.Abs(x) <= RampHalfWidth
+            // 北坡道：x 在中心 ±3 之内，z 从 19 爬到 32
+            if (Mathf.Abs(x - NorthRampCenterX) <= RampHalfWidth
                 && z >= RampInnerHalfExtent
                 && z <= WallHalfExtent)
             {
@@ -168,8 +216,8 @@ namespace RaidDemo.Bootstrap.Editor
                 return true;
             }
 
-            // 东坡道：z ∈ [-3, 3]，x 从 19 爬到 32
-            if (Mathf.Abs(z) <= RampHalfWidth
+            // 东坡道：z 在中心 ±3 之内，x 从 19 爬到 32
+            if (Mathf.Abs(z - EastRampCenterZ) <= RampHalfWidth
                 && x >= RampInnerHalfExtent
                 && x <= WallHalfExtent)
             {
@@ -177,8 +225,8 @@ namespace RaidDemo.Bootstrap.Editor
                 return true;
             }
 
-            // 西坡道：z ∈ [-3, 3]，x 从 -32 爬到 -19
-            if (Mathf.Abs(z) <= RampHalfWidth
+            // 西坡道：z 在中心 ±3 之内，x 从 -32 爬到 -19
+            if (Mathf.Abs(z - WestRampCenterZ) <= RampHalfWidth
                 && x <= -RampInnerHalfExtent
                 && x >= -WallHalfExtent)
             {
@@ -230,7 +278,7 @@ namespace RaidDemo.Bootstrap.Editor
         {
             get
             {
-                var run = SouthWallHalfExtent - ValleyHalfExtent;
+                var run = WallHalfExtent - ValleyHalfExtent;
                 return Mathf.Atan2(SouthRimHeight - FloorHeight, run) * Mathf.Rad2Deg;
             }
         }

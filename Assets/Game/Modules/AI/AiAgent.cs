@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using RaidDemo.Combat;
 using RaidDemo.Shared;
+using RaidDemo.Simulation;
 
 namespace RaidDemo.AI
 {
@@ -107,6 +108,24 @@ namespace RaidDemo.AI
 
         /// <summary>巡逻路线。</summary>
         public PatrolRoute PatrolRoute { get; }
+
+        /// <summary>
+        /// 注入移动碰撞（表现层的 PhysX 胶囊扫掠实现）。
+        /// </summary>
+        /// <param name="world">碰撞查询实现；传 null 表示退回"不做碰撞修正"的无头行为。</param>
+        /// <param name="bodyRadius">移动体半径（米），默认与敌人的碰撞胶囊一致。</param>
+        /// <remarks>
+        /// <para>由启动层在创建完单位的宿主对象之后调用：碰撞实现需要宿主 Transform，
+        /// 才能排除自己的碰撞体、并让扫掠胶囊跟着单位当前高度走。</para>
+        ///
+        /// <para>不注入时行为与之前完全一致（直线推进、不查障碍），
+        /// 因此无头服务端与既有单元测试不受影响。</para>
+        /// </remarks>
+        public void SetMovementCollision(IMovementCollisionWorld world, float bodyRadius = 0.4f)
+        {
+            m_Movement.Collision = world;
+            m_Movement.BodyRadius = bodyRadius;
+        }
 
         /// <summary>本帧的感知输入。</summary>
         public AiPerceptionSnapshot Snapshot
