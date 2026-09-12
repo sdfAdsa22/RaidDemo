@@ -317,6 +317,8 @@ namespace RaidDemo.UI
                 }
 
                 views[i].SetSelected(selected);
+                // B + C 方案：未选中压暗，选中保留品质色并使用白色描边与勾。
+                views[i].SetDimmed(m_SellMode && !selected);
             }
         }
     }

@@ -29,11 +29,14 @@ namespace RaidDemo.UI
 
         private RectTransform m_Rect;
         private Image m_Outline;
+        private Image m_InnerLine;
         private Image m_Fill;
         private Text m_Label;
+        private Text m_CheckBadge;
         private Color m_BaseOutlineColor;
         private Color m_BaseFillColor;
         private bool m_Selected;
+        private bool m_Dimmed;
 
         /// <summary>本视图对应的物品实例。</summary>
         public ItemInstance Item { get; private set; }
@@ -76,45 +79,81 @@ namespace RaidDemo.UI
                 color.r * 0.45f, color.g * 0.45f, color.b * 0.45f, FillAlpha);
 
             m_Outline = EnsureImage("Outline", m_Rect, color);
+            // 黑色内分隔线：选中时夹在白色外描边与品质填充之间，
+            // 让白色描边在任何亮度的品质色上都能被看清。
+            m_InnerLine = EnsureImage("InnerLine", m_Outline.rectTransform, Color.clear);
+            StretchToParent(m_InnerLine.rectTransform, 1f);
             m_Fill = EnsureImage("Fill", m_Outline.rectTransform, m_BaseFillColor);
             StretchToParent(m_Fill.rectTransform, 2f);
             m_Outline.color = m_BaseOutlineColor;
             StretchToParent(m_Outline.rectTransform, 0f);
 
             m_Label = EnsureLabel("Label", m_Outline.rectTransform);
-            RefreshSelectionVisual();
+            m_CheckBadge = EnsureCheckBadge(m_Outline.rectTransform);
+            RefreshVisualState();
         }
 
         /// <summary>
-        /// 设置选中高亮。
+        /// 设置选中状态。
         /// </summary>
         /// <remarks>
-        /// 批量出售模式下，玩家需要一眼看出"哪些已经选进来了"。
-        /// 高亮只改变描边与填充色，不改变物品本身的数据。
+        /// 选中不替换稀有度填充色：白色外描边、黑色内分隔线与右上角勾
+        /// 提供与品质颜色无关的形状信号，避免和绿色 / 蓝色品质混淆。
         /// </remarks>
         public void SetSelected(bool selected)
         {
             m_Selected = selected;
-            RefreshSelectionVisual();
+            RefreshVisualState();
         }
 
-        private void RefreshSelectionVisual()
+        /// <summary>设置压暗状态。批量出售模式下未选中的物品会被压暗。</summary>
+        public void SetDimmed(bool dimmed)
         {
-            if (m_Outline == null || m_Fill == null)
+            m_Dimmed = dimmed;
+            RefreshVisualState();
+        }
+
+        /// <summary>按选中与压暗状态重画描边、填充与角标。</summary>
+        private void RefreshVisualState()
+        {
+            if (m_Outline == null || m_Fill == null || m_Label == null)
             {
                 return;
             }
 
-            if (!m_Selected)
+            var outlineColor = m_BaseOutlineColor;
+            var fillColor = m_BaseFillColor;
+            var labelColor = Color.white;
+
+            // 未选中且处于出售模式：整体压暗，选中项保持原亮度形成对比。
+            if (m_Dimmed && !m_Selected)
             {
-                m_Outline.color = m_BaseOutlineColor;
-                m_Fill.color = m_BaseFillColor;
-                return;
+                outlineColor = Dim(outlineColor, 0.55f);
+                fillColor = Dim(fillColor, 0.55f);
+                labelColor = new Color(0.62f, 0.62f, 0.66f, 0.85f);
             }
 
-            var selection = new Color(0.35f, 0.95f, 0.45f, 1f);
-            m_Outline.color = selection;
-            m_Fill.color = new Color(selection.r * 0.55f, selection.g * 0.55f, selection.b * 0.55f, FillAlpha);
+            if (m_Selected)
+            {
+                outlineColor = Color.white;
+                fillColor = m_BaseFillColor;
+                labelColor = Color.white;
+            }
+
+            m_Outline.color = outlineColor;
+            m_Fill.color = fillColor;
+            m_Label.color = labelColor;
+            m_InnerLine.color = m_Selected ? Color.black : Color.clear;
+            if (m_CheckBadge != null)
+            {
+                m_CheckBadge.gameObject.SetActive(m_Selected);
+            }
+        }
+
+        /// <summary>按比例压暗颜色，保留原来的透明度。</summary>
+        private static Color Dim(Color color, float factor)
+        {
+            return new Color(color.r * factor, color.g * factor, color.b * factor, color.a);
         }
 
         /// <summary>刷新数量与名称文本。</summary>
@@ -156,6 +195,34 @@ namespace RaidDemo.UI
             text.verticalOverflow = VerticalWrapMode.Truncate;
             text.raycastTarget = false;
             StretchToParent(rect, 2f);
+            return text;
+        }
+
+        /// <summary>创建右上角的选中勾。</summary>
+        private static Text EnsureCheckBadge(RectTransform parent)
+        {
+            var host = new GameObject("SelectedBadge", typeof(RectTransform), typeof(Text));
+            var rect = (RectTransform)host.transform;
+            rect.SetParent(parent, worldPositionStays: false);
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-1f, -1f);
+            rect.sizeDelta = new Vector2(18f, 18f);
+
+            var text = host.GetComponent<Text>();
+            text.font = UiFontProvider.Get(14);
+            text.fontSize = 14;
+            text.text = "✓";
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.raycastTarget = false;
+
+            var outline = host.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            outline.effectDistance = new Vector2(1f, -1f);
+
+            host.SetActive(false);
             return text;
         }
 
