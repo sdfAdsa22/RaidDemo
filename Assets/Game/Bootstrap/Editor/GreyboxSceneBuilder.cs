@@ -199,36 +199,28 @@ namespace RaidDemo.Bootstrap.Editor
             collider.radius = PlayerRadius;
             collider.center = new Vector3(0f, PlayerHeight * 0.5f, 0f);
 
-            // 身体：圆柱体，高度略低于总身高，把头部占用的空间留出来。
-            var bodyHeight = PlayerHeight - (PlayerRadius * 2f);
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            body.name = "Body";
-            body.transform.SetParent(player.transform, worldPositionStays: false);
-            body.transform.localPosition = new Vector3(0f, PlayerRadius + (bodyHeight * 0.5f), 0f);
-            body.transform.localScale = new Vector3(PlayerRadius * 2f, bodyHeight * 0.5f, PlayerRadius * 2f);
-            Object.DestroyImmediate(body.GetComponent<Collider>());
-            SetMaterialColor(body, new Color(0.25f, 0.6f, 0.95f));
-
-            // 头部：球体，放在身体顶端。
-            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            head.name = "Head";
-            head.transform.SetParent(player.transform, worldPositionStays: false);
-            head.transform.localPosition = new Vector3(0f, PlayerHeight - PlayerRadius, 0f);
-            head.transform.localScale = Vector3.one * (PlayerRadius * 2f);
-            Object.DestroyImmediate(head.GetComponent<Collider>());
-            SetMaterialColor(head, new Color(0.85f, 0.72f, 0.2f));
-
-            // 朝向指示：在角色前方（本地 +Z）放一个小方块。
-            // 斜俯视下角色本身近似圆形，若不放置指示物将无法判断朝向是否正确。
-            var nose = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            nose.name = "FacingIndicator";
-            nose.transform.SetParent(player.transform, worldPositionStays: false);
-            nose.transform.localPosition = new Vector3(0f, 0.25f, PlayerRadius + 0.3f);
-            nose.transform.localScale = new Vector3(0.2f, 0.15f, 0.5f);
-            Object.DestroyImmediate(nose.GetComponent<Collider>());
-            SetMaterialColor(nose, new Color(0.95f, 0.35f, 0.2f));
+            // M7 批次 1：外观改为 Kenney 角色（预制体自带 Animator 与项目材质）。
+            // 旧灰盒的圆柱/球/朝向方块全部移除——角色朝向由模型本身表达。
+            AttachPlayerCharacter(player);
 
             player.AddComponent<RaidDemo.Presentation.PlayerMotor>();
+            player.AddComponent<RaidDemo.Presentation.PlayerCharacterView>();
+        }
+
+        /// <summary>把玩家角色预制体挂到角色根节点下（脚底对齐根节点）。</summary>
+        private static void AttachPlayerCharacter(GameObject player)
+        {
+            const string prefabPath = "Assets/Game/Content/Art/Characters/Player/PlayerCharacter.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning($"玩家角色预制体缺失：{prefabPath}");
+                return;
+            }
+
+            var visual = (GameObject)PrefabUtility.InstantiatePrefab(prefab, player.transform);
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localRotation = Quaternion.identity;
         }
 
         /// <summary>创建场景启动对象，并把各组件引用接好。</summary>

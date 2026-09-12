@@ -34,6 +34,9 @@ namespace RaidDemo.Presentation
         private Transform m_Root;
         private Renderer m_Renderer;
 
+        /// <summary>当前是否装备了武器。角色动画用它决定是否播放持枪姿态。</summary>
+        public bool IsEquipped { get; private set; }
+
         /// <summary>把视图挂到角色身上。</summary>
         /// <param name="owner">角色根节点。</param>
         /// <remarks>
@@ -68,6 +71,8 @@ namespace RaidDemo.Presentation
         /// <param name="lengthInGridCells">武器在背包里占的格数，用于推算枪身长度。</param>
         public void UpdateView(Vector3 playerPosition, float aimDegrees, bool equipped, int lengthInGridCells)
         {
+            IsEquipped = equipped;
+
             if (m_Root == null)
             {
                 return;

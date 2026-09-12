@@ -50,33 +50,22 @@ namespace RaidDemo.Bootstrap.Editor
             collider.radius = 0.4f;
             collider.center = new Vector3(0f, 0.9f, 0f);
 
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            body.name = "Body";
-            body.transform.SetParent(player.transform, worldPositionStays: false);
-            body.transform.localPosition = new Vector3(0f, 0.9f, 0f);
-            body.transform.localScale = new Vector3(0.8f, 0.5f, 0.8f);
-            Object.DestroyImmediate(body.GetComponent<Collider>());
-            SetColor(body, new Color(0.25f, 0.6f, 0.95f));
-
-            // 头与朝向指示必须与战局里的角色一致：两个场景里「我」应当是同一个形象，
-            // 缺了头会让俯视下分不清正反，缺了朝向块则完全看不出在瞄哪边。
-            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            head.name = "Head";
-            head.transform.SetParent(player.transform, worldPositionStays: false);
-            head.transform.localPosition = new Vector3(0f, 1.4f, 0f);
-            head.transform.localScale = Vector3.one * 0.8f;
-            Object.DestroyImmediate(head.GetComponent<Collider>());
-            SetColor(head, new Color(0.85f, 0.72f, 0.2f));
-
-            var nose = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            nose.name = "FacingIndicator";
-            nose.transform.SetParent(player.transform, worldPositionStays: false);
-            nose.transform.localPosition = new Vector3(0f, 0.25f, 0.7f);
-            nose.transform.localScale = new Vector3(0.2f, 0.15f, 0.5f);
-            Object.DestroyImmediate(nose.GetComponent<Collider>());
-            SetColor(nose, new Color(0.95f, 0.35f, 0.2f));
+            // M7 批次 1：安全屋与战局使用同一个角色预制体，保证两个场景里「我」是同一个形象。
+            const string prefabPath = "Assets/Game/Content/Art/Characters/Player/PlayerCharacter.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab != null)
+            {
+                var visual = (GameObject)PrefabUtility.InstantiatePrefab(prefab, player.transform);
+                visual.transform.localPosition = Vector3.zero;
+                visual.transform.localRotation = Quaternion.identity;
+            }
+            else
+            {
+                Debug.LogWarning($"玩家角色预制体缺失：{prefabPath}");
+            }
 
             player.AddComponent<RaidDemo.Presentation.PlayerMotor>();
+            player.AddComponent<RaidDemo.Presentation.PlayerCharacterView>();
         }
 
         /// <summary>相机与启动对象。</summary>
