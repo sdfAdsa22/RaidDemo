@@ -37,11 +37,14 @@ namespace RaidDemo.Diagnostics
         /// </remarks>
         public static float SampleGroundHeight(float x, float z)
         {
-            var origin = new Vector3(x, 50f, z);
-            return Physics.Raycast(origin, Vector3.down, out var hit, 100f, ~0, QueryTriggerInteraction.Ignore)
-                ? hit.point.y
-                : 0f;
+            // 用与 AI 完全相同的高度采样（导航网格），而不是物理射线：
+            // 物理射线会先命中单位自己的碰撞胶囊顶（约 1.8 米），把视角锥画到头顶上去。
+            return s_Ground.SampleHeight(new RaidDemo.Shared.Vector2F(x, z));
         }
+
+        /// <summary>与 AI 共用同一套地面高度采样，保证调试图形与实际判定一致。</summary>
+        private static readonly RaidDemo.AI.IGroundHeightProvider s_Ground =
+            new RaidDemo.Presentation.NavMeshGroundHeightProvider();
 
         private const float CircleWidth = 0.04f;
         private const float OutlineWidth = 0.05f;

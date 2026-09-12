@@ -296,15 +296,16 @@ namespace RaidDemo.AI
 
             // 两档都要做遮挡判定：6 米内可以忽略朝向，但隔着集装箱不算发现。
             //
-            // 两端都要按各自脚下的地面高度抬起：逻辑层只有平面坐标，
-            // 若只抬一端，射线的方向仍然指向平台下方，视线会被平台表面挡住，
-            // 表现就是"敌人一直警惕、永远不进入交战"。
+            // 只有射手这一端需要补高度：AI 的 m_Position 是纯平面坐标。
+            //
+            // 目标中心**不能**再补一次：CenterWorld 来自战斗层的世界坐标（站在 1.25 米平台上
+            // 的单位，中心就是 2.10 米）。曾经两端都补过一次，结果是射线瞄到目标头顶上方
+            // 1.25 米处、什么也打不到，视线恒为 false，敌人永远停在"警惕"。
             var eyeGround = m_Director.GroundHeight?.SampleHeight(m_Position) ?? 0f;
-            var targetGround = m_Director.GroundHeight?.SampleHeight(target.Position) ?? 0f;
             var hasLineOfSight = AISensor.HasLineOfSight(
                 m_Director.Probe,
                 AISensor.ToEyePosition(m_Position, profile.EyeHeightMeters, eyeGround),
-                AISensor.LiftByHeight(target.CenterWorld, targetGround),
+                target.CenterWorld,
                 target.CombatantId,
                 profile.ViewDistanceMeters);
 
