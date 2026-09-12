@@ -18,7 +18,7 @@ namespace RaidDemo.Data
         fileName = "ItemCatalog",
         menuName = "RaidDemo/物品目录",
         order = 11)]
-    public sealed class ItemCatalog : ScriptableObject
+    public sealed class ItemCatalog : ScriptableObject, IItemDefinitionLookup
     {
         /// <summary>目录中的全部物品定义。</summary>
         [SerializeField] private List<ItemDefinition> m_Items = new List<ItemDefinition>();
@@ -48,6 +48,25 @@ namespace RaidDemo.Data
             }
 
             return m_Lookup.TryGetValue(id, out definition);
+        }
+
+        /// <summary>
+        /// 以只读接口返回物品定义。
+        /// </summary>
+        /// <remarks>
+        /// C# 的 out 参数不支持协变，因此这里显式实现接口，
+        /// 让规则层拿到 <see cref="IItemDefinition"/> 而不必认识具体的资产类型。
+        /// </remarks>
+        bool IItemDefinitionLookup.TryGet(string id, out IItemDefinition definition)
+        {
+            if (TryGet(id, out var concrete))
+            {
+                definition = concrete;
+                return true;
+            }
+
+            definition = null;
+            return false;
         }
 
         /// <summary>按 ID 查找物品定义，找不到时返回 null。</summary>

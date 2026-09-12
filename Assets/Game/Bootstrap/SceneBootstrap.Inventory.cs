@@ -30,7 +30,10 @@ namespace RaidDemo.Bootstrap
 
             // 随身携带物来自跨场景存活的局外进度：出击准备就是在它上面做的，
             // 而每开一局都会重载场景——若在这里新建，玩家准备完一按出击就白准备了。
-            var progress = RaidFlowController.Ensure().Progress;
+            var flow = RaidFlowController.Ensure();
+            flow.ApplyPendingSave(m_ItemCatalog);
+            m_MetaProgress = flow.Progress;
+            var progress = m_MetaProgress;
             m_Loadout = progress.Loadout;
             m_BackpackContainerId = m_ContainerRegistry.Register(m_Loadout.Backpack, ContainerKind.PlayerBackpack);
             m_AmmoPouchContainerId = m_ContainerRegistry.Register(m_Loadout.AmmoPouch, ContainerKind.AmmoPouch);

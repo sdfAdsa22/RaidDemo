@@ -362,6 +362,11 @@ namespace RaidDemo.Bootstrap
                 }
 
                 Debug.Log($"[RaidDemo] 撤离成功，{deposited} 件物品已入库。");
+
+                // 只有活着带出来才算任务进度；阵亡与超时不会推进任何撤离类目标。
+                progress.Quests.ReportExtraction(
+                    result.ExtractedValue,
+                    m_PlayerTookDamageThisRaid);
             }
             else
             {
@@ -369,7 +374,10 @@ namespace RaidDemo.Bootstrap
                 progress.ClearLoadout();
             }
 
-            RaidFlowController.Ensure().ShowResult(result);
+            var questSummary = progress.Quests.BuildRaidSummary();
+            var flow = RaidFlowController.Ensure();
+            flow.MarkRaidFinished();
+            flow.ShowResult(result, questSummary);
         }
     }
 }

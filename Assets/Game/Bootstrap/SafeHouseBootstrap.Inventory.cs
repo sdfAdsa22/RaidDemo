@@ -1,6 +1,7 @@
 using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
+using RaidDemo.Meta;
 using RaidDemo.Shared;
 using RaidDemo.UI;
 using UnityEngine;
@@ -20,6 +21,9 @@ namespace RaidDemo.Bootstrap
     {
         private EncumbranceProfile m_EncumbranceProfile;
         private System.IDisposable m_ChangedSubscription;
+        private MetaProgress m_Progress;
+        private TraderCatalog m_TraderCatalog;
+        private MerchantScreenController m_MerchantScreen;
 
         /// <summary>开发期测试箱的容器 ID；0 表示没有（定义被删掉之后就是这样）。</summary>
         private int m_DebugCrateContainerId;
@@ -29,11 +33,13 @@ namespace RaidDemo.Bootstrap
             m_Registry = new ContainerRegistry();
             m_EncumbranceProfile = new EncumbranceProfile();
 
-            var progress = RaidFlowController.Ensure().Progress;
-            m_Loadout = progress.Loadout;
+            var flow = RaidFlowController.Ensure();
+            flow.ApplyPendingSave(m_ItemCatalog);
+            m_Progress = flow.Progress;
+            m_Loadout = m_Progress.Loadout;
             m_BackpackContainerId = m_Registry.Register(m_Loadout.Backpack, ContainerKind.PlayerBackpack);
             m_AmmoPouchContainerId = m_Registry.Register(m_Loadout.AmmoPouch, ContainerKind.AmmoPouch);
-            m_StashContainerId = m_Registry.Register(progress.Stash, ContainerKind.Stash);
+            m_StashContainerId = m_Registry.Register(m_Progress.Stash, ContainerKind.Stash);
             BuildDebugCrate();
 
             var context = new InventoryContext(m_Registry, m_Loadout, m_EventBus);
@@ -63,6 +69,34 @@ namespace RaidDemo.Bootstrap
                 requestUseItem: null);
             m_InventoryScreen.SetStashContainer(m_StashContainerId);
             m_InventoryScreen.InputEnabled = true;
+
+            // 商人经济：货架固定、价格由 TraderPricing 计算，买卖与任务都走命令链路。
+            m_TraderCatalog = TraderCatalog.CreateDefault();
+            m_CommandRouter.Register<BuyItemIntent>(
+                new BuyItemCommandHandler(m_Progress, m_ItemCatalog, m_TraderCatalog, m_EventBus));
+            m_CommandRouter.Register<SellItemIntent>(
+                new SellItemCommandHandler(m_Progress, m_Registry, m_EventBus));
+            m_CommandRouter.Register<QuestAcceptIntent>(
+                new QuestAcceptCommandHandler(m_Progress.Quests));
+            m_CommandRouter.Register<QuestTrackIntent>(
+                new QuestTrackCommandHandler(m_Progress.Quests));
+            m_CommandRouter.Register<QuestTurnInIntent>(
+                new QuestTurnInCommandHandler(m_Progress.Quests));
+            m_CommandRouter.Register<QuestClaimIntent>(
+                new QuestClaimCommandHandler(m_Progress.Quests));
+
+            var merchantHost = new GameObject("MerchantScreen");
+            merchantHost.transform.SetParent(transform, worldPositionStays: false);
+            m_MerchantScreen = merchantHost.AddComponent<MerchantScreenController>();
+            m_MerchantScreen.Initialize(
+                m_CommandRouter,
+                m_Registry,
+                m_Progress,
+                m_ItemCatalog,
+                m_TraderCatalog,
+                m_EventBus,
+                m_StashContainerId,
+                ApplyCursorLock);
 
             // 在安全屋里换背包也要立刻改格子数——否则玩家会以为背包没用。
             m_ChangedSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshBackpackCapacity());

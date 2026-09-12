@@ -1,6 +1,8 @@
 using RaidDemo.Raid;
 using RaidDemo.UI;
 using RaidDemo.Meta;
+using RaidDemo.Data;
+using RaidDemo.Kernel;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -23,7 +25,7 @@ namespace RaidDemo.Bootstrap
     /// <para>它属于装配层：只有装配层允许同时认识界面、战局结果与场景加载。</para>
     /// </remarks>
     [DisallowMultipleComponent]
-    public sealed class RaidFlowController : MonoBehaviour
+    public sealed partial class RaidFlowController : MonoBehaviour
     {
         /// <summary>当前流程所处的位置。</summary>
         public enum FlowState
@@ -51,7 +53,6 @@ namespace RaidDemo.Bootstrap
 
         private MainMenuScreen m_MenuScreen;
         private RaidResultScreen m_ResultScreen;
-
         /// <summary>
         /// 局外进度（仓库）。
         /// </summary>
@@ -59,7 +60,7 @@ namespace RaidDemo.Bootstrap
         /// 放在流程控制器上而不是场景里：它标记了 DontDestroyOnLoad，
         /// 而每开一局都会重新加载场景——放在场景里的东西活不过一局。
         /// </remarks>
-        public MetaProgress Progress { get; } = new MetaProgress();
+        public MetaProgress Progress { get; private set; } = new MetaProgress();
 
         /// <summary>当前流程状态。</summary>
         public FlowState State { get; private set; } = FlowState.MainMenu;
@@ -95,11 +96,24 @@ namespace RaidDemo.Bootstrap
             s_Instance = this;
             DontDestroyOnLoad(gameObject);
 
+            // 读档只读原始 DTO，不在这里还原物品：还原需要物品目录资产，
+            // 而那个资产属于场景，要等装配层把目录交进来之后才能做。
+            m_SaveStore = new SaveFileStore();
+            if (m_SaveStore.TryLoad<MetaSaveData>(out var data, out var loadError))
+            {
+                m_PendingSave = data;
+            }
+            else if (m_SaveStore.Exists)
+            {
+                Debug.LogWarning($"[RaidDemo] 存档读取失败：{loadError}");
+            }
+
             m_MenuScreen = gameObject.AddComponent<MainMenuScreen>();
-            m_MenuScreen.Initialize(EnterSafeHouse);
+            m_MenuScreen.Initialize(EnterSafeHouse, StartNewGame);
 
             m_ResultScreen = gameObject.AddComponent<RaidResultScreen>();
             m_ResultScreen.Initialize(StartRaid, GoToSafeHouse);
+            HookProgress(Progress);
         }
 
         /// <summary>
@@ -114,6 +128,8 @@ namespace RaidDemo.Bootstrap
             State = FlowState.MainMenu;
             Time.timeScale = 0f;
             m_ResultScreen.SetVisible(false);
+            m_MenuScreen.SetHasSave(HasSave);
+            m_MenuScreen.SetNotice(StartupNotice);
             m_MenuScreen.SetVisible(true);
             UnlockCursor();
         }
@@ -121,6 +137,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>开始一局：重载场景，让新场景以「战局进行中」的状态启动。</summary>
         public void StartRaid()
         {
+            // 先写入"战局进行中"再切场景：这样中途强退时，下一次启动能判定为阵亡。
+            m_RaidInProgress = true;
+            SaveNow();
             State = FlowState.InRaid;
             HideScreens();
             Time.timeScale = 1f;
@@ -136,6 +155,8 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public void EnterSafeHouse()
         {
+            m_RaidInProgress = false;
+            SaveNow();
             State = FlowState.SafeHouse;
             HideScreens();
         }
@@ -149,6 +170,8 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public void GoToSafeHouse()
         {
+            m_RaidInProgress = false;
+            SaveNow();
             State = FlowState.SafeHouse;
             HideScreens();
             Time.timeScale = 1f;
@@ -158,6 +181,8 @@ namespace RaidDemo.Bootstrap
         /// <summary>返回主菜单：重载场景，让新场景以主菜单状态启动。</summary>
         public void ReturnToMenu()
         {
+            m_RaidInProgress = false;
+            SaveNow();
             State = FlowState.MainMenu;
             ReloadScene();
         }
@@ -169,11 +194,11 @@ namespace RaidDemo.Bootstrap
         /// 结算画面背后应该是玩家阵亡或撤离那一刻的静止画面，
         /// 让敌人继续跑动会让「战局已经结束」这件事显得含糊。
         /// </remarks>
-        public void ShowResult(RaidResult result)
+        public void ShowResult(RaidResult result, string questSummary = null)
         {
             State = FlowState.Result;
             m_MenuScreen.SetVisible(false);
-            m_ResultScreen.Show(result);
+            m_ResultScreen.Show(result, questSummary);
             Time.timeScale = 0f;
             UnlockCursor();
         }

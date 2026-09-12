@@ -30,6 +30,7 @@ namespace RaidDemo.UI
         private Action m_OnDeploy;
         private Text m_PromptLabel;
         private Text m_HintLabel;
+        private Text m_MoneyLabel;
         private GameObject m_MapRoot;
         private float m_HintRemaining;
 
@@ -59,7 +60,24 @@ namespace RaidDemo.UI
             m_HintLabel = CreateLabel(root, string.Empty, new Vector2(0.5f, 0f), new Vector2(0f, 176f), 18, DimColor);
             m_HintLabel.gameObject.SetActive(false);
 
+            // 金币常驻右上角：局外系统的核心问题是「我的家底在变好还是变差」，
+            // 余额必须在不打开任何界面的情况下就能看到。
+            m_MoneyLabel = CreateLabel(
+                root, "金币 0", new Vector2(1f, 1f), new Vector2(-32f, -24f), 22, TextColor);
+            m_MoneyLabel.alignment = TextAnchor.MiddleRight;
+            m_MoneyLabel.rectTransform.sizeDelta = new Vector2(360f, 30f);
+            m_MoneyLabel.color = new Color(0.95f, 0.82f, 0.35f);
+
             BuildMapPanel(root);
+        }
+
+        /// <summary>刷新右上角金币显示。</summary>
+        public void SetMoney(int money)
+        {
+            if (m_MoneyLabel != null)
+            {
+                m_MoneyLabel.text = $"金币 {money:N0}";
+            }
         }
 
         /// <summary>设置交互提示；传 null 表示隐藏。</summary>

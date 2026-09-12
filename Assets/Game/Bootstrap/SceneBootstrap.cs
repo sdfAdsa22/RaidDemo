@@ -119,6 +119,11 @@ namespace RaidDemo.Bootstrap
 
         private void OnDestroy()
         {
+            if (m_MetaProgress != null)
+            {
+                m_MetaProgress.Changed -= RefreshQuestTracker;
+            }
+
             // 释放订阅。AI 调度器订阅了伤害事件，漏掉这一步会在退出播放模式时留下悬挂引用。
             m_WeaponNoiseSubscription?.Dispose();
             m_WeaponNoiseSubscription = null;

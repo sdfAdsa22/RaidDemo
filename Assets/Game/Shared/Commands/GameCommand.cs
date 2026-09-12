@@ -157,6 +157,27 @@ namespace RaidDemo.Shared
 
         /// <summary>背包里没有匹配口径的弹药。</summary>
         public const string CombatNoAmmo = "combat_no_ammo";
+
+        /// <summary>金币余额不足，交易被拒绝。</summary>
+        public const string MetaInsufficientFunds = "meta_insufficient_funds";
+
+        /// <summary>交易数量非法（小于等于 0，或超过一次可购买的上限）。</summary>
+        public const string MetaInvalidQuantity = "meta_invalid_quantity";
+
+        /// <summary>商人货架上没有这件商品。</summary>
+        public const string MetaItemNotSold = "meta_item_not_sold";
+
+        /// <summary>找不到指定任务。</summary>
+        public const string MetaQuestNotFound = "meta_quest_not_found";
+
+        /// <summary>任务当前状态不允许该操作。</summary>
+        public const string MetaQuestStateInvalid = "meta_quest_state_invalid";
+
+        /// <summary>上交任务所需的物品数量不足。</summary>
+        public const string MetaQuestItemsMissing = "meta_quest_items_missing";
+
+        /// <summary>任务奖励没有空间发放。</summary>
+        public const string MetaQuestRewardBlocked = "meta_quest_reward_blocked";
     }
 
     /// <summary>

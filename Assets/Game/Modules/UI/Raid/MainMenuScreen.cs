@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace RaidDemo.UI
 {
     /// <summary>
-    /// 极简主菜单：一个出击按钮，加上一页操作说明。
+    /// 极简主菜单：继续 / 新游戏 / 退出，加上一页操作说明。
     /// </summary>
     /// <remarks>
     /// <para><b>为什么要放操作说明：</b>这个 Demo 会被不认识它的人打开（面试官、同学）。
@@ -29,15 +29,23 @@ namespace RaidDemo.UI
 
 
         private RectTransform m_Root;
-        private RaidButtonWidget m_DeployButton;
-        private Action m_OnDeploy;
+        private RaidButtonWidget m_ContinueButton;
+        private RaidButtonWidget m_NewGameButton;
+        private Text m_NoticeLabel;
+        private Action m_OnContinue;
+        private Action m_OnNewGame;
         private bool m_IsVisible;
+        private bool m_HasSave;
+        private bool m_ConfirmNewGame;
+        private float m_ConfirmRemaining;
 
         /// <summary>构建界面。</summary>
-        /// <param name="onDeploy">点击「出击」时执行的回调。</param>
-        public void Initialize(Action onDeploy)
+        /// <param name="onContinue">点击「继续 / 开始」时执行的回调。</param>
+        /// <param name="onNewGame">点击「新游戏」时执行的回调。</param>
+        public void Initialize(Action onContinue, Action onNewGame)
         {
-            m_OnDeploy = onDeploy;
+            m_OnContinue = onContinue;
+            m_OnNewGame = onNewGame;
 
             m_Root = RaidScreenFactory.CreateCanvas(transform, "MainMenuCanvas", 300);
             RaidScreenFactory.CreatePanel(
@@ -56,19 +64,35 @@ namespace RaidDemo.UI
                 new Vector2(48f, 100f), new Vector2(700f, 30f),
                 19, TextAnchor.MiddleLeft, HintColor);
 
-            m_DeployButton = RaidScreenFactory.CreateButton(
+            m_ContinueButton = RaidScreenFactory.CreateButton(
                 panel,
-                "出击（Enter）",
+                "开始游戏（Enter）",
                 new Vector2(48f, 170f),
                 new Vector2(300f, 68f),
                 ButtonColor,
                 ButtonHoverColor);
 
+            m_NewGameButton = RaidScreenFactory.CreateButton(
+                panel,
+                "新游戏",
+                new Vector2(368f, 170f),
+                new Vector2(240f, 68f),
+                new Color(0.28f, 0.29f, 0.33f),
+                new Color(0.36f, 0.37f, 0.42f));
+
+            m_NoticeLabel = RaidScreenFactory.CreateLabel(
+                panel,
+                string.Empty,
+                new Vector2(48f, 248f), new Vector2(700f, 44f),
+                16, TextAnchor.UpperLeft,
+                new Color(0.95f, 0.72f, 0.35f));
+            m_NoticeLabel.gameObject.SetActive(false);
+
             RaidScreenFactory.CreateLabel(
                 panel,
                 "在一块不大的安全屋里，你可以整理仓库、试枪、从出口选地图出击。\n"
                 + "操作说明写在安全屋的墙上；出击前的准备也都在那里完成。",
-                new Vector2(48f, 272f), new Vector2(700f, 80f),
+                new Vector2(48f, 300f), new Vector2(700f, 80f),
                 17, TextAnchor.UpperLeft, BodyColor);
 
             RaidScreenFactory.CreateLabel(
@@ -78,6 +102,29 @@ namespace RaidDemo.UI
                 15, TextAnchor.MiddleLeft, HintColor);
 
             SetVisible(false);
+        }
+
+        /// <summary>告诉菜单是否存在存档，据此切换主按钮文字与「新游戏」是否显示。</summary>
+        public void SetHasSave(bool hasSave)
+        {
+            m_HasSave = hasSave;
+            m_ContinueButton.Label.text = hasSave ? "继续游戏（Enter）" : "开始游戏（Enter）";
+            m_NewGameButton.Rect.gameObject.SetActive(hasSave);
+            if (!hasSave)
+            {
+                ResetNewGameConfirm();
+            }
+        }
+
+        /// <summary>显示一次性提示（例如强退战局的惩罚）。</summary>
+        public void SetNotice(string notice)
+        {
+            var has = !string.IsNullOrEmpty(notice);
+            m_NoticeLabel.gameObject.SetActive(has);
+            if (has)
+            {
+                m_NoticeLabel.text = notice;
+            }
         }
 
         /// <summary>显示或隐藏菜单。</summary>
@@ -99,17 +146,30 @@ namespace RaidDemo.UI
         /// </remarks>
         private void Update()
         {
-            if (!m_IsVisible || m_OnDeploy == null)
+            if (!m_IsVisible || m_OnContinue == null)
             {
                 return;
             }
 
+            if (m_ConfirmNewGame)
+            {
+                m_ConfirmRemaining -= Time.unscaledDeltaTime;
+                if (m_ConfirmRemaining <= 0f)
+                {
+                    ResetNewGameConfirm();
+                }
+            }
+
             var keyboard = Keyboard.current;
             var pointer = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
-            var hovered = Mouse.current != null && m_DeployButton.Contains(pointer);
-            m_DeployButton.SetHovered(hovered);
+            var overContinue = Mouse.current != null && m_ContinueButton.Contains(pointer);
+            var overNewGame = m_HasSave
+                && Mouse.current != null
+                && m_NewGameButton.Contains(pointer);
+            m_ContinueButton.SetHovered(overContinue);
+            m_NewGameButton.SetHovered(overNewGame);
 
-            var clicked = hovered && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+            var clicked = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
             var confirmed = keyboard != null && keyboard.enterKey.wasPressedThisFrame;
 
             // Esc 退出游戏。编辑器里退出播放模式，构建里真正退出——
@@ -124,9 +184,35 @@ namespace RaidDemo.UI
                 return;
             }
 
-            if (clicked || confirmed)
+            if ((clicked && overContinue) || confirmed)
             {
-                m_OnDeploy.Invoke();
+                m_OnContinue.Invoke();
+                return;
+            }
+
+            if (clicked && overNewGame)
+            {
+                if (!m_ConfirmNewGame)
+                {
+                    m_ConfirmNewGame = true;
+                    m_ConfirmRemaining = 4f;
+                    m_NewGameButton.Label.text = "再次点击确认清空进度";
+                }
+                else
+                {
+                    ResetNewGameConfirm();
+                    m_OnNewGame?.Invoke();
+                }
+            }
+        }
+
+        private void ResetNewGameConfirm()
+        {
+            m_ConfirmNewGame = false;
+            m_ConfirmRemaining = 0f;
+            if (m_NewGameButton != null)
+            {
+                m_NewGameButton.Label.text = "新游戏";
             }
         }
     }

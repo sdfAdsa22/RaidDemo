@@ -274,6 +274,9 @@ namespace RaidDemo.UI
                     m_LootAnchorTopLeft);
             }
 
+            // 每次打开都主动重画一次：商人买卖只改变了仓库数据，
+            // 若界面恰好没收到对应事件，旧视图会显示过期内容。
+            RefreshAll();
             SetVisible(true);
         }
 

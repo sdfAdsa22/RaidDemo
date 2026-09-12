@@ -20,6 +20,15 @@ namespace RaidDemo.Meta
     /// </remarks>
     public sealed class MetaProgress
     {
+        /// <summary>
+        /// 新存档的启动资金。
+        /// </summary>
+        /// <remarks>
+        /// 只给钱、不送装备：玩家必须先走进商人界面完成第一次购买，
+        /// 经济循环因此从第一分钟就能被看见；同时不会破坏"从零开始"的规则。
+        /// </remarks>
+        public const int StartingMoney = 5000;
+
         /// <summary>仓库网格的尺寸（列 x 行）。</summary>
         /// <remarks>
         /// 批次 1 先做成固定的较大网格而不是无限容量：无限容量需要一套分页或滚动界面，
@@ -30,8 +39,9 @@ namespace RaidDemo.Meta
         public const int StashHeight = 8;
 
         /// <summary>创建一个空的局外进度。</summary>
-        public MetaProgress()
+        public MetaProgress(int startingMoney = StartingMoney)
         {
+            Money = startingMoney > 0 ? startingMoney : 0;
             Stash = new InventoryGrid(StashWidth, StashHeight, "仓库");
 
             // 随身物也放在这里：出击准备就是在它上面做的，
@@ -40,6 +50,13 @@ namespace RaidDemo.Meta
                 new InventoryGrid(PocketWidth, PocketHeight, "主背包"),
                 new EquipmentLoadout(),
                 new InventoryGrid(AmmoPouchCells, 1, "弹药挂", acceptedCategory: ItemCategory.Ammo));
+
+            Quests = new QuestSystem(
+                Stash,
+                new ItemFactory(),
+                null,
+                AddMoney,
+                _ => NotifyChanged());
         }
 
         /// <summary>仓库网格。跨战局保留，每个场景重新登记进容器注册表。</summary>
@@ -47,6 +64,79 @@ namespace RaidDemo.Meta
 
         /// <summary>玩家的随身携带物（背包网格、装备槽、弹药挂）。跨战局保留。</summary>
         public PlayerLoadout Loadout { get; }
+
+        /// <summary>玩家当前持有的金币。</summary>
+        public int Money { get; private set; }
+
+        /// <summary>任务系统。与仓库共享同一份存档生命周期。</summary>
+        public QuestSystem Quests { get; }
+
+        /// <summary>局外进度发生任何变化时触发。存档与界面刷新订阅它。</summary>
+        public event System.Action Changed;
+
+        /// <summary>仓库内物品的总账面价值，用于界面上回答「我的家底在变好还是变差」。</summary>
+        public int TotalStashValue
+        {
+            get
+            {
+                var total = 0;
+                var items = Stash.Items;
+                for (var i = 0; i < items.Count; i++)
+                {
+                    total += items[i].TotalValue;
+                }
+
+                return total;
+            }
+        }
+
+        /// <summary>增加金币。</summary>
+        /// <remarks>
+        /// 这里只改数值，不广播变化。一次交易可能同时改余额与物品，
+        /// 广播必须等两件事都完成后由调用方统一发出，否则自动存档可能
+        /// 在"钱已扣、物品还没放进去"的中间状态写盘。
+        /// </remarks>
+        public void AddMoney(int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            Money += amount;
+        }
+
+        /// <summary>尝试扣除金币。余额不足时不做任何改变。</summary>
+        public bool TrySpend(int amount)
+        {
+            if (amount <= 0 || Money < amount)
+            {
+                return false;
+            }
+
+            Money -= amount;
+            return true;
+        }
+
+        /// <summary>注入物品目录，供任务奖励与上交检查使用。</summary>
+        public void AttachCatalog(IItemDefinitionLookup catalog)
+        {
+            Quests.AttachCatalog(catalog);
+        }
+
+        /// <summary>
+        /// 存档还原专用：直接写入余额，不触发"变化"事件。
+        /// </summary>
+        internal void RestoreMoney(int money)
+        {
+            Money = money > 0 ? money : 0;
+        }
+
+        /// <summary>广播一次局外变化。</summary>
+        internal void NotifyChanged()
+        {
+            Changed?.Invoke();
+        }
 
         /// <summary>没有装备背包时的口袋尺寸，与 M5.6 的规则一致。</summary>
         public const int PocketWidth = 5;
@@ -97,6 +187,7 @@ namespace RaidDemo.Meta
             moved += DrainGrid(Loadout.AmmoPouch, ref failed);
             moved += DrainGrid(Loadout.Backpack, ref failed);
             LastDepositFailures = failed;
+            NotifyChanged();
             return moved;
         }
 
@@ -112,6 +203,7 @@ namespace RaidDemo.Meta
             Loadout.Equipment.Clear();
             DiscardAll(Loadout.AmmoPouch);
             DiscardAll(Loadout.Backpack);
+            NotifyChanged();
         }
 
         /// <summary>把一个网格里的物品全部丢弃。</summary>

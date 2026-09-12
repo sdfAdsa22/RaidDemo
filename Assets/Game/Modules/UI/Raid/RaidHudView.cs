@@ -52,6 +52,7 @@ namespace RaidDemo.UI
 
         private Text m_TimerLabel;
         private Text m_KillsLabel;
+        private Text m_QuestLabel;
         private Text m_PromptLabel;
         private GameObject m_SearchRoot;
         private Text m_SearchLabel;
@@ -93,11 +94,34 @@ namespace RaidDemo.UI
                 rootRect, "击杀 0", new Vector2(1f, 1f),
                 new Vector2(-48f, -32f), new Vector2(240f, 28f), 18, TextAnchor.MiddleRight);
 
+            // 任务追踪放在左上角：不与顶部倒计时、右侧击杀数争夺视线焦点。
+            m_QuestLabel = CreateLabel(
+                rootRect, string.Empty, new Vector2(0f, 1f),
+                new Vector2(32f, -32f), new Vector2(520f, 28f), 16, TextAnchor.MiddleLeft);
+            m_QuestLabel.color = new Color(0.85f, 0.88f, 0.60f);
+            m_QuestLabel.gameObject.SetActive(false);
+
             BuildExtraction(rootRect);
             BuildPrompt(rootRect);
             BuildSearch(rootRect);
             BuildUse(rootRect);
             BuildHeal(rootRect);
+        }
+
+        /// <summary>写入任务追踪文本；传 null 或空串时隐藏。</summary>
+        public void SetQuestTracker(string text)
+        {
+            if (m_QuestLabel == null)
+            {
+                return;
+            }
+
+            var has = !string.IsNullOrEmpty(text);
+            m_QuestLabel.gameObject.SetActive(has);
+            if (has)
+            {
+                m_QuestLabel.text = text;
+            }
         }
 
         /// <summary>推进回血提示的倒计时。用非缩放时间，战局结算时也能正常消失。</summary>

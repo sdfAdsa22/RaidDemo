@@ -4,6 +4,7 @@ using RaidDemo.Combat;
 using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
+using RaidDemo.Meta;
 using RaidDemo.Presentation;
 using RaidDemo.Raid;
 using RaidDemo.Shared;
@@ -84,6 +85,7 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>本帧玩家是否受了伤。受伤会打断正在进行的物品使用。</summary>
         private bool m_PlayerDamagedThisFrame;
+
         private RaidHudView m_RaidHud;
         private List<LootContainerRuntime> m_LootContainers;
         private LootContainerRuntime m_NearbyLoot;
@@ -169,6 +171,8 @@ namespace RaidDemo.Bootstrap
 
             // 开局先按当前装备算一次容量：默认没有背包时应当是口袋大小。
             RefreshBackpackCapacity();
+
+            InitializeQuestTracking();
         }
 
         /// <summary>从场景标记构建撤离点列表。</summary>
@@ -257,16 +261,6 @@ namespace RaidDemo.Bootstrap
                     point.transform.position,
                     m_LootSearchRangeMeters));
             }
-        }
-
-        /// <summary>创建战局界面。</summary>
-        private void BuildRaidHud()
-        {
-            var host = new GameObject("RaidHud");
-            host.transform.SetParent(transform, worldPositionStays: false);
-            m_RaidHud = host.AddComponent<RaidHudView>();
-            m_RaidHud.Initialize();
-            m_RaidHud.SetKills(0);
         }
 
         /// <summary>把战局状态写进界面。</summary>
@@ -363,6 +357,7 @@ namespace RaidDemo.Bootstrap
             if (evt.TargetId == m_PlayerCombatantId)
             {
                 m_PlayerDamagedThisFrame = true;
+                MarkPlayerDamagedForQuests();
             }
 
             if (!evt.WasKilled || evt.AttackerId != m_PlayerCombatantId)
@@ -371,6 +366,7 @@ namespace RaidDemo.Bootstrap
             }
 
             m_RaidSession?.NotifyKill(evt.AttackerId);
+            NotifyQuestKill();
         }
 
         /// <summary>按容器 ID 查找运行时容器。</summary>

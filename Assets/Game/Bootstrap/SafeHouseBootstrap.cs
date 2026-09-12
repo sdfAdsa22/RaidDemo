@@ -96,6 +96,11 @@ namespace RaidDemo.Bootstrap
             uiHost.transform.SetParent(transform, worldPositionStays: false);
             m_Ui = uiHost.AddComponent<SafeHouseUI>();
             m_Ui.Initialize(StartRaid);
+            if (m_Progress != null)
+            {
+                m_Progress.Changed += RefreshWallet;
+                RefreshWallet();
+            }
 
             // 启动时先显示极简主菜单（开始 / 退出）；从战局回来时直接进安全屋。
             var flow = RaidFlowController.Ensure();
@@ -112,8 +117,19 @@ namespace RaidDemo.Bootstrap
 
         private void OnDestroy()
         {
+            if (m_Progress != null)
+            {
+                m_Progress.Changed -= RefreshWallet;
+            }
+
             ServiceLocatorHolder.Clear();
             m_Services?.Clear();
+        }
+
+        /// <summary>把最新余额写进安全屋右上角。</summary>
+        private void RefreshWallet()
+        {
+            m_Ui?.SetMoney(m_Progress != null ? m_Progress.Money : 0);
         }
 
         /// <summary>出战：切到战局场景。</summary>
@@ -130,7 +146,18 @@ namespace RaidDemo.Bootstrap
             }
 
             var uiOpen = (m_InventoryScreen != null && m_InventoryScreen.IsOpen)
-                || (m_Ui != null && m_Ui.IsOpen);
+                || (m_Ui != null && m_Ui.IsOpen)
+                || (m_MerchantScreen != null && m_MerchantScreen.IsOpen);
+
+            // 商人界面关闭后恢复背包的 Tab 输入；打开商人时会临时关掉它，
+            // 避免两个全屏界面叠在一起。
+            if (m_MerchantScreen != null
+                && !m_MerchantScreen.IsOpen
+                && m_InventoryScreen != null
+                && !m_InventoryScreen.InputEnabled)
+            {
+                m_InventoryScreen.InputEnabled = true;
+            }
 
             if (m_InputCollector != null && Application.isFocused && Cursor.lockState != CursorLockMode.Locked && !uiOpen)
             {
@@ -262,7 +289,13 @@ namespace RaidDemo.Bootstrap
                     break;
 
                 case SafeHouseInteractable.Kind.Merchant:
-                    m_Ui?.ShowHint("商人：交易功能在批次 3 开放");
+                    m_InventoryScreen?.Close();
+                    if (m_InventoryScreen != null)
+                    {
+                        m_InventoryScreen.InputEnabled = false;
+                    }
+
+                    m_MerchantScreen?.Open();
                     break;
 
                 case SafeHouseInteractable.Kind.DebugCrate:

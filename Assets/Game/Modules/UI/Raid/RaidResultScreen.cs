@@ -47,6 +47,7 @@ namespace RaidDemo.UI
         private Text m_ExtractedLabel;
         private Text m_ListHeaderLabel;
         private Text m_ListFooterLabel;
+        private Text m_QuestLabel;
         private Text m_NoteLabel;
         private RaidButtonWidget m_RestartButton;
         private RaidButtonWidget m_MenuButton;
@@ -103,6 +104,10 @@ namespace RaidDemo.UI
                 panel, string.Empty, new Vector2(48f, 250f + (MaxItemRows * 26f)), new Vector2(800f, 24f),
                 16, TextAnchor.MiddleLeft, HintColor);
 
+            m_QuestLabel = RaidScreenFactory.CreateLabel(
+                panel, string.Empty, new Vector2(48f, 506f), new Vector2(800f, 26f),
+                16, TextAnchor.MiddleLeft, ProfitColor);
+
             m_NoteLabel = RaidScreenFactory.CreateLabel(
                 panel, string.Empty, new Vector2(48f, 540f), new Vector2(800f, 26f),
                 15, TextAnchor.MiddleLeft, HintColor);
@@ -129,7 +134,7 @@ namespace RaidDemo.UI
         }
 
         /// <summary>用一份战局结算数据刷新界面。</summary>
-        public void Show(RaidResult result)
+        public void Show(RaidResult result, string questSummary = null)
         {
             if (result == null)
             {
@@ -158,6 +163,10 @@ namespace RaidDemo.UI
             m_NoteLabel.text = failed
                 ? "随身携带的装备与物资已全部丢失；仓库里的物品不受影响。"
                 : "带出的物品已存入仓库，可在出击准备界面查看。";
+
+            var hasQuest = !string.IsNullOrEmpty(questSummary);
+            m_QuestLabel.gameObject.SetActive(hasQuest);
+            m_QuestLabel.text = hasQuest ? questSummary : string.Empty;
 
             SetVisible(true);
         }
