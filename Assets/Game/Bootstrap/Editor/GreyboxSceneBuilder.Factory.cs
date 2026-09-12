@@ -209,7 +209,9 @@ namespace RaidDemo.Bootstrap.Editor
                 return;
             }
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            // 灰盒几何体全部使用带遮挡透视孔的着色器：厂房墙体、装卸平台、掩体都可能挡在
+            // 相机与角色之间。小件（撤离点立柱、货箱）即使挡住角色，能透视过去也是好事。
+            var shader = Shader.Find(M7MaterialLibrary.PeepholeShaderName);
             if (shader == null)
             {
                 return;

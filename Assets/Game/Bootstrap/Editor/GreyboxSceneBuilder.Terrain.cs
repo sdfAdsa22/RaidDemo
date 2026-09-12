@@ -248,7 +248,13 @@ namespace RaidDemo.Bootstrap.Editor
 
             Object.DestroyImmediate(instance);
             var path = $"{BasinTerrainMaterialBuilder.MaterialsFolder}/{materialName}.mat";
-            return M7MaterialLibrary.EnsureLitMaterial(path, sourceColor, texture, smoothness: 0.06f);
+            // 远景山石也要参与开孔：站在塬面边缘时它们同样会挡在相机与角色之间。
+            return M7MaterialLibrary.EnsureLitMaterial(
+                path,
+                sourceColor,
+                texture,
+                smoothness: 0.06f,
+                occluder: true);
         }
 
         /// <summary>把模型实例化一次以测量包围盒（预制体资产本身读不到渲染器边界）。</summary>

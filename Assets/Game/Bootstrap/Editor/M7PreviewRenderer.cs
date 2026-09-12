@@ -28,7 +28,15 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>一张预览图的机位定义。</summary>
         private readonly struct Shot
         {
-            public Shot(string fileName, Vector3 focus, float pitch, float yaw, float distance, float fieldOfView)
+            public Shot(
+                string fileName,
+                Vector3 focus,
+                float pitch,
+                float yaw,
+                float distance,
+                float fieldOfView,
+                bool peephole = false,
+                bool marker = false)
             {
                 FileName = fileName;
                 Focus = focus;
@@ -36,6 +44,8 @@ namespace RaidDemo.Bootstrap.Editor
                 Yaw = yaw;
                 Distance = distance;
                 FieldOfView = fieldOfView;
+                Peephole = peephole;
+                Marker = marker;
             }
 
             public string FileName { get; }
@@ -49,6 +59,12 @@ namespace RaidDemo.Bootstrap.Editor
             public float Distance { get; }
 
             public float FieldOfView { get; }
+
+            /// <summary>是否在渲染前按焦点位置设置一次遮挡透视孔参数（用于验收该功能）。</summary>
+            public bool Peephole { get; }
+
+            /// <summary>是否在焦点处放一个代用角色（胶囊），用于对比开孔前后的画面。</summary>
+            public bool Marker { get; }
         }
 
         /// <summary>
@@ -79,6 +95,14 @@ namespace RaidDemo.Bootstrap.Editor
 
             // 塬面回望：站上北坡顶向南看，这是玩家撤离前看到的画面，也是「下沉盆地」最直观的一帧
             new Shot("06_北塬面回望盆地", new Vector3(0f, 3f, 32f), 40f, 180f, 22f, 60f),
+
+            // 遮挡透视孔：角色站在集装箱北侧、相机在集装箱南侧，箱子正好挡在中间。
+            // 这一帧用来验收「不开孔把相机拉近，而是把遮挡物抠出一个圆洞」。
+            // 代用角色贴着箱体北面（z=0.6），从 62 度俯角看过去身体几乎全被箱体挡住——正是需要开孔的场合。
+            new Shot("07_遮挡透视孔", new Vector3(10f, -5f, -1.2f), 62f, 0f, 13f, 55f, peephole: true, marker: true),
+
+            // 对照组：同一机位、同一个代用角色，但关闭透视孔——两图对比即可看出孔的作用。
+            new Shot("08_遮挡透视孔_关闭对照", new Vector3(10f, -5f, -1.2f), 62f, 0f, 13f, 55f, peephole: false, marker: true),
         };
 
         /// <summary>菜单入口。</summary>
@@ -123,9 +147,51 @@ namespace RaidDemo.Bootstrap.Editor
             host.transform.position = shot.Focus - (forward * shot.Distance);
             host.transform.rotation = rotation;
 
+            // 验收透视孔时要有个「角色」站在孔里，否则看不出洞开在哪。
+            // 用一个与玩家同高的胶囊代替：脚底对齐焦点下方 1 米（焦点取的是胸口高度）。
+            GameObject marker = null;
+            if (shot.Marker)
+            {
+                marker = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                marker.name = "PeepholePreviewMarker";
+                marker.transform.position = shot.Focus - new Vector3(0f, 1f, 0f) + new Vector3(0f, 0.85f, 0f);
+                marker.transform.localScale = new Vector3(0.8f, 1.7f, 0.8f);
+                var renderer = marker.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    var shader = Shader.Find(M7MaterialLibrary.LitShaderName);
+                    if (shader != null)
+                    {
+                        var material = new Material(shader) { name = "PeepholePreviewMarker" };
+                        material.SetColor("_BaseColor", new Color(0.95f, 0.45f, 0.2f));
+                        renderer.sharedMaterial = material;
+                    }
+                }
+            }
+
+            // 先把渲染目标挂上，再算孔参数：屏幕坐标依赖相机的 pixelWidth / pixelHeight，
+            // 没挂目标纹理时读到的是编辑器的预览尺寸，算出来的圆心会偏。
             var renderTexture = new RenderTexture(ImageWidth, ImageHeight, 24, RenderTextureFormat.ARGB32);
             var previous = camera.targetTexture;
             camera.targetTexture = renderTexture;
+
+            // 验收透视孔时手动喂一次全局参数：预览相机不在运行时组件管理之下，
+            // 不设的话着色器收到的半径是 0，也就看不到孔。
+            if (shot.Peephole
+                && RaidDemo.Presentation.OcclusionPeepholeController.TryResolvePeephole(
+                    camera,
+                    shot.Focus,
+                    heightOffset: 0.9f,
+                    radiusRatio: 0.11f,
+                    out var peephole))
+            {
+                Shader.SetGlobalVector(Shader.PropertyToID("_PeepholeParams"), peephole);
+            }
+            else
+            {
+                Shader.SetGlobalVector(Shader.PropertyToID("_PeepholeParams"), Vector4.zero);
+            }
+
             camera.Render();
             camera.targetTexture = previous;
 
@@ -140,6 +206,11 @@ namespace RaidDemo.Bootstrap.Editor
 
             Object.DestroyImmediate(texture);
             Object.DestroyImmediate(renderTexture);
+            if (marker != null)
+            {
+                Object.DestroyImmediate(marker);
+            }
+
             Object.DestroyImmediate(host);
             return true;
         }

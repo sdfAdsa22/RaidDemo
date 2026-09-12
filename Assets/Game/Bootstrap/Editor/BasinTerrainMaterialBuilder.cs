@@ -68,7 +68,8 @@ namespace RaidDemo.Bootstrap.Editor
                 GrassMaterialPath,
                 Color.white,
                 texture,
-                smoothness: 0.04f);
+                smoothness: 0.04f,
+                occluder: true);
         }
 
         /// <summary>创建/更新土墙材质（地形网格上的黏土立面）。</summary>
@@ -78,7 +79,8 @@ namespace RaidDemo.Bootstrap.Editor
                 ClayMaterialPath,
                 ClayColor,
                 texture: null,
-                smoothness: 0.06f);
+                smoothness: 0.06f,
+                occluder: true);
         }
 
         /// <summary>
@@ -97,7 +99,8 @@ namespace RaidDemo.Bootstrap.Editor
                 CliffTileMaterialPath,
                 palette != null ? Color.white : ClayColor,
                 palette,
-                smoothness: 0.06f);
+                smoothness: 0.06f,
+                occluder: true);
         }
 
         /// <summary>确保草地噪点贴图存在；不存在时按固定种子生成并写入 PNG。</summary>

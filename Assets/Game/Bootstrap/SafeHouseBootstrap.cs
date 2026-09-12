@@ -91,6 +91,7 @@ namespace RaidDemo.Bootstrap
             if (m_CameraController != null && m_PlayerMotor != null)
             {
                 m_CameraController.SetTarget(m_PlayerMotor.transform, snap: true);
+                BindOcclusionPeephole();
             }
 
             var uiHost = new GameObject("SafeHouseUI");
@@ -115,6 +116,27 @@ namespace RaidDemo.Bootstrap
                 flow.HideScreens();
                 m_InputCollector?.SetCursorLock(true);
             }
+        }
+
+        /// <summary>
+        /// 绑定遮挡透视孔：安全屋与战局共用同一套相机表现，因此这里也要挂一份，
+        /// 否则进出场景时会出现「战局能透视、安全屋不能」的不一致。
+        /// </summary>
+        private void BindOcclusionPeephole()
+        {
+            var camera = m_CameraController != null ? m_CameraController.GetComponent<Camera>() : null;
+            if (camera == null || m_PlayerMotor == null)
+            {
+                return;
+            }
+
+            var peephole = camera.GetComponent<OcclusionPeepholeController>();
+            if (peephole == null)
+            {
+                peephole = camera.gameObject.AddComponent<OcclusionPeepholeController>();
+            }
+
+            peephole.Bind(m_PlayerMotor.transform, camera);
         }
 
         private void OnDestroy()

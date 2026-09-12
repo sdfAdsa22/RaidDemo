@@ -49,13 +49,15 @@ namespace RaidDemo.Bootstrap.Editor
                 string sourceName,
                 string prefabName,
                 float targetHeight,
-                bool addCollider)
+                bool addCollider,
+                bool occluder = false)
             {
                 Source = source;
                 SourceName = sourceName;
                 PrefabName = prefabName;
                 TargetHeight = targetHeight;
                 AddCollider = addCollider;
+                Occluder = occluder;
             }
 
             public SourceKind Source { get; }
@@ -67,6 +69,9 @@ namespace RaidDemo.Bootstrap.Editor
             public float TargetHeight { get; }
 
             public bool AddCollider { get; }
+
+            /// <summary>是否使用带透视孔的材质（会挡住相机的大件）。</summary>
+            public bool Occluder { get; }
         }
 
         /// <summary>
@@ -79,13 +84,13 @@ namespace RaidDemo.Bootstrap.Editor
         private static readonly PropRecipe[] s_Recipes =
         {
             // 集装箱三型：海运标准箱比例（长 6.06 × 宽 2.44 × 高 2.59），三种涂装做视觉变化
-            new PropRecipe(SourceKind.CityKit, "shipping-container-a", "Prop_Container_A", 2.59f, true),
-            new PropRecipe(SourceKind.CityKit, "shipping-container-b", "Prop_Container_B", 2.59f, true),
-            new PropRecipe(SourceKind.CityKit, "shipping-container-c", "Prop_Container_C", 2.59f, true),
+            new PropRecipe(SourceKind.CityKit, "shipping-container-a", "Prop_Container_A", 2.59f, true, occluder: true),
+            new PropRecipe(SourceKind.CityKit, "shipping-container-b", "Prop_Container_B", 2.59f, true, occluder: true),
+            new PropRecipe(SourceKind.CityKit, "shipping-container-c", "Prop_Container_C", 2.59f, true, occluder: true),
 
             // 工业点缀：储罐与水塔作为堆场地标，刻意做高，让玩家在俯视下也能定位
-            new PropRecipe(SourceKind.CityKit, "detail-tank", "Prop_Tank", 1.6f, true),
-            new PropRecipe(SourceKind.CityKit, "water-tower", "Prop_WaterTower", 7.5f, true),
+            new PropRecipe(SourceKind.CityKit, "detail-tank", "Prop_Tank", 1.6f, true, occluder: true),
+            new PropRecipe(SourceKind.CityKit, "water-tower", "Prop_WaterTower", 7.5f, true, occluder: true),
 
             // 搜刮容器：木箱与纸箱（医疗箱用纸箱的浅色观感，武器架用木箱加长摆放）
             new PropRecipe(SourceKind.ToonShooter, "Crate", "Prop_Crate_Wood", 1.0f, true),
@@ -101,8 +106,8 @@ namespace RaidDemo.Bootstrap.Editor
             new PropRecipe(SourceKind.ToonShooter, "SackTrench", "Prop_Barrier", 1.21f, true),
 
             // 远景工业建筑：只在地图外圈做天际线，不给碰撞体，也不参与导航烘焙
-            new PropRecipe(SourceKind.ToonShooter, "Structure_2", "Prop_Warehouse_A", 7.79f, false),
-            new PropRecipe(SourceKind.ToonShooter, "Structure_4", "Prop_Warehouse_B", 7.66f, false),
+            new PropRecipe(SourceKind.ToonShooter, "Structure_2", "Prop_Warehouse_A", 7.79f, false, occluder: true),
+            new PropRecipe(SourceKind.ToonShooter, "Structure_4", "Prop_Warehouse_B", 7.66f, false, occluder: true),
         };
 
         /// <summary>共享材质路径：一个资源包一个材质，满足「全场材质数量收敛」的要求。</summary>
@@ -166,7 +171,7 @@ namespace RaidDemo.Bootstrap.Editor
             PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
 
             FitAndCenter(instance, recipe.TargetHeight);
-            ApplyMaterial(recipe.Source, recipe.PrefabName, instance);
+            ApplyMaterial(recipe.Source, recipe.PrefabName, instance, recipe.Occluder);
             if (recipe.AddCollider)
             {
                 AddBoxCollider(container, instance);
@@ -241,7 +246,7 @@ namespace RaidDemo.Bootstrap.Editor
         /// 建筑是灰的），没有贴图。这类必须逐模型建材质：若共用一份，所有道具都会变成同一种颜色；
         /// 若沿用白色，就会得到一排惨白的模型——这是把「贴图优先」写成硬规则时最容易踩的坑。</para>
         /// </remarks>
-        private static void ApplyMaterial(SourceKind source, string prefabName, GameObject instance)
+        private static void ApplyMaterial(SourceKind source, string prefabName, GameObject instance, bool occluder)
         {
             var renderers = instance.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0)
@@ -260,7 +265,7 @@ namespace RaidDemo.Bootstrap.Editor
 
             // 每次都走创建/更新：贴图可能第一次生成时还没导入成功，
             // 若只在「材质不存在」时写入，之后就会一直保留没有贴图的版本。
-            var material = M7MaterialLibrary.EnsureLitMaterial(materialPath, baseColor, texture, 0.08f);
+            var material = M7MaterialLibrary.EnsureLitMaterial(materialPath, baseColor, texture, 0.08f, occluder);
             if (material == null)
             {
                 return;

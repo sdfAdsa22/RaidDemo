@@ -37,10 +37,17 @@ namespace RaidDemo.Presentation
         [SerializeField] private float m_SmoothTime = 0.12f;
 
         /// <summary>
-        /// 是否启用遮挡回避。关闭后相机行为与本功能加入之前完全一致。
-        /// 留这个开关是为了在遮挡判定本身出问题时能一键排除它的嫌疑。
+        /// 是否启用「把相机拉近」的遮挡回避。
         /// </summary>
-        [SerializeField] private bool m_CollisionEnabled = true;
+        /// <remarks>
+        /// <para>默认关闭：现在的遮挡方案改成了<see cref="OcclusionPeepholeController"/>的透视孔——
+        /// 在遮挡物上以角色为中心开一个圆形透明洞，相机距离与俯角保持不变。
+        /// 拉近镜头会改变玩家已经熟悉的构图与可视范围，两套机制同时开还会互相打架。</para>
+        ///
+        /// <para>代码保留可随时打开：在没有自定义着色器的环境（例如某些后处理调试场景）里，
+        /// 拉近是唯一还能防止相机穿进墙体的手段。</para>
+        /// </remarks>
+        [SerializeField] private bool m_CollisionEnabled;
 
         /// <summary>
         /// 遮挡探测的球半径（米）。用小球而不是一条射线：射线在镜头贴边掠过物体时

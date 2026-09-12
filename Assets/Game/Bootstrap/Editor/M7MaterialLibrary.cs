@@ -21,22 +21,32 @@ namespace RaidDemo.Bootstrap.Editor
         public const string LitShaderName = "Universal Render Pipeline/Lit";
 
         /// <summary>
+        /// 带遮挡透视孔的着色器名。
+        /// </summary>
+        /// <remarks>用在「会挡住相机的大件」上：地形、厂房墙体、装卸平台、集装箱、远景山石。
+        /// 角色与小道具继续用普通 URP Lit——角色自己开洞会把人物抠空。</remarks>
+        public const string PeepholeShaderName = "RaidDemo/OccluderPeephole";
+
+        /// <summary>
         /// 创建或更新一个不透明 URP Lit 材质资产。
         /// </summary>
         /// <param name="assetPath">材质资产路径（工程相对）。</param>
         /// <param name="color">基础色。传入贴图时它是乘算的色调。</param>
         /// <param name="texture">基础贴图，可为 null（纯色材质）。</param>
         /// <param name="smoothness">光滑度，卡通风格取 0.05~0.2。</param>
+        /// <param name="occluder">true 时使用带透视孔的着色器（用于会挡住相机的大件）。</param>
         public static Material EnsureLitMaterial(
             string assetPath,
             Color color,
             Texture texture = null,
-            float smoothness = 0.1f)
+            float smoothness = 0.1f,
+            bool occluder = false)
         {
-            var shader = Shader.Find(LitShaderName);
+            var shaderName = occluder ? PeepholeShaderName : LitShaderName;
+            var shader = Shader.Find(shaderName);
             if (shader == null)
             {
-                Debug.LogError($"[RaidDemo] 找不到 {LitShaderName} 着色器，材质 {assetPath} 无法创建。");
+                Debug.LogError($"[RaidDemo] 找不到 {shaderName} 着色器，材质 {assetPath} 无法创建。");
                 return null;
             }
 
