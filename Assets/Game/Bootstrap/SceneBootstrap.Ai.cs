@@ -314,6 +314,14 @@ namespace RaidDemo.Bootstrap
                 PlayerMaxHealth,
                 playerAlive);
 
+            // 护甲也走推送：它的来源与生命值一样在战斗层，界面只负责显示。
+            if (playerCombatant != null && m_CombatHud != null)
+            {
+                var body = playerCombatant.GetArmorSnapshot();
+                var head = playerCombatant.GetHeadArmorSnapshot();
+                m_CombatHud.SetArmor(body.Level, body.Durability, head.Level, head.Durability);
+            }
+
             // 快照只构造一次并交给两个使用者：调度器与开发者模式。
             // 若两边各构造一份，调试面板显示的位置会比 AI 实际使用的晚一帧，
             // 看起来就像"AI 在追空气"。

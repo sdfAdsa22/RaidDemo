@@ -251,7 +251,7 @@ namespace RaidDemo.Bootstrap
 
                 // 掉落在这里一次抽完：搜刮读条只是「打开箱子的成本」，
                 // 而不是「逐件抽取」——逐件抽取会让玩家在读条时就猜出箱子里有什么。
-                roller.Roll(definition.Table, grid);
+                roller.Roll(definition.Table, grid, definition.FixedContents);
 
                 m_LootContainers.Add(new LootContainerRuntime(
                     containerId,

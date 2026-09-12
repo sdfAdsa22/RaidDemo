@@ -1,4 +1,5 @@
 using RaidDemo.Data;
+using System.Collections.Generic;
 
 namespace RaidDemo.Raid
 {
@@ -51,13 +52,15 @@ namespace RaidDemo.Raid
             ContainerFlavor flavor,
             int gridWidth,
             int gridHeight,
-            LootTable table)
+            LootTable table,
+            IReadOnlyList<LootTableEntry> fixedContents = null)
         {
             Id = id;
             DisplayName = displayName;
             Flavor = flavor;
             GridSize = new GridSize(gridWidth, gridHeight);
             Table = table;
+            FixedContents = fixedContents ?? new LootTableEntry[0];
         }
 
         /// <summary>稳定标识。</summary>
@@ -74,6 +77,16 @@ namespace RaidDemo.Raid
 
         /// <summary>掉落表。</summary>
         public LootTable Table { get; }
+
+        /// <summary>
+        /// 必定产出的条目。为空时只按掉落表随机。
+        /// </summary>
+        /// <remarks>
+        /// 用于「这个箱子里一定有某样东西」的场合：测试箱、任务奖励箱都属此类。
+        /// 做成数据而不是给测试箱写特例代码，是为了交付前删掉它时
+        /// 只需要删掉一条容器定义与一个场景标记，不必回头翻逻辑代码。
+        /// </remarks>
+        public IReadOnlyList<LootTableEntry> FixedContents { get; }
 
         /// <inheritdoc />
         public override string ToString()

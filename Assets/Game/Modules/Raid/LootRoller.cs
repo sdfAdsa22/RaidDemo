@@ -1,6 +1,7 @@
 using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
+using System.Collections.Generic;
 
 namespace RaidDemo.Raid
 {
@@ -36,8 +37,12 @@ namespace RaidDemo.Raid
         /// </summary>
         /// <param name="table">掉落表，为 null 时不做任何事。</param>
         /// <param name="target">目标网格，为 null 时不做任何事。</param>
+        /// <param name="fixedContents">必定产出的条目，可为 null。</param>
         /// <returns>成功放入的件数。</returns>
-        public int Roll(LootTable table, InventoryGrid target)
+        public int Roll(
+            LootTable table,
+            InventoryGrid target,
+            IReadOnlyList<LootTableEntry> fixedContents = null)
         {
             if (table == null || target == null || m_Catalog == null || m_Random == null)
             {
@@ -46,6 +51,19 @@ namespace RaidDemo.Raid
 
             var weights = table.BuildWeightArray();
             var placed = 0;
+
+            // 先放必定产出的条目：测试箱与任务奖励箱靠它保证「一定有什么」。
+            if (fixedContents != null)
+            {
+                for (var i = 0; i < fixedContents.Count; i++)
+                {
+                    if (PlaceFixed(target, fixedContents[i]))
+                    {
+                        placed++;
+                    }
+                }
+            }
+
             for (var roll = 0; roll < table.RollCount; roll++)
             {
                 var index = m_Random.NextWeightedIndex(weights);
@@ -72,6 +90,19 @@ namespace RaidDemo.Raid
             }
 
             return placed;
+        }
+
+        /// <summary>放置一条必定产出的配置。数量取 MinCount，放不下时返回 false。</summary>
+        private bool PlaceFixed(InventoryGrid target, LootTableEntry entry)
+        {
+            var definition = m_Catalog.Get(entry.ItemId);
+            if (definition == null)
+            {
+                return false;
+            }
+
+            var item = m_Factory.Create(definition, entry.MinCount);
+            return PlaceOrStack(target, item);
         }
 
         /// <summary>

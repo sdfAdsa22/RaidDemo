@@ -105,7 +105,8 @@ namespace RaidDemo.Tests.EditMode
         public void 容器定义齐全且能校验出缺失的物品()
         {
             var all = LootContainerCatalog.All;
-            Assert.AreEqual(5, all.Count, "应有 5 种容器定义");
+            // 5 种常规容器 + 1 个测试箱（crate.debug，交付前删除，届时这里改回 5）。
+            Assert.AreEqual(6, all.Count, "应有 5 种常规容器定义与 1 个测试箱");
 
             var ids = new System.Collections.Generic.HashSet<string>();
             for (var i = 0; i < all.Count; i++)

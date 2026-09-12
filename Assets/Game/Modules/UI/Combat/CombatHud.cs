@@ -56,6 +56,9 @@ namespace RaidDemo.UI
         private Text m_AmmoLabel;
         private Text m_ReserveLabel;
         private Text m_HealthLabel;
+
+        /// <summary>护甲显示（身体护甲与头盔的等级和耐久）。</summary>
+        private Text m_ArmorLabel;
         private Image m_ReloadBarFill;
         private RectTransform m_ReloadBarRoot;
         private string m_WeaponName = "无武器";
@@ -146,6 +149,35 @@ namespace RaidDemo.UI
                 : TextColor;
         }
 
+        /// <summary>
+        /// 更新护甲显示。由启动层推送。
+        /// </summary>
+        /// <param name="bodyLevel">身体护甲等级，0 表示无甲。</param>
+        /// <param name="bodyDurability">身体护甲当前耐久。</param>
+        /// <param name="headLevel">头盔等级，0 表示无盔。</param>
+        /// <param name="headDurability">头盔当前耐久。</param>
+        /// <remarks>
+        /// 耐久用整数显示：护甲耐久的实际意义是「还能挡几下」，
+        /// 小数点后两位对玩家没有任何决策价值，只会让这一行更长。
+        /// </remarks>
+        public void SetArmor(int bodyLevel, float bodyDurability, int headLevel, float headDurability)
+        {
+            if (m_ArmorLabel == null)
+            {
+                return;
+            }
+
+            var body = bodyLevel > 0
+                ? $"甲 {bodyLevel}级 {Mathf.CeilToInt(bodyDurability)}"
+                : "甲 无";
+            var head = headLevel > 0
+                ? $"盔 {headLevel}级 {Mathf.CeilToInt(headDurability)}"
+                : "盔 无";
+
+            m_ArmorLabel.text = $"{body}  ｜  {head}";
+            m_ArmorLabel.color = bodyLevel > 0 || headLevel > 0 ? TextColor : DimTextColor;
+        }
+
         private void Update()
         {
             if (m_Controller == null)
@@ -232,6 +264,7 @@ namespace RaidDemo.UI
             // 生命值放在武器信息上方：它是玩家最先要看的数字，
             // 而弹匣数量在交火中反而是次要信息。
             m_HealthLabel = CreateLabel(canvasHost.transform, "生命 -- / --", Margin + 132f, 24f, 18, TextColor);
+            m_ArmorLabel = CreateLabel(canvasHost.transform, "甲 无  ｜  盔 无", Margin + 158f, 22f, 15, DimTextColor);
             BuildReloadBar(canvasHost.transform);
         }
 
