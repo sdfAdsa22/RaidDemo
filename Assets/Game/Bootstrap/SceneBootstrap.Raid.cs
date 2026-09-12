@@ -105,6 +105,7 @@ namespace RaidDemo.Bootstrap
         private IDisposable m_LootSearchSubscription;
         private IDisposable m_ExtractionSubscription;
         private IDisposable m_ItemUseSubscription;
+        private IDisposable m_ArmorSubscription;
 
         /// <summary>战局会话，供测试与调试读取。</summary>
         public RaidSession Raid
@@ -161,6 +162,7 @@ namespace RaidDemo.Bootstrap
             m_LootSearchSubscription = m_EventBus.Subscribe<LootSearchCompletedEvent>(OnLootSearchCompleted);
             m_ExtractionSubscription = m_EventBus.Subscribe<ExtractionCompletedEvent>(OnExtractionCompleted);
             m_ItemUseSubscription = m_EventBus.Subscribe<ItemUseCompletedEvent>(OnItemUseCompleted);
+            m_ArmorSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshPlayerArmor());
 
             // 带入价值必须在开战前统计，之后背包里的东西就分不清「本来就有的」与「刚搜到的」了。
             m_RaidSession.Start(m_BroughtInValue);
@@ -308,6 +310,36 @@ namespace RaidDemo.Bootstrap
                 extracting,
                 zone != null ? zone.DisplayName : string.Empty,
                 m_ExtractionTracker != null ? m_ExtractionTracker.Progress01 : 0f);
+        }
+
+        /// <summary>把当前装备的头盔与护甲同步到战斗单位。</summary>
+        /// <remarks>
+        /// <para>订阅「背包变化」而不是「装备变化」：M2 没有单独的装备变化事件，
+        /// 而每次装备变动必然伴随背包变化，这条订阅能覆盖全部换装路径。</para>
+        ///
+        /// <para><b>没换装就直接返回</b>：SetArmor 会把耐久重置为满值，
+        /// 若每次整理背包都调用，玩家拖一件物品就能把护甲耐久刷满。</para>
+        /// </remarks>
+        private void RefreshPlayerArmor()
+        {
+            if (m_CombatWorld == null || m_PlayerCombatantId == 0 || m_Loadout == null)
+            {
+                return;
+            }
+
+            var helmet = m_Loadout.Equipment?.Get(EquipmentSlot.Head)?.Definition?.ArmorStats;
+            var vest = m_Loadout.Equipment?.Get(EquipmentSlot.Body)?.Definition?.ArmorStats;
+            if (ReferenceEquals(helmet, m_LastAppliedHelmet) && ReferenceEquals(vest, m_LastAppliedVest))
+            {
+                return;
+            }
+
+            if (m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
+            {
+                state.SetArmor(helmet, vest);
+                m_LastAppliedHelmet = helmet;
+                m_LastAppliedVest = vest;
+            }
         }
 
         /// <summary>玩家当前是否存活。</summary>

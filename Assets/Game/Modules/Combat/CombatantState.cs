@@ -15,12 +15,49 @@ namespace RaidDemo.Combat
     {
         private readonly int m_Id;
         private readonly float m_MaxHealth;
-        private readonly int m_ArmorLevel;
-        private readonly float m_ArmorMaxDurability;
-        private readonly float m_ArmorWearFactor;
 
         private float m_Health;
-        private float m_ArmorDurability;
+
+        /// <summary>一套护甲的运行时状态。</summary>
+        /// <remarks>
+        /// 用结构体把「等级 / 耐久上限 / 磨损系数 / 当前耐久」捆在一起，
+        /// 是因为头部与身体各需要一份：分成八个字段会很容易出现「改了一半」的错误。
+        /// </remarks>
+        private struct ArmorState
+        {
+            public int Level;
+            public float MaxDurability;
+            public float WearFactor;
+            public float Durability;
+
+            /// <summary>由护甲参数构造。参数为 null 时得到一套「无甲」。</summary>
+            public static ArmorState From(IArmorStats stats)
+            {
+                var state = default(ArmorState);
+                if (stats == null)
+                {
+                    return state;
+                }
+
+                state.Level = ArmorTiers.ClampLevel(stats.ProtectionLevel);
+                state.MaxDurability = stats.MaxDurability > 0f ? stats.MaxDurability : 0f;
+                state.WearFactor = stats.WearFactor > 0f ? stats.WearFactor : 0f;
+                state.Durability = state.MaxDurability;
+                return state;
+            }
+
+            /// <summary>换算成伤害计算用的快照。</summary>
+            public ArmorSnapshot ToSnapshot()
+            {
+                return new ArmorSnapshot(Level, Durability, MaxDurability, WearFactor);
+            }
+        }
+
+        /// <summary>身体护甲（命中躯干时生效）。</summary>
+        private ArmorState m_BodyArmor;
+
+        /// <summary>头部护甲（命中上部位时生效）。</summary>
+        private ArmorState m_HeadArmor;
 
         /// <summary>
         /// 创建一个可受击单位。
@@ -34,13 +71,7 @@ namespace RaidDemo.Combat
             m_MaxHealth = maxHealth > 0f ? maxHealth : 0f;
             m_Health = m_MaxHealth;
 
-            if (armor != null)
-            {
-                m_ArmorLevel = ArmorTiers.ClampLevel(armor.ProtectionLevel);
-                m_ArmorMaxDurability = armor.MaxDurability > 0f ? armor.MaxDurability : 0f;
-                m_ArmorWearFactor = armor.WearFactor > 0f ? armor.WearFactor : 0f;
-                m_ArmorDurability = m_ArmorMaxDurability;
-            }
+            m_BodyArmor = ArmorState.From(armor);
         }
 
         /// <summary>运行时标识。</summary>
@@ -70,13 +101,41 @@ namespace RaidDemo.Combat
         /// <summary>当前护甲耐久。</summary>
         public float ArmorDurability
         {
-            get { return m_ArmorDurability; }
+            get { return m_BodyArmor.Durability; }
         }
 
-        /// <summary>当前护甲快照，供伤害结算读取。</summary>
+        /// <summary>当前头部护甲耐久。</summary>
+        public float HeadArmorDurability
+        {
+            get { return m_HeadArmor.Durability; }
+        }
+
+        /// <summary>当前身体护甲快照，供伤害结算读取。</summary>
         public ArmorSnapshot GetArmorSnapshot()
         {
-            return new ArmorSnapshot(m_ArmorLevel, m_ArmorDurability, m_ArmorMaxDurability, m_ArmorWearFactor);
+            return m_BodyArmor.ToSnapshot();
+        }
+
+        /// <summary>当前头部护甲快照。</summary>
+        public ArmorSnapshot GetHeadArmorSnapshot()
+        {
+            return m_HeadArmor.ToSnapshot();
+        }
+
+        /// <summary>
+        /// 重新设置护甲，并按当前耐久上限重置耐久。
+        /// </summary>
+        /// <param name="head">头部护甲，可为 null。</param>
+        /// <param name="body">身体护甲，可为 null。</param>
+        /// <remarks>
+        /// 战局中换装（从箱子里捡到防弹背心并穿上）必须走这里：
+        /// 护甲在创建单位时读一次、之后永不更新的写法，
+        /// 会让「捡到并穿上」这件事完全不生效——而且没有任何报错。
+        /// </remarks>
+        public void SetArmor(IArmorStats head, IArmorStats body)
+        {
+            m_HeadArmor = ArmorState.From(head);
+            m_BodyArmor = ArmorState.From(body);
         }
 
         /// <summary>
@@ -102,7 +161,12 @@ namespace RaidDemo.Combat
                 return new DamageOutcome(0f, 0f, 0f);
             }
 
-            var request = new DamageRequest(baseDamage, penetration, GetArmorSnapshot(), isCritical);
+            // 命中上部位（暴击）由头盔挡，其余由身体护甲挡。
+            var request = new DamageRequest(
+                baseDamage,
+                penetration,
+                isCritical ? GetHeadArmorSnapshot() : GetArmorSnapshot(),
+                isCritical);
             var outcome = DamageCalculator.Resolve(request, tuning);
 
             m_Health -= outcome.Damage;
@@ -113,10 +177,21 @@ namespace RaidDemo.Combat
 
             if (outcome.ArmorDamage > 0f)
             {
-                m_ArmorDurability -= outcome.ArmorDamage;
-                if (m_ArmorDurability < 0f)
+                // 磨损记在真正挡下这一击的那一套护甲上。
+                var damaged = isCritical ? m_HeadArmor : m_BodyArmor;
+                damaged.Durability -= outcome.ArmorDamage;
+                if (damaged.Durability < 0f)
                 {
-                    m_ArmorDurability = 0f;
+                    damaged.Durability = 0f;
+                }
+
+                if (isCritical)
+                {
+                    m_HeadArmor = damaged;
+                }
+                else
+                {
+                    m_BodyArmor = damaged;
                 }
             }
 
@@ -159,7 +234,9 @@ namespace RaidDemo.Combat
 
         public override string ToString()
         {
-            return $"Combatant#{m_Id}(生命={m_Health:F0}/{m_MaxHealth:F0}, 甲={m_ArmorLevel}级/{m_ArmorDurability:F0})";
+            return $"Combatant#{m_Id}(生命={m_Health:F0}/{m_MaxHealth:F0}, "
+                + $"甲={m_BodyArmor.Level}级/{m_BodyArmor.Durability:F0}, "
+                + $"盔={m_HeadArmor.Level}级/{m_HeadArmor.Durability:F0})";
         }
     }
 }

@@ -97,6 +97,10 @@ namespace RaidDemo.Bootstrap
         private NavMeshSurface m_NavMeshSurface;
         private int m_PlayerCombatantId;
 
+        /// <summary>上一次同步到战斗层的护甲，用于避免重复设置导致耐久被刷满。</summary>
+        private IArmorStats m_LastAppliedHelmet;
+        private IArmorStats m_LastAppliedVest;
+
         /// <summary>本帧交给 AI 的目标快照。开发者模式读的也是这一份。</summary>
         private AiTargetInfo m_CurrentAiTarget = AiTargetInfo.None;
 
@@ -241,8 +245,17 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            var armor = m_Loadout?.Equipment?.Get(EquipmentSlot.Body)?.Definition?.ArmorStats;
-            m_PlayerCombatantId = m_CombatWorld.Create(PlayerMaxHealth, armor);
+            // 头盔与背心各读一份：上部位命中由头盔挡，其余由背心挡。
+            var vest = m_Loadout?.Equipment?.Get(EquipmentSlot.Body)?.Definition?.ArmorStats;
+            var helmet = m_Loadout?.Equipment?.Get(EquipmentSlot.Head)?.Definition?.ArmorStats;
+            m_PlayerCombatantId = m_CombatWorld.Create(PlayerMaxHealth, vest);
+            m_LastAppliedVest = vest;
+            m_LastAppliedHelmet = helmet;
+
+            if (m_CombatWorld.TryGet(m_PlayerCombatantId, out var playerState))
+            {
+                playerState.SetArmor(helmet, vest);
+            }
 
             // 只登记标识、不接管颜色：玩家的配色与受击反馈由角色本身和界面负责。
             m_PlayerTargetView = m_PlayerMotor.gameObject.AddComponent<CombatTargetView>();
