@@ -126,6 +126,28 @@ namespace RaidDemo.Bootstrap.Editor
             return null;
         }
 
+        /// <summary>
+        /// 按候选顺序查找剪辑。
+        /// </summary>
+        /// <remarks>
+        /// 三个角色的剪辑集并不一致：Soldier **没有 Walk**，只有 Run / Run_Gun，
+        /// 按固定名字取会拿到 null，表现就是"这个敌人走路没有动画"。
+        /// 因此走路用 Walk → Walk_Shoot → Run_Gun → Run 依次兜底，跑步同理。
+        /// </remarks>
+        private static AnimationClip ResolveClip(string characterName, params string[] clipKeys)
+        {
+            foreach (var key in clipKeys)
+            {
+                var clip = LoadClip(characterName, key);
+                if (clip != null)
+                {
+                    return clip;
+                }
+            }
+
+            return null;
+        }
+
         /// <summary>生成一个敌人的动画控制器。</summary>
         private static string BuildController(string characterName)
         {
@@ -139,9 +161,9 @@ namespace RaidDemo.Bootstrap.Editor
             controller.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
 
             var machine = controller.layers[0].stateMachine;
-            var idle = AddState(machine, characterName, "Idle");
-            var walk = AddState(machine, characterName, "Walk");
-            var run = AddState(machine, characterName, "Run");
+            var idle = AddState(machine, characterName, "Idle", "Idle_Shoot");
+            var walk = AddState(machine, characterName, "Walk", "Walk_Shoot", "Run_Gun", "Run");
+            var run = AddState(machine, characterName, "Run", "Run_Gun", "Run_Shoot", "Walk");
             var shoot = AddState(machine, characterName, "Idle_Shoot");
             var death = AddState(machine, characterName, "Death");
             var hit = AddState(machine, characterName, "HitReact");
@@ -180,10 +202,13 @@ namespace RaidDemo.Bootstrap.Editor
             return path;
         }
 
-        private static AnimatorState AddState(AnimatorStateMachine machine, string characterName, string clipKey)
+        private static AnimatorState AddState(
+            AnimatorStateMachine machine,
+            string characterName,
+            params string[] clipKeys)
         {
-            var state = machine.AddState(clipKey);
-            state.motion = LoadClip(characterName, clipKey);
+            var state = machine.AddState(clipKeys[0]);
+            state.motion = ResolveClip(characterName, clipKeys);
             return state;
         }
 
