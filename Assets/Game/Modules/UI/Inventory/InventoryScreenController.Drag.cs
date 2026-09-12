@@ -178,8 +178,12 @@ namespace RaidDemo.UI
             return m_QuickActionContext;
         }
 
-        /// <summary>右键：对堆叠执行拆分，对装备槽执行卸下。</summary>
-        private void HandleRightClick(Vector2 pointer)
+        /// <summary>Shift + 右键：对堆叠执行拆分，对装备槽执行卸下。</summary>
+        /// <remarks>
+        /// 这是右键菜单之前的默认行为，现在作为快捷路径保留：
+        /// 拆分是整理背包时的高频动作，走菜单会变成两次点击起步。
+        /// </remarks>
+        private void HandleRightClickDirect(Vector2 pointer)
         {
             var slot = FindSlotAt(pointer);
             if (slot != null && slot.Item != null)

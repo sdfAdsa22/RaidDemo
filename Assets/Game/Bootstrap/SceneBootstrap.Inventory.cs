@@ -67,9 +67,40 @@ namespace RaidDemo.Bootstrap
                 m_BackpackContainerId,
                 m_AmmoPouchContainerId,
                 m_EncumbranceProfile,
-                ApplyCursorLock);
+                ApplyCursorLock,
+                m_ItemCatalog,
+                RequestUseItemAt);
 
             UpdateEncumbrance(true);
+        }
+
+        /// <summary>
+        /// 右键菜单的「使用」入口：从指定格子取物品并开始使用。
+        /// </summary>
+        /// <remarks>
+        /// 菜单只负责派发意图，能不能用由这里判断（是否医疗品、是否已在用、是否满血）。
+        /// 它与 H 键走同一条路径——否则迟早出现「快捷键能用、菜单点了没反应」这种分叉。
+        /// </remarks>
+        private void RequestUseItemAt(int containerId, int cellX, int cellY)
+        {
+            if (m_ItemUse == null || m_ItemUse.IsUsing || m_ContainerRegistry == null)
+            {
+                return;
+            }
+
+            if (!m_ContainerRegistry.TryGetGrid(containerId, out var grid))
+            {
+                return;
+            }
+
+            var item = grid.GetAt(cellX, cellY);
+            var medical = ResolveMedical(item);
+            if (medical == null || ResolveMissingHealth() <= 0f)
+            {
+                return;
+            }
+
+            m_ItemUse.TryBegin(item, item.Definition.DisplayName, medical.UseDurationSeconds);
         }
 
         /// <summary>按给定尺寸创建一个网格容器。</summary>

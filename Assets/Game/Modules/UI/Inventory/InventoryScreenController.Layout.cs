@@ -25,6 +25,7 @@ namespace RaidDemo.UI
             var canvasHost = new GameObject("InventoryCanvas", typeof(Canvas), typeof(CanvasScaler));
             canvasHost.transform.SetParent(transform, worldPositionStays: false);
             var canvas = canvasHost.GetComponent<Canvas>();
+            m_CanvasHost = canvasHost;
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             // 必须高于准星画布的 100：两者相同时，后创建的画布会盖在上面，
             // 而准星是启动过程中后建的，于是准星会压在背包面板上。
@@ -213,6 +214,7 @@ namespace RaidDemo.UI
             if (!visible)
             {
                 CancelDrag();
+                CloseContextMenu();
 
                 // 关闭界面即结束这次搜刮：战利品面板随之销毁，
                 // 想再搬东西就得重新走到箱子前读条。这样「开箱成本」对每次搜刮都成立，

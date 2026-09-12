@@ -82,6 +82,15 @@ namespace RaidDemo.UI
         private IDisposable m_Subscription;
 
         private GameObject m_Root;
+
+        /// <summary>界面画布。右键菜单作为它的子节点，才能盖在面板之上。</summary>
+        private GameObject m_CanvasHost;
+
+        /// <summary>物品目录。右键菜单靠它判断「这件东西能不能用」。</summary>
+        private ItemCatalog m_ItemCatalog;
+
+        /// <summary>「使用物品」的回调（容器 ID + 格子坐标）。由装配层注入。</summary>
+        private Action<int, int, int> m_RequestUseItem;
         private InventoryGridView m_BackpackView;
         private InventoryGridView m_AmmoPouchView;
         private InventoryGridView m_LootView;
@@ -147,7 +156,9 @@ namespace RaidDemo.UI
             int backpackContainerId,
             int ammoPouchContainerId,
             EncumbranceProfile encumbranceProfile,
-            Action<bool> setCursorLock)
+            Action<bool> setCursorLock,
+            ItemCatalog itemCatalog = null,
+            Action<int, int, int> requestUseItem = null)
         {
             m_Router = router;
             m_Registry = registry;
@@ -157,6 +168,8 @@ namespace RaidDemo.UI
             m_AmmoPouchContainerId = ammoPouchContainerId;
             m_EncumbranceProfile = encumbranceProfile;
             m_SetCursorLock = setCursorLock;
+            m_ItemCatalog = itemCatalog;
+            m_RequestUseItem = requestUseItem;
 
             BuildLayout();
             m_Subscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshAll());
@@ -277,6 +290,17 @@ namespace RaidDemo.UI
 
             var pointer = mouse.position.ReadValue();
 
+            // 菜单打开时它优先吃掉本帧输入：否则点菜单会被当成「开始拖拽」。
+            var escapePressed = keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
+            if (UpdateContextMenu(
+                    pointer,
+                    mouse.leftButton.wasPressedThisFrame,
+                    mouse.rightButton.wasPressedThisFrame,
+                    escapePressed))
+            {
+                return;
+            }
+
             if (m_IsDragging && keyboard != null && keyboard.rKey.wasPressedThisFrame)
             {
                 m_DragRotated = !m_DragRotated;
@@ -304,7 +328,16 @@ namespace RaidDemo.UI
 
             if (mouse.rightButton.wasPressedThisFrame)
             {
-                HandleRightClick(pointer);
+                // Shift + 右键保留「直接拆一半」这条快捷路径：拆分是高频操作，
+                // 全部塞进菜单会让整理背包变成两次点击起步。
+                if (keyboard != null && keyboard.leftShiftKey.isPressed)
+                {
+                    HandleRightClickDirect(pointer);
+                }
+                else
+                {
+                    OpenContextMenu(pointer);
+                }
             }
         }
     }
