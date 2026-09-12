@@ -28,6 +28,15 @@ namespace RaidDemo.UI
         /// <summary>搜刮读条宽度（像素）。</summary>
         private const float SearchBarWidth = 300f;
 
+        /// <summary>使用读条宽度（像素）。</summary>
+        private const float UseBarWidth = 300f;
+
+        /// <summary>回血提示的显示时长（秒）。</summary>
+        private const float HealLabelSeconds = 1.6f;
+
+        /// <summary>回血提示的颜色（与撤离成功的绿色同一族，表示「变好」）。</summary>
+        private static readonly Color HealColor = new Color(0.40f, 0.90f, 0.55f);
+
         /// <summary>撤离读条宽度（像素）。</summary>
         private const float ExtractionBarWidth = 360f;
 
@@ -50,6 +59,11 @@ namespace RaidDemo.UI
         private GameObject m_ExtractionRoot;
         private Text m_ExtractionLabel;
         private Image m_ExtractionFill;
+        private GameObject m_UseRoot;
+        private Text m_UseLabel;
+        private Image m_UseFill;
+        private Text m_HealLabel;
+        private float m_HealRemaining;
 
         /// <summary>构建界面。由装配层在战局开始时调用一次。</summary>
         public void Initialize()
@@ -82,6 +96,62 @@ namespace RaidDemo.UI
             BuildExtraction(rootRect);
             BuildPrompt(rootRect);
             BuildSearch(rootRect);
+            BuildUse(rootRect);
+            BuildHeal(rootRect);
+        }
+
+        /// <summary>推进回血提示的倒计时。用非缩放时间，战局结算时也能正常消失。</summary>
+        private void Update()
+        {
+            if (m_HealRemaining <= 0f)
+            {
+                return;
+            }
+
+            m_HealRemaining -= Time.unscaledDeltaTime;
+            if (m_HealRemaining > 0f)
+            {
+                return;
+            }
+
+            m_HealRemaining = 0f;
+            if (m_HealLabel != null)
+            {
+                m_HealLabel.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>写入医疗品使用读条。</summary>
+        public void SetUseProgress(bool visible, float progress01, string label)
+        {
+            if (m_UseRoot == null)
+            {
+                return;
+            }
+
+            m_UseRoot.SetActive(visible);
+            if (!visible)
+            {
+                return;
+            }
+
+            var ratio = Mathf.Clamp01(progress01);
+            m_UseFill.rectTransform.sizeDelta = new Vector2(UseBarWidth * ratio, 0f);
+            m_UseLabel.text = string.IsNullOrEmpty(label) ? "使用中…" : label;
+        }
+
+        /// <summary>显示一条回血提示，若干秒后自动消失。</summary>
+        public void ShowHeal(int amount)
+        {
+            if (m_HealLabel == null || amount <= 0)
+            {
+                return;
+            }
+
+            m_HealLabel.text = $"生命 +{amount}";
+            m_HealLabel.color = HealColor;
+            m_HealLabel.gameObject.SetActive(true);
+            m_HealRemaining = HealLabelSeconds;
         }
 
         /// <summary>写入战局倒计时。</summary>
@@ -193,6 +263,36 @@ namespace RaidDemo.UI
                 parent, string.Empty, new Vector2(0.5f, 0f),
                 new Vector2(0f, 176f), new Vector2(560f, 32f), 20, TextAnchor.MiddleCenter);
             m_PromptLabel.gameObject.SetActive(false);
+        }
+
+        /// <summary>创建医疗品使用读条（在搜刮读条上方一排，避免两者同时出现时重叠）。</summary>
+        private void BuildUse(RectTransform parent)
+        {
+            m_UseRoot = new GameObject("UsePanel", typeof(RectTransform));
+            var rect = (RectTransform)m_UseRoot.transform;
+            rect.SetParent(parent, worldPositionStays: false);
+            rect.anchorMin = new Vector2(0.5f, 0f);
+            rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = new Vector2(0f, 166f);
+            rect.sizeDelta = new Vector2(UseBarWidth, 46f);
+
+            m_UseLabel = CreateLabel(
+                rect, "使用中…", new Vector2(0.5f, 1f),
+                Vector2.zero, new Vector2(UseBarWidth, 24f), 17, TextAnchor.MiddleCenter);
+
+            m_UseFill = CreateBar(rect, UseBarWidth, 12f, HealColor);
+            m_UseRoot.SetActive(false);
+        }
+
+        /// <summary>创建回血提示（显示在生命条上方，右侧留白处）。</summary>
+        private void BuildHeal(RectTransform parent)
+        {
+            m_HealLabel = CreateLabel(
+                parent, string.Empty, new Vector2(0f, 0f),
+                new Vector2(200f, 250f), new Vector2(220f, 28f), 18, TextAnchor.MiddleLeft);
+            m_HealLabel.color = HealColor;
+            m_HealLabel.gameObject.SetActive(false);
         }
 
         /// <summary>创建搜刮读条。</summary>

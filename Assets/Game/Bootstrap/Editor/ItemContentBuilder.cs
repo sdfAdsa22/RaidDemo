@@ -141,6 +141,7 @@ namespace RaidDemo.Bootstrap.Editor
             {
                 var definition = CreateOrUpdate(s_Specs[i]);
                 AttachCombatStats(definition);
+                AttachMedicalBehavior(definition);
                 definitions.Add(definition);
             }
 
@@ -176,6 +177,46 @@ namespace RaidDemo.Bootstrap.Editor
             }
 
             ReportProblems(catalog);
+        }
+
+        /// <summary>
+        /// 给医疗类物品挂上医疗行为。
+        /// </summary>
+        /// <remarks>
+        /// <para>行为做成**独立资产文件**而不是物品资产的子资产：子资产虽然更干净，
+        /// 但要靠 <c>AddObjectToAsset</c> 维护，重新生成时容易出现重复挂载，
+        /// 而这里只有两件物品，多两个文件的代价远小于出错后的排查成本。</para>
+        ///
+        /// <para>非医疗物品不挂任何行为，<c>Behavior</c> 保持为 null——
+        /// 逻辑层据此判断「这件东西能不能用」。</para>
+        /// </remarks>
+        private static void AttachMedicalBehavior(ItemDefinition definition)
+        {
+            var healAmount = 0;
+            var duration = 0f;
+            switch (definition.Id)
+            {
+                case "medical.bandage.small":
+                    healAmount = 25;
+                    duration = 1.5f;
+                    break;
+                case "medical.kit.field":
+                    healAmount = 70;
+                    duration = 3f;
+                    break;
+                default:
+                    return;
+            }
+
+            var path = $"{ItemFolder}/Behavior_{definition.Id}.asset";
+            var behavior = LoadOrCreate<MedicalBehavior>(path);
+            behavior.Configure(healAmount, duration);
+            EditorUtility.SetDirty(behavior);
+
+            var serialized = new SerializedObject(definition);
+            serialized.FindProperty("m_Behavior").objectReferenceValue = behavior;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(definition);
         }
 
         /// <summary>按数据表创建或更新一条物品定义。</summary>

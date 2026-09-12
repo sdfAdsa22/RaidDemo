@@ -1,3 +1,5 @@
+using UnityEngine.InputSystem;
+
 namespace RaidDemo.Input
 {
     /// <summary>
@@ -102,6 +104,30 @@ namespace RaidDemo.Input
             }
 
             return m_InteractAction != null && m_InteractAction.WasPressedThisFrame();
+        }
+
+        /// <summary>
+        /// 读取「使用医疗品」的输入。
+        /// </summary>
+        /// <returns>本帧是否按下了使用键（默认 H）。</returns>
+        /// <remarks>
+        /// <para>这个键没有做成输入资产里的动作，而是直接读键盘：它只有一个绑定，
+        /// 而新增动作需要改 <c>.inputactions</c> 资产并让整条输入链路重新解析一次，
+        /// 收益与风险不成比例。等出现手柄需求时再补动作。</para>
+        ///
+        /// <para>返回「按下的那一帧」：读条由逻辑层累计，输入层只报告一次意图。
+        /// 与交互键不同的是，这个键在**读条中再次按下表示取消**，
+        /// 因此它不携带「是否正在读条」的判断——那是装配层的决定。</para>
+        /// </remarks>
+        public bool ReadUseMedicalIntent()
+        {
+            if (UseScriptedInput)
+            {
+                return ScriptedWantsToUseMedical;
+            }
+
+            var keyboard = Keyboard.current;
+            return keyboard != null && keyboard.hKey.wasPressedThisFrame;
         }
     }
 }

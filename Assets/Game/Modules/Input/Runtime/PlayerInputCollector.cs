@@ -157,6 +157,9 @@ namespace RaidDemo.Input
         /// <summary>脚本化交互输入。</summary>
         public bool ScriptedWantsToInteract { get; set; }
 
+        /// <summary>脚本化「使用医疗品」输入。</summary>
+        public bool ScriptedWantsToUseMedical { get; set; }
+
         /// <summary>是否启用脚本化输入。启用后真实设备输入被忽略。</summary>
         public bool UseScriptedInput { get; set; }
 

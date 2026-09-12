@@ -1,6 +1,9 @@
 using RaidDemo.Raid;
 using RaidDemo.Shared;
 using RaidDemo.Combat;
+using RaidDemo.Data;
+using RaidDemo.Inventory;
+using UnityEngine;
 
 namespace RaidDemo.Bootstrap
 {
@@ -35,7 +38,223 @@ namespace RaidDemo.Bootstrap
             }
 
             UpdateLootSearch(deltaTime, playerPosition, playerAlive, inputBlocked);
+            UpdateItemUse(deltaTime, playerAlive, inputBlocked);
             UpdateRaidHud(playerAlive);
+        }
+
+        /// <summary>
+        /// 处理医疗品的使用：按键、读条、完成后的回血与消耗。
+        /// </summary>
+        /// <remarks>
+        /// <para>读条期间**允许移动**：被打到只剩一丝血时还要站住包扎，
+        /// 会把这条功能从「救命」变成「自杀」。它唯一的打断条件是受伤。</para>
+        ///
+        /// <para>读条中再按一次 H 表示主动取消。</para>
+        /// </remarks>
+        private void UpdateItemUse(float deltaTime, bool playerAlive, bool inputBlocked)
+        {
+            if (m_ItemUse == null)
+            {
+                return;
+            }
+
+            if (!inputBlocked && playerAlive && m_InputCollector != null && m_InputCollector.ReadUseMedicalIntent())
+            {
+                if (m_ItemUse.IsUsing)
+                {
+                    m_ItemUse.Cancel("主动取消");
+                }
+                else
+                {
+                    TryBeginMedicalUse();
+                }
+            }
+
+            // 受伤标记在这一帧用完即清：它表示「刚刚这一帧挨了打」，
+            // 留到下一帧就会把「读完的瞬间受伤」误判成打断。
+            m_ItemUse.Tick(deltaTime, playerAlive, m_PlayerDamagedThisFrame);
+            m_PlayerDamagedThisFrame = false;
+        }
+
+        /// <summary>从随身携带物里挑一件医疗品开始使用。</summary>
+        /// <remarks>
+        /// 挑选策略：**优先用刚好够补满缺口的最小那件**，都不够时用回血最多的那件。
+        /// 这样常态下省下医疗包留给硬仗，急救时才自动切到大件。
+        /// </remarks>
+        private void TryBeginMedicalUse()
+        {
+            var missing = ResolveMissingHealth();
+            if (missing <= 0f)
+            {
+                return;
+            }
+
+            var best = SelectMedicalItem(missing, out var bestHeal, out var bestDuration);
+            if (best != null)
+            {
+                m_ItemUse.TryBegin(best, best.Definition.DisplayName, bestDuration);
+            }
+        }
+
+        /// <summary>取物品定义上的医疗行为，取不到返回 null。</summary>
+        /// <remarks>
+        /// 走物品目录而不是 <c>ItemInstance.Definition</c>：后者是 IItemDefinition 接口，
+        /// 而接口刻意不认识 Behavior——行为是 Unity 资产类型，
+        /// 把它挂进接口会让数据层反向依赖内容层。目录返回的是具体定义，认识它。
+        /// </remarks>
+        private MedicalBehavior ResolveMedical(ItemInstance item)
+        {
+            if (item == null || m_ItemCatalog == null)
+            {
+                return null;
+            }
+
+            var definition = m_ItemCatalog.Get(item.Definition.Id);
+            return definition != null ? definition.Behavior as MedicalBehavior : null;
+        }
+
+        /// <summary>还差多少生命才满血。已经满血或读不到状态时返回 0。</summary>
+        private float ResolveMissingHealth()
+        {
+            if (m_CombatWorld == null || !m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
+            {
+                return 0f;
+            }
+
+            var missing = PlayerMaxHealth - state.Health;
+            return missing > 0f ? missing : 0f;
+        }
+
+        /// <summary>从背包与弹药挂里挑一件最合适的医疗品。</summary>
+        private ItemInstance SelectMedicalItem(float missingHealth, out int healAmount, out float durationSeconds)
+        {
+            healAmount = 0;
+            durationSeconds = 0f;
+
+            ItemInstance smallestSufficient = null;
+            var smallestSurplus = float.MaxValue;
+            var smallestHeal = 0;
+            var smallestDuration = 0f;
+            ItemInstance largestFallback = null;
+            var largestHeal = 0;
+            var largestDuration = 0f;
+
+            for (var pass = 0; pass < 2; pass++)
+            {
+                var grid = pass == 0 ? m_Loadout?.Backpack : m_Loadout?.AmmoPouch;
+                if (grid == null)
+                {
+                    continue;
+                }
+
+                var items = grid.Items;
+                for (var i = 0; i < items.Count; i++)
+                {
+                    var item = items[i];
+                    var medical = ResolveMedical(item);
+                    if (medical == null)
+                    {
+                        continue;
+                    }
+
+                    if (medical.HealAmount >= missingHealth)
+                    {
+                        var surplus = medical.HealAmount - missingHealth;
+                        if (surplus < smallestSurplus)
+                        {
+                            smallestSurplus = surplus;
+                            smallestSufficient = item;
+                            smallestHeal = medical.HealAmount;
+                            smallestDuration = medical.UseDurationSeconds;
+                        }
+
+                        continue;
+                    }
+
+                    if (medical.HealAmount > largestHeal)
+                    {
+                        largestHeal = medical.HealAmount;
+                        largestDuration = medical.UseDurationSeconds;
+                        largestFallback = item;
+                    }
+                }
+            }
+
+            var picked = smallestSufficient ?? largestFallback;
+            if (picked == null)
+            {
+                return null;
+            }
+
+            healAmount = smallestSufficient != null ? smallestHeal : largestHeal;
+            durationSeconds = smallestSufficient != null ? smallestDuration : largestDuration;
+            return picked;
+        }
+
+        /// <summary>使用完成：回血并把物品消耗掉。</summary>
+        private void OnItemUseCompleted(ItemUseCompletedEvent evt)
+        {
+            var item = evt.Item;
+            var medical = ResolveMedical(item);
+            if (medical == null)
+            {
+                return;
+            }
+
+            if (m_CombatWorld != null && m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
+            {
+                var healed = Mathf.Min(state.Health + medical.HealAmount, PlayerMaxHealth);
+                state.SetHealth(healed);
+            }
+
+            ConsumeOne(item);
+            if (m_RaidHud != null)
+            {
+                m_RaidHud.ShowHeal(medical.HealAmount);
+            }
+        }
+
+        /// <summary>
+        /// 从堆叠里扣掉一件。
+        /// </summary>
+        /// <remarks>
+        /// 数量大于 1 时用 <c>Split(1)</c> 让原堆减一，拆出来的那一件直接丢弃；
+        /// 只剩一件时整件从格子里移除。两条路径都走物品自身的 API，
+        /// 不直接改数量，避免绕开堆叠规则。
+        /// </remarks>
+        private void ConsumeOne(ItemInstance item)
+        {
+            var grid = FindOwningGrid(item);
+            if (grid == null)
+            {
+                return;
+            }
+
+            if (item.StackCount > 1)
+            {
+                item.Split(1);
+                return;
+            }
+
+            grid.Remove(item);
+        }
+
+        /// <summary>找出某个物品实例当前在哪个随身容器里。</summary>
+        private InventoryGrid FindOwningGrid(ItemInstance item)
+        {
+            var backpack = m_Loadout?.Backpack;
+            if (backpack != null && backpack.Contains(item))
+            {
+                return backpack;
+            }
+
+            var pouch = m_Loadout?.AmmoPouch;
+            if (pouch != null && pouch.Contains(item))
+            {
+                return pouch;
+            }
+
+            return null;
         }
 
         /// <summary>处理搜刮交互：寻找附近容器、接收交互键、推进读条。</summary>
@@ -98,32 +317,6 @@ namespace RaidDemo.Bootstrap
             }
 
             return nearest;
-        }
-
-        /// <summary>玩家当前是否存活。</summary>
-        private bool IsPlayerAlive()
-        {
-            if (m_CombatWorld == null || m_PlayerCombatantId == 0)
-            {
-                return false;
-            }
-
-            return m_CombatWorld.TryGet(m_PlayerCombatantId, out var state) && state.IsAlive;
-        }
-
-        /// <summary>统计玩家造成的击杀。</summary>
-        /// <remarks>
-        /// 只认「攻击方是玩家」且「本次确实打死」的伤害事件。
-        /// 让 AI 之间互相误伤也计入击杀会让结算数字变得不可信。
-        /// </remarks>
-        private void OnKillCounted(DamageAppliedEvent evt)
-        {
-            if (!evt.WasKilled || evt.AttackerId != m_PlayerCombatantId)
-            {
-                return;
-            }
-
-            m_RaidSession?.NotifyKill(evt.AttackerId);
         }
 
         /// <summary>搜刮读条完成：打开对应容器。</summary>

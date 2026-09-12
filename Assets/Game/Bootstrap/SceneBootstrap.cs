@@ -126,6 +126,8 @@ namespace RaidDemo.Bootstrap
             m_LootSearchSubscription = null;
             m_ExtractionSubscription?.Dispose();
             m_ExtractionSubscription = null;
+            m_ItemUseSubscription?.Dispose();
+            m_ItemUseSubscription = null;
             m_AiDirector?.Dispose();
             ServiceLocatorHolder.Clear();
             m_Services?.Clear();

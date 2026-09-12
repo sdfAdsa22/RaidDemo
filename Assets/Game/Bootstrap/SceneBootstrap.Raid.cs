@@ -78,6 +78,12 @@ namespace RaidDemo.Bootstrap
         private RaidSession m_RaidSession;
         private ExtractionTracker m_ExtractionTracker;
         private LootSearchInteraction m_LootSearch;
+
+        /// <summary>使用物品的读条器（M5.5：医疗品）。</summary>
+        private ItemUseInteraction m_ItemUse;
+
+        /// <summary>本帧玩家是否受了伤。受伤会打断正在进行的物品使用。</summary>
+        private bool m_PlayerDamagedThisFrame;
         private RaidHudView m_RaidHud;
         private List<LootContainerRuntime> m_LootContainers;
         private LootContainerRuntime m_NearbyLoot;
@@ -98,6 +104,7 @@ namespace RaidDemo.Bootstrap
         private IDisposable m_RaidEndedSubscription;
         private IDisposable m_LootSearchSubscription;
         private IDisposable m_ExtractionSubscription;
+        private IDisposable m_ItemUseSubscription;
 
         /// <summary>战局会话，供测试与调试读取。</summary>
         public RaidSession Raid
@@ -139,6 +146,8 @@ namespace RaidDemo.Bootstrap
                 movementToleranceMeters: 0.35f,
                 m_EventBus);
 
+            m_ItemUse = new ItemUseInteraction(m_EventBus);
+
             BuildExtractionTracker();
             BuildLootContainers();
             BuildRaidHud();
@@ -151,6 +160,7 @@ namespace RaidDemo.Bootstrap
             m_RaidEndedSubscription = m_EventBus.Subscribe<RaidEndedEvent>(OnRaidEnded);
             m_LootSearchSubscription = m_EventBus.Subscribe<LootSearchCompletedEvent>(OnLootSearchCompleted);
             m_ExtractionSubscription = m_EventBus.Subscribe<ExtractionCompletedEvent>(OnExtractionCompleted);
+            m_ItemUseSubscription = m_EventBus.Subscribe<ItemUseCompletedEvent>(OnItemUseCompleted);
 
             // 带入价值必须在开战前统计，之后背包里的东西就分不清「本来就有的」与「刚搜到的」了。
             m_RaidSession.Start(m_BroughtInValue);
@@ -272,6 +282,12 @@ namespace RaidDemo.Bootstrap
                 m_LootSearch != null ? m_LootSearch.Progress01 : 0f,
                 searchingContainer != null ? $"搜刮中：{searchingContainer.Definition.DisplayName}" : "搜刮中…");
 
+            var usingItem = m_ItemUse != null && m_ItemUse.IsUsing;
+            m_RaidHud.SetUseProgress(
+                usingItem,
+                usingItem ? m_ItemUse.Progress01 : 0f,
+                usingItem ? $"使用中：{m_ItemUse.DisplayName}" : null);
+
             if (m_InventoryScreen != null && m_InventoryScreen.IsOpen)
             {
                 // 背包打开时不需要交互提示与撤离提示：玩家的注意力在物品上，
@@ -292,6 +308,37 @@ namespace RaidDemo.Bootstrap
                 extracting,
                 zone != null ? zone.DisplayName : string.Empty,
                 m_ExtractionTracker != null ? m_ExtractionTracker.Progress01 : 0f);
+        }
+
+        /// <summary>玩家当前是否存活。</summary>
+        private bool IsPlayerAlive()
+        {
+            if (m_CombatWorld == null || m_PlayerCombatantId == 0)
+            {
+                return false;
+            }
+
+            return m_CombatWorld.TryGet(m_PlayerCombatantId, out var state) && state.IsAlive;
+        }
+
+        /// <summary>统计玩家造成的击杀，并记录「本帧挨打」用于打断物品使用。</summary>
+        /// <remarks>
+        /// 只认「攻击方是玩家」且「本次确实打死」的伤害事件。
+        /// 让 AI 之间互相误伤也计入击杀会让结算数字变得不可信。
+        /// </remarks>
+        private void OnKillCounted(DamageAppliedEvent evt)
+        {
+            if (evt.TargetId == m_PlayerCombatantId)
+            {
+                m_PlayerDamagedThisFrame = true;
+            }
+
+            if (!evt.WasKilled || evt.AttackerId != m_PlayerCombatantId)
+            {
+                return;
+            }
+
+            m_RaidSession?.NotifyKill(evt.AttackerId);
         }
 
         /// <summary>按容器 ID 查找运行时容器。</summary>
