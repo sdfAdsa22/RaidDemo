@@ -32,8 +32,20 @@ namespace RaidDemo.Presentation
         /// <summary>2D 声部数量（界面与结算提示，始终不衰减）。</summary>
         private const int FlatVoiceCount = 4;
 
-        /// <summary>空间音效不再随距离衰减的距离下限（米）。</summary>
-        private const float MinDistance = 3.5f;
+        /// <summary>
+        /// 空间音效不再随距离衰减的距离下限（米）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>这个值必须贴近相机距离，而不是"人耳到嘴巴的距离"。</b>
+        /// 本项目是斜俯视：AudioListener 挂在相机上，而相机离角色 13 米。
+        /// 若按常规第三人称游戏取 3 米，角色身边发生的一切都会被衰减到四分之一音量——
+        /// 敌人站在面前开枪，听起来像在隔壁街区。</para>
+        /// <para>取 13 米之后，"角色身边 13 米以内"的声音是满音量，
+        /// 更远的才开始按距离衰减，同时仍然保留左右声像。</para>
+        /// <para>另一条更彻底的路是把 AudioListener 挪到角色身上（俯视游戏里的常规做法），
+        /// 但那要改动两个场景里相机上的监听器与既有装配，风险大于收益，暂不做。</para>
+        /// </remarks>
+        private const float MinDistance = 13f;
 
         /// <summary>空间音效的默认最远可听距离（米）。</summary>
         private const float DefaultMaxDistance = 45f;
@@ -113,7 +125,8 @@ namespace RaidDemo.Presentation
             Vector3 position,
             float volume = 1f,
             float maxDistance = DefaultMaxDistance,
-            float pitchJitter = DefaultPitchJitter)
+            float pitchJitter = DefaultPitchJitter,
+            bool flat = false)
         {
             if (!CanPlay(clip, out var source))
             {
@@ -121,7 +134,7 @@ namespace RaidDemo.Presentation
             }
 
             source.transform.position = position;
-            ConfigureSpatial(source, maxDistance);
+            ConfigureVoice(source, maxDistance, flat);
             Play(source, clip, volume, pitchJitter);
             return true;
         }
@@ -236,9 +249,27 @@ namespace RaidDemo.Presentation
             }
         }
 
-        /// <summary>设置空间参数。同一个声部被不同距离的音效复用时必须重设。</summary>
-        private static void ConfigureSpatial(AudioSource source, float maxDistance)
+        /// <summary>
+        /// 设置空间参数。同一个声部会被不同性质的音效复用，因此每次播放都要重设。
+        /// </summary>
+        /// <param name="source">声部。</param>
+        /// <param name="maxDistance">最远可听距离。</param>
+        /// <param name="flat">
+        /// true 表示这次播放不参与空间化（等响度、不衰减）。
+        /// </param>
+        /// <remarks>
+        /// 本地玩家自己的枪声、脚步与换弹用 <paramref name="flat"/>：它们不需要方位感
+        /// （方位就是"我这里"），但必须满音量——玩家判断"我这一枪打出去没有"全靠它。
+        /// 敌人的枪声仍然走 3D，因为那里最需要的恰恰是方位与距离。
+        /// </remarks>
+        private static void ConfigureVoice(AudioSource source, float maxDistance, bool flat)
         {
+            if (flat)
+            {
+                source.spatialBlend = 0f;
+                return;
+            }
+
             source.spatialBlend = 1f;
             source.rolloffMode = AudioRolloffMode.Logarithmic;
             source.minDistance = MinDistance;

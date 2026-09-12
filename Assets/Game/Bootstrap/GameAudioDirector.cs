@@ -56,6 +56,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>撤离读秒的提示分档：进度跨过 25% / 50% / 75% 各响一声。</summary>
         private const int ExtractionTicks = 3;
 
+        /// <summary>枪声的音高抖动幅度：比默认略大，让连射听起来不是同一发在重复。</summary>
+        private const float ShotPitchJitter = 0.07f;
+
         private readonly List<IDisposable> m_Subscriptions = new List<IDisposable>();
 
         private AudioService m_Audio;
@@ -148,7 +151,10 @@ namespace RaidDemo.Bootstrap
                 clip,
                 evt.Origin,
                 isLocal ? LocalShotVolume : RemoteShotVolume,
-                kind == WeaponPresentationKind.Rifle ? RifleShotDistance : PistolShotDistance);
+                kind == WeaponPresentationKind.Rifle ? RifleShotDistance : PistolShotDistance,
+                ShotPitchJitter,
+                // 自己的枪声不参与空间化：它必须满音量、居中；别人的枪声走 3D 才有方位与距离感。
+                flat: isLocal);
 
             if (!evt.DidHit)
             {
@@ -177,12 +183,12 @@ namespace RaidDemo.Bootstrap
             var position = ResolvePlayerPosition();
             if (evt.IsReloading)
             {
-                m_Audio.PlayAt(m_Audio.Catalog.MagazineOut, position, ReloadVolume, 8f, 0.04f);
+                m_Audio.PlayAt(m_Audio.Catalog.MagazineOut, position, ReloadVolume, 8f, 0.04f, flat: true);
                 return;
             }
 
-            m_Audio.PlayAt(m_Audio.Catalog.MagazineIn, position, ReloadVolume, 8f, 0.04f);
-            m_Audio.PlayAt(m_Audio.Catalog.BoltClose, position, ReloadVolume * 0.9f, 8f, 0.04f);
+            m_Audio.PlayAt(m_Audio.Catalog.MagazineIn, position, ReloadVolume, 8f, 0.04f, flat: true);
+            m_Audio.PlayAt(m_Audio.Catalog.BoltClose, position, ReloadVolume * 0.9f, 8f, 0.04f, flat: true);
         }
 
         /// <summary>搜刮读条：按固定间隔播放翻找声，让"正在搜"这件事有听觉反馈。</summary>

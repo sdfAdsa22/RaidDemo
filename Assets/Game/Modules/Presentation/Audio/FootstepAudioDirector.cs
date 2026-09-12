@@ -89,7 +89,9 @@ namespace RaidDemo.Presentation
                 ? catalog.PickFootstepGrass(m_Cadence.StepIndex)
                 : catalog.PickFootstepHard(m_Cadence.StepIndex);
 
-            m_Audio.PlayAt(clip, ResolveFeetPosition(), volume, StepMaxDistance, 0.08f);
+            // 自己的脚步用等响度播放：方位就是"我这里"，但必须听得清——
+            // 脚步是不被背刺的最后一道听觉提示。
+            m_Audio.PlayAt(clip, ResolveFeetPosition(), volume, StepMaxDistance, 0.08f, flat: true);
         }
 
         private float m_LastTimestamp;
