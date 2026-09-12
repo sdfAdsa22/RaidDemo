@@ -265,8 +265,10 @@ namespace RaidDemo.Bootstrap.Editor
         /// 但上去只有两条坡道，撤离时也容易被堵。它同时验证了三件事——
         /// 玩家地面吸附、玩家移动碰撞的坡道处理、AI 的导航网格高度采样。</para>
         ///
-        /// <para>坡道正对平台北侧边缘，从地面直接接上平台面：坡道的高端必须与台面同高，
-        /// 否则会在衔接处形成一个上不去的台阶。</para>
+        /// <para>坡道正对平台北侧边缘，从地面直接接上平台面。高端刻意向台体内多伸入
+        /// 0.5 米：如果坡道的高端刚好停在台缘，坡道板的厚度端面会在台缘前留下一条
+        /// 极窄的斜面缝——向下射线会先打到端面而不是坡道顶面，角色在这里会被卡住。
+        /// 伸入台体后，坡道顶面连续覆盖到台面下方，衔接处不再有可见的端面。</para>
         /// </remarks>
         private static void CreateLoadingDockZone()
         {
@@ -281,8 +283,8 @@ namespace RaidDemo.Bootstrap.Editor
             SetMaterialColor(platform, DockColor);
 
             // 两条坡道，分别位于台体东、西两端，让上下台都有两条路
-            CreateRamp("Dock_Ramp_West", -4f, -15f, -19f, 3.5f, DockHeight, 0.3f, parent);
-            CreateRamp("Dock_Ramp_East", 8f, -15f, -19f, 3.5f, DockHeight, 0.3f, parent);
+            CreateRamp("Dock_Ramp_West", -4f, -15f, -19.5f, 3.5f, DockHeight, 0.3f, parent);
+            CreateRamp("Dock_Ramp_East", 8f, -15f, -19.5f, 3.5f, DockHeight, 0.3f, parent);
 
             // 台上的货箱与挡墙：挡墙沿西、东两端布置，留着北面朝向坡道
             var dockProps = new (Vector3 Position, Vector3 Size, Color Color)[]

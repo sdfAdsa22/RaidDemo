@@ -34,6 +34,16 @@ namespace RaidDemo.Presentation
         /// <summary>地面探测的起始高度（米）。探测从角色头顶上方这么高的位置向下打射线。</summary>
         [SerializeField] private float m_GroundProbeHeight = 4f;
 
+        /// <summary>
+        /// 地面吸附允许的最大抬升高度（米）。
+        /// </summary>
+        /// <remarks>
+        /// 这个值必须与 <see cref="PhysicsMovementCollisionService"/> 的台阶高度一致。
+        /// 没有它时，射线会命中栅栏顶部（2.2 米）或平台顶面，把角色直接吸到障碍物上方；
+        /// 有了它，只有脚下极近的地面才会被当成落脚点，栅栏顶不再是"地面"。
+        /// </remarks>
+        private const float MaxStepUpHeight = 0.35f;
+
         /// <summary>所属玩家编号，用于过滤事件。</summary>
         [SerializeField] private int m_PlayerId;
 
@@ -49,11 +59,19 @@ namespace RaidDemo.Presentation
         /// </remarks>
         private readonly RaycastHit[] m_GroundHits = new RaycastHit[8];
 
+        /// <summary>上一次吸附到的地面高度。台阶过滤以它为基准，避免视觉插值拖慢判定。</summary>
+        private float m_LastGroundHeight;
+
         /// <summary>当前模拟位置（水平面）。</summary>
         public Vector2 SimulatedPosition { get; private set; }
 
         /// <summary>当前朝向角度（度）。</summary>
         public float FacingDegrees { get; private set; }
+
+        private void Awake()
+        {
+            m_LastGroundHeight = transform.position.y - m_GroundOffset;
+        }
 
         private void OnEnable()
         {
@@ -86,6 +104,8 @@ namespace RaidDemo.Presentation
         {
             SimulatedPosition = position;
             FacingDegrees = Mathf.Atan2(facing.y, facing.x) * Mathf.Rad2Deg;
+            // 传送可能跨越高度差，先做一次不受台阶限制的采样，避免新位置被旧高度过滤掉。
+            m_LastGroundHeight = SampleGroundHeight(float.PositiveInfinity);
             ApplyTransform(instant: true);
         }
 
@@ -158,9 +178,19 @@ namespace RaidDemo.Presentation
                 return m_GroundOffset;
             }
 
+            m_LastGroundHeight = SampleGroundHeight(m_LastGroundHeight + MaxStepUpHeight);
+            return m_LastGroundHeight + m_GroundOffset;
+        }
+
+        /// <summary>
+        /// 采样脚下地面高度。
+        /// </summary>
+        /// <param name="maxHeight">允许的最高落点。高于它的命中会被忽略。</param>
+        private float SampleGroundHeight(float maxHeight)
+        {
             var origin = new Vector3(
                 SimulatedPosition.x,
-                m_GroundProbeHeight,
+                Mathf.Max(transform.position.y, m_LastGroundHeight) + m_GroundProbeHeight,
                 SimulatedPosition.y);
             var count = Physics.RaycastNonAlloc(
                 origin,
@@ -179,12 +209,24 @@ namespace RaidDemo.Presentation
                     continue;
                 }
 
-                if (hit.collider.transform.IsChildOf(transform))
+                if (hit.collider.transform == transform
+                    || hit.collider.transform.IsChildOf(transform))
                 {
                     continue;
                 }
 
                 if (hit.collider.GetComponentInParent<EnemyAgentView>() != null)
+                {
+                    continue;
+                }
+
+                // 只接受朝上的可站立面；竖直墙面即使被射线擦到也不算地面。
+                if (hit.normal.y < 0.5f)
+                {
+                    continue;
+                }
+
+                if (hit.point.y > maxHeight)
                 {
                     continue;
                 }
@@ -195,7 +237,8 @@ namespace RaidDemo.Presentation
                 }
             }
 
-            return best > float.NegativeInfinity ? best + m_GroundOffset : m_GroundOffset;
+            // 什么都没命中时保持上一次高度，避免角色掉进没有碰撞体的空隙里。
+            return best > float.NegativeInfinity ? best : m_LastGroundHeight;
         }
     }
 }

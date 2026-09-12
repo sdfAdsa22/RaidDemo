@@ -19,6 +19,9 @@ namespace RaidDemo.UI
     /// </remarks>
     public sealed partial class InventoryScreenController
     {
+        /// <summary>背包价值 / 携带总值显示。由 Layout 部分创建与刷新。</summary>
+        private Text m_ValueLabel;
+
         /// <summary>
         /// 换背包后重建整套界面布局。
         /// </summary>
@@ -191,6 +194,17 @@ namespace RaidDemo.UI
             m_BarFill.raycastTarget = false;
 
             m_BarLabel = CreateLabel(parent, string.Empty, new Vector2(40f, top + BarHeight + 4f), BarWidth, 20f, 13);
+
+            // 价值放在负重条下方：两者回答的是同一个准备问题——
+            // "这一趟带了多少，输了会亏多少"。
+            m_ValueLabel = CreateLabel(
+                parent,
+                string.Empty,
+                new Vector2(40f, top + BarHeight + 28f),
+                320f,
+                20f,
+                13);
+            m_ValueLabel.color = new Color(0.95f, 0.82f, 0.35f);
         }
 
         /// <summary>创建一个网格视图。</summary>
@@ -217,6 +231,7 @@ namespace RaidDemo.UI
             m_LootView?.Refresh();
             RefreshEquipmentSlots();
             RefreshWeightBar();
+            RefreshValueLabel();
         }
 
         /// <summary>刷新装备槽显示。</summary>
@@ -249,6 +264,35 @@ namespace RaidDemo.UI
             m_BarFill.rectTransform.sizeDelta = new Vector2(BarWidth * Mathf.Clamp01(ratio), 0f);
             m_BarFill.color = ratio > 1f ? OverloadedColor : ratio >= 0.7f ? HeavyColor : LightColor;
             m_BarLabel.text = $"{weight:F1} / {capacity:F0} kg";
+        }
+
+        /// <summary>
+        /// 刷新背包价值与携带总值。
+        /// </summary>
+        /// <remarks>
+        /// 「背包价值」只统计主背包网格；「携带总值」与战局结算的带入价值同口径，
+        /// 包含装备槽、弹药挂与背包。两个数字同时显示，玩家既能看到背包里装了什么，
+        /// 也能看到这一趟输了会亏多少。
+        /// </remarks>
+        private void RefreshValueLabel()
+        {
+            if (m_ValueLabel == null || m_Loadout == null)
+            {
+                return;
+            }
+
+            var backpackValue = 0;
+            var backpackItems = m_Loadout.Backpack != null ? m_Loadout.Backpack.Items : null;
+            if (backpackItems != null)
+            {
+                for (var i = 0; i < backpackItems.Count; i++)
+                {
+                    backpackValue += backpackItems[i].TotalValue;
+                }
+            }
+
+            var carriedValue = RaidDemo.Raid.RaidResult.ComputeCarriedValue(m_Loadout);
+            m_ValueLabel.text = $"背包价值 {backpackValue:N0}　携带总值 {carriedValue:N0}";
         }
 
         /// <summary>显示或隐藏整个界面。</summary>

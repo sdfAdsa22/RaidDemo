@@ -49,18 +49,14 @@ namespace RaidDemo.UI
         private Text m_ListFooterLabel;
         private Text m_QuestLabel;
         private Text m_NoteLabel;
-        private RaidButtonWidget m_RestartButton;
         private RaidButtonWidget m_MenuButton;
-        private Action m_OnRestart;
         private Action m_OnReturnToMenu;
         private bool m_IsVisible;
 
         /// <summary>构建界面。</summary>
-        /// <param name="onRestart">点击「再来一局」时执行的回调。</param>
-        /// <param name="onReturnToMenu">点击「返回主菜单」时执行的回调。</param>
-        public void Initialize(Action onRestart, Action onReturnToMenu)
+        /// <param name="onReturnToMenu">点击「返回安全屋」时执行的回调。</param>
+        public void Initialize(Action onReturnToMenu)
         {
-            m_OnRestart = onRestart;
             m_OnReturnToMenu = onReturnToMenu;
 
             m_Root = RaidScreenFactory.CreateCanvas(transform, "RaidResultCanvas", 310);
@@ -112,12 +108,11 @@ namespace RaidDemo.UI
                 panel, string.Empty, new Vector2(48f, 540f), new Vector2(800f, 26f),
                 15, TextAnchor.MiddleLeft, HintColor);
 
-            m_RestartButton = RaidScreenFactory.CreateButton(
-                panel, "再来一局（Enter）", new Vector2(48f, 588f), new Vector2(320f, 58f),
-                ButtonColor, ButtonHoverColor);
-
+            // 结算后只有一条去处：回安全屋整理与再接任务。
+            // 保留单一按钮而不是"再来一局 / 返回安全屋"两条路，避免玩家在结算界面
+            // 直接跳过局外准备，也避免两个按钮在视觉上争夺主次。
             m_MenuButton = RaidScreenFactory.CreateButton(
-                panel, "返回安全屋（Esc）", new Vector2(392f, 588f), new Vector2(320f, 58f),
+                panel, "返回安全屋（Esc）", new Vector2(290f, 588f), new Vector2(320f, 58f),
                 SecondaryButtonColor, SecondaryHoverColor);
 
             SetVisible(false);
@@ -248,21 +243,13 @@ namespace RaidDemo.UI
                 return;
             }
 
-            if (keyboard != null && keyboard.enterKey.wasPressedThisFrame)
-            {
-                m_OnRestart?.Invoke();
-                return;
-            }
-
             if (Mouse.current == null)
             {
                 return;
             }
 
             var pointer = Mouse.current.position.ReadValue();
-            var overRestart = m_RestartButton.Contains(pointer);
             var overMenu = m_MenuButton.Contains(pointer);
-            m_RestartButton.SetHovered(overRestart);
             m_MenuButton.SetHovered(overMenu);
 
             if (!Mouse.current.leftButton.wasPressedThisFrame)
@@ -270,11 +257,7 @@ namespace RaidDemo.UI
                 return;
             }
 
-            if (overRestart)
-            {
-                m_OnRestart?.Invoke();
-            }
-            else if (overMenu)
+            if (overMenu)
             {
                 m_OnReturnToMenu?.Invoke();
             }

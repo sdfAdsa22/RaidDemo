@@ -112,7 +112,7 @@ namespace RaidDemo.Bootstrap
             m_MenuScreen.Initialize(EnterSafeHouse, StartNewGame);
 
             m_ResultScreen = gameObject.AddComponent<RaidResultScreen>();
-            m_ResultScreen.Initialize(StartRaid, GoToSafeHouse);
+            m_ResultScreen.Initialize(GoToSafeHouse);
             HookProgress(Progress);
         }
 

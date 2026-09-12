@@ -25,6 +25,26 @@ namespace RaidDemo.Presentation
         /// <summary>小于该长度的位移视为静止（米）。</summary>
         private const float PositionEpsilon = 1e-4f;
 
+        /// <summary>
+        /// 可行走斜面的最大倾角（度）。
+        /// </summary>
+        /// <remarks>
+        /// 胶囊扫掠时，坡道表面也会被当成命中。若把它当作墙，玩家走到坡道中段
+        /// 就会因胶囊底部与斜面相交而被卡住。真正的障碍是倾角更大的竖直面，
+        /// 因此这里把可行走斜面从「阻挡」里排除，高度由 PlayerMotor 的地面吸附负责。
+        /// </remarks>
+        private const float WalkableSlopeAngle = 45f;
+
+        /// <summary>
+        /// 可跨越的台阶高度（米）。
+        /// </summary>
+        /// <remarks>
+        /// 脚底被挡住时，会把胶囊抬高这个高度再扫一次；如果抬高后畅通，
+        /// 就允许移动，由地面吸附把角色抬到台阶顶。这样既不会卡在 0.3 米的
+        /// 路缘 / 坡道接缝上，也不会让 1.2 米的平台边缘变成可随意翻越的矮墙。
+        /// </remarks>
+        private const float StepHeight = 0.35f;
+
         private readonly Transform m_Owner;
         private readonly float m_BodyHeight;
         private readonly float m_Skin;
@@ -84,6 +104,19 @@ namespace RaidDemo.Presentation
 
                 if (remaining <= PositionEpsilon || allowed <= PositionEpsilon)
                 {
+                    // 脚底被挡住时先试一次"抬高跨越"：低台阶与坡道接缝可以过去，
+                    // 平台边缘与栅栏仍然会被高处的胶囊挡住。
+                    if (CanStepOver(start, direction, radius, remaining))
+                    {
+                        travelled += direction * remaining;
+                    }
+
+                    break;
+                }
+
+                if (CanStepOver(start, direction, radius, remaining))
+                {
+                    travelled += direction * remaining;
                     break;
                 }
 
@@ -136,9 +169,44 @@ namespace RaidDemo.Presentation
             float distance,
             out RaycastHit hit)
         {
+            return Cast(start, direction, radius, distance, verticalOffset: 0f, out hit);
+        }
+
+        /// <summary>
+        /// 抬高胶囊后再扫一次，判断低台阶能否跨越。
+        /// </summary>
+        private bool CanStepOver(
+            Vector2F start,
+            Vector2F direction,
+            float radius,
+            float distance)
+        {
+            if (distance <= PositionEpsilon)
+            {
+                return true;
+            }
+
+            return !Cast(
+                start,
+                direction,
+                radius,
+                distance,
+                StepHeight,
+                out _);
+        }
+
+        /// <summary>带垂直偏移的胶囊扫掠。</summary>
+        private bool Cast(
+            Vector2F start,
+            Vector2F direction,
+            float radius,
+            float distance,
+            float verticalOffset,
+            out RaycastHit hit)
+        {
             var ownerY = m_Owner.position.y;
-            var bottom = new Vector3(start.X, ownerY + 0.5f, start.Y);
-            var top = new Vector3(start.X, ownerY + m_BodyHeight - 0.4f, start.Y);
+            var bottom = new Vector3(start.X, ownerY + 0.5f + verticalOffset, start.Y);
+            var top = new Vector3(start.X, ownerY + m_BodyHeight - 0.4f + verticalOffset, start.Y);
             var castDirection = new Vector3(direction.X, 0f, direction.Y);
 
             var count = Physics.CapsuleCastNonAlloc(
@@ -158,6 +226,12 @@ namespace RaidDemo.Presentation
             {
                 var candidate = m_Hits[i];
                 if (candidate.collider == null || IsOwnerCollider(candidate.collider))
+                {
+                    continue;
+                }
+
+                // 可行走斜面不是障碍：坡道高度交由 PlayerMotor 的地面吸附处理。
+                if (Vector3.Angle(candidate.normal, Vector3.up) <= WalkableSlopeAngle)
                 {
                     continue;
                 }
