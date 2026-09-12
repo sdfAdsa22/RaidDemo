@@ -279,5 +279,6 @@
 
 > **交付前清理清单**（M8 之前必须做）：
 > 1. 删掉 `LootContainerCatalog.BuildDebugCrate()` 及其在 `BuildAll()` 里的调用；
-> 2. 删掉 `GreyboxSceneBuilder.Layout.cs` 里 `crate.debug` 那一行并重新生成场景；
+> 2. 删掉 `SafeHouseSceneBuilder.CreateDebugCrate()` 及其调用并重新生成安全屋场景
+>    （**注意：测试箱已从战局地图搬到安全屋**，战局地图里已经没有了）；
 > 3. 把 `LootTableTests` 里的容器数量断言从 6 改回 5。
