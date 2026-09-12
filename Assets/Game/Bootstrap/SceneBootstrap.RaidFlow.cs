@@ -63,8 +63,8 @@ namespace RaidDemo.Bootstrap
             var open = m_InventoryScreen.IsOpen;
             if (open && m_InventoryScreen.LootContainerId != m_StashContainerId)
             {
-                // 把右侧面板绑到仓库；标题直接用「仓库」，与战局里的「战利品：XXX」区分开。
-                m_InventoryScreen.OpenLootContainer(m_StashContainerId, "仓库");
+                // 把右侧面板绑到仓库，标题为「仓库」，与战局里的「战利品：XXX」区分开。
+                m_InventoryScreen.OpenStash(m_StashContainerId);
             }
 
             RaidFlowController.Ensure().SetMenuVisible(!open);

@@ -204,6 +204,26 @@ namespace RaidDemo.UI
         /// </remarks>
         public void OpenLootContainer(int containerId, string displayName)
         {
+            var title = string.IsNullOrEmpty(displayName) ? "战利品" : $"战利品：{displayName}";
+            OpenContainerView(containerId, title);
+        }
+
+        /// <summary>
+        /// 打开仓库（出击准备）。
+        /// </summary>
+        /// <param name="containerId">仓库容器 ID。</param>
+        /// <remarks>
+        /// 与战利品共用同一块面板，只是标题不同：对它来说两者都只是「一个容器」。
+        /// 标题必须区分开——在准备界面看到「战利品」会让玩家以为自己进了战局。
+        /// </remarks>
+        public void OpenStash(int containerId)
+        {
+            OpenContainerView(containerId, "仓库");
+        }
+
+        /// <summary>打开指定容器并显示界面。</summary>
+        private void OpenContainerView(int containerId, string title)
+        {
             if (containerId <= 0)
             {
                 return;
@@ -218,7 +238,6 @@ namespace RaidDemo.UI
             {
                 DestroyLootView();
                 m_LootContainerId = containerId;
-                var title = string.IsNullOrEmpty(displayName) ? "战利品" : $"战利品：{displayName}";
                 m_LootView = CreateGridView(
                     (RectTransform)m_Root.transform,
                     grid,
