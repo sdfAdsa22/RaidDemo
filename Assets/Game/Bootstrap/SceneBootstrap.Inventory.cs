@@ -74,6 +74,58 @@ namespace RaidDemo.Bootstrap
             UpdateEncumbrance(true);
         }
 
+        /// <summary>没有装备背包时的口袋容量（列 x 行）。</summary>
+        private static readonly Vector2Int PocketSize = new Vector2Int(5, 5);
+
+        /// <summary>
+        /// 按当前装备的背包重算随身容量。
+        /// </summary>
+        /// <remarks>
+        /// <para>规则：装备了背包就用它的内部格数，没装备就用 5x5 口袋。
+        /// 换包时先把现有物品搬进新网格，**任何一件放不下就放弃这次调整**并保留原网格——
+        /// 项目里没有地面掉落系统，让物品凭空消失是不可接受的失败方式。</para>
+        ///
+        /// <para>因此缩容只会在「东西刚好放得下」时发生：背包塞满时把它卸下来，
+        /// 容量会暂时保持不变（自愈：等你腾出空间后，下一次变化会重新尝试缩容）。
+        /// 这是灰盒阶段的已知放宽，正式版应当改为「拒绝卸下」并给出提示。</para>
+        /// </remarks>
+        private void RefreshBackpackCapacity()
+        {
+            if (m_Loadout == null || m_ContainerRegistry == null || m_InventoryScreen == null)
+            {
+                return;
+            }
+
+            var equipped = m_Loadout.Equipment?.Get(EquipmentSlot.Backpack)?.Definition;
+            var size = equipped != null && equipped.IsContainer
+                ? equipped.ContainerGridSize
+                : new GridSize(PocketSize.x, PocketSize.y);
+
+            var current = m_Loadout.Backpack;
+            if (current != null && current.Width == size.Width && current.Height == size.Height)
+            {
+                return;
+            }
+
+            var resized = new InventoryGrid(size.Width, size.Height, "主背包");
+            var items = current != null ? new List<ItemInstance>(current.Items) : new List<ItemInstance>();
+            for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                var rotatedBefore = item.Rotated;
+                if (!resized.AutoPlace(item).Success)
+                {
+                    // 放弃这次调整：把旋转状态还原，否则旧网格的占位图会与物品对不上。
+                    item.Rotated = rotatedBefore;
+                    return;
+                }
+            }
+
+            m_Loadout.ReplaceBackpack(resized);
+            m_ContainerRegistry.Replace(m_BackpackContainerId, resized);
+            m_InventoryScreen.RebuildLayout(resized, m_BackpackContainerId);
+        }
+
         /// <summary>
         /// 右键菜单的「使用」入口：从指定格子取物品并开始使用。
         /// </summary>

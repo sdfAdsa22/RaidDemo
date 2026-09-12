@@ -14,7 +14,7 @@ namespace RaidDemo.Inventory
     /// </remarks>
     public sealed class PlayerLoadout
     {
-        private readonly InventoryGrid m_Backpack;
+        private InventoryGrid m_Backpack;
         private readonly InventoryGrid m_AmmoPouch;
         private readonly EquipmentLoadout m_Equipment;
 
@@ -29,6 +29,23 @@ namespace RaidDemo.Inventory
             m_Backpack = backpack ?? throw new System.ArgumentNullException(nameof(backpack));
             m_Equipment = equipment ?? throw new System.ArgumentNullException(nameof(equipment));
             m_AmmoPouch = ammoPouch;
+        }
+
+        /// <summary>
+        /// 替换随身背包网格。
+        /// </summary>
+        /// <param name="backpack">新网格，为 null 时忽略。</param>
+        /// <remarks>
+        /// 换背包（装备或卸下）会改变随身容量，因此网格本身需要被替换。
+        /// 调用方负责先把旧网格里的物品搬进新网格——这个方法只做替换，不搬运，
+        /// 因为「装不下怎么办」属于规则，不该藏在一个 setter 里。
+        /// </remarks>
+        public void ReplaceBackpack(InventoryGrid backpack)
+        {
+            if (backpack != null)
+            {
+                m_Backpack = backpack;
+            }
         }
 
         /// <summary>主背包网格。</summary>

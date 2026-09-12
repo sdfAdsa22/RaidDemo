@@ -91,6 +91,27 @@ namespace RaidDemo.Inventory
             return id;
         }
 
+        /// <summary>
+        /// 替换某个已登记容器的网格。
+        /// </summary>
+        /// <param name="containerId">容器 ID。</param>
+        /// <param name="grid">新网格。</param>
+        /// <returns>替换成功返回 true；ID 不存在或网格为空时返回 false。</returns>
+        /// <remarks>
+        /// 用于「换背包」这类**容量会变的容器**：容器 ID 必须保持不变，
+        /// 否则命令里携带的 ID 会立刻失效，界面也会跟着错位。
+        /// </remarks>
+        public bool Replace(int containerId, InventoryGrid grid)
+        {
+            if (grid == null || !m_Grids.ContainsKey(containerId))
+            {
+                return false;
+            }
+
+            m_Grids[containerId] = grid;
+            return true;
+        }
+
         /// <summary>按 ID 查找容器网格。</summary>
         /// <param name="containerId">容器 ID。</param>
         /// <param name="grid">找到的网格。</param>

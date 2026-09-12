@@ -19,6 +19,42 @@ namespace RaidDemo.UI
     /// </remarks>
     public sealed partial class InventoryScreenController
     {
+        /// <summary>
+        /// 换背包后重建整套界面布局。
+        /// </summary>
+        /// <param name="backpack">新的背包网格。</param>
+        /// <param name="containerId">背包的容器 ID。</param>
+        /// <remarks>
+        /// <para>换包会改变网格尺寸，而弹药挂与战利品面板的位置是按背包高度推算出来的，
+        /// 因此不能只替换一个视图——必须整块重建，否则面板会互相压住。</para>
+        ///
+        /// <para>重建只销毁自己创建的画布，玩家数据（网格与装备）完全不动。</para>
+        /// </remarks>
+        public void RebuildLayout(InventoryGrid backpack, int containerId)
+        {
+            if (m_CanvasHost != null)
+            {
+                Destroy(m_CanvasHost);
+            }
+
+            m_CanvasHost = null;
+            m_Root = null;
+            m_MenuRoot = null;
+            m_BackpackView = null;
+            m_AmmoPouchView = null;
+            m_LootView = null;
+            m_Slots.Clear();
+            m_MenuRows.Clear();
+
+            m_BackpackContainerId = containerId;
+            m_Loadout.ReplaceBackpack(backpack);
+
+            var wasOpen = m_IsOpen;
+            BuildLayout();
+            RefreshAll();
+            SetVisible(wasOpen);
+        }
+
         /// <summary>构建整套界面。</summary>
         private void BuildLayout()
         {
