@@ -99,6 +99,14 @@ namespace RaidDemo.Bootstrap
         {
             var weapon = m_Loadout?.Equipment?.Get(EquipmentSlot.PrimaryWeapon);
 
+            // 枪口位置必须每帧写入：命中射线从枪口出发，不设置的话它停在世界原点，
+            // 于是「枪响了、子弹也飞了」，但永远打不到眼前的靶子。
+            if (m_PlayerMotor != null && m_WeaponController != null)
+            {
+                m_WeaponController.SetMuzzlePosition(
+                    m_PlayerMotor.transform.position + (Vector3.up * 1.2f));
+            }
+
             // 必须把「手上是什么武器」同步给控制器：弹匣容量、装弹、射速全部由它管理。
             // 漏掉这一步的症状很有迷惑性——界面上武器名是有的（那是这里直接读装备槽显示的），
             // 但弹药数是「-- / --」、按 R 没反应、开枪也打不响。
