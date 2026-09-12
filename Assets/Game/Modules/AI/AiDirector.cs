@@ -48,6 +48,10 @@ namespace RaidDemo.AI
         /// <param name="profile">感知与行为参数。</param>
         /// <param name="pathfinding">寻路能力，可为 null（退化为直线推进）。</param>
         /// <param name="baseSeed">随机种子基数。</param>
+        /// <param name="groundHeight">
+        /// 地面高度采样能力（表现层注入）。为 null 时所有单位按高度 0 处理，
+        /// 与无头环境、既有测试的假设一致。
+        /// </param>
         public AiDirector(
             IHitProbe probe,
             CombatWorld world,
@@ -55,7 +59,8 @@ namespace RaidDemo.AI
             EventBus eventBus,
             AIPerceptionProfile profile,
             IPathfindingService pathfinding = null,
-            uint baseSeed = DefaultBaseSeed)
+            uint baseSeed = DefaultBaseSeed,
+            IGroundHeightProvider groundHeight = null)
         {
             Probe = probe;
             World = world ?? throw new ArgumentNullException(nameof(world));
@@ -63,6 +68,7 @@ namespace RaidDemo.AI
             EventBus = eventBus;
             Profile = profile ?? new AIPerceptionProfile();
             Pathfinding = pathfinding;
+            GroundHeight = groundHeight;
             m_BaseSeed = baseSeed;
 
             if (EventBus != null)
@@ -86,6 +92,9 @@ namespace RaidDemo.AI
 
         /// <summary>感知与行为参数。</summary>
         public AIPerceptionProfile Profile { get; }
+
+        /// <summary>地面高度采样能力；为 null 时按平地处理。感知与射击都用它补齐高差。</summary>
+        public IGroundHeightProvider GroundHeight { get; }
 
         /// <summary>寻路能力，可为 null。</summary>
         public IPathfindingService Pathfinding { get; }

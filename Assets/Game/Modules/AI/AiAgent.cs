@@ -295,10 +295,16 @@ namespace RaidDemo.AI
             }
 
             // 两档都要做遮挡判定：6 米内可以忽略朝向，但隔着集装箱不算发现。
+            //
+            // 两端都要按各自脚下的地面高度抬起：逻辑层只有平面坐标，
+            // 若只抬一端，射线的方向仍然指向平台下方，视线会被平台表面挡住，
+            // 表现就是"敌人一直警惕、永远不进入交战"。
+            var eyeGround = m_Director.GroundHeight?.SampleHeight(m_Position) ?? 0f;
+            var targetGround = m_Director.GroundHeight?.SampleHeight(target.Position) ?? 0f;
             var hasLineOfSight = AISensor.HasLineOfSight(
                 m_Director.Probe,
-                AISensor.ToEyePosition(m_Position, profile.EyeHeightMeters),
-                target.CenterWorld,
+                AISensor.ToEyePosition(m_Position, profile.EyeHeightMeters, eyeGround),
+                AISensor.LiftByHeight(target.CenterWorld, targetGround),
                 target.CombatantId,
                 profile.ViewDistanceMeters);
 

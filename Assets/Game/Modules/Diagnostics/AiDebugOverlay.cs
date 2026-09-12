@@ -235,7 +235,7 @@ namespace RaidDemo.Diagnostics
                 return;
             }
 
-            var center = new Vector3(target.Position.X, 0f, target.Position.Y);
+            var center = new Vector3(target.Position.X, AiDebugShapeRenderer.SampleGroundHeight(target.Position.X, target.Position.Y), target.Position.Y);
 
             // 三档参考圈：始终画出，方便对照"还能再跑多远才被听见"。
             m_Shapes.DrawCircle(center, profile.HearingRadiusWalk, ReferenceRingColor);
@@ -286,7 +286,8 @@ namespace RaidDemo.Diagnostics
                 return;
             }
 
-            var position = new Vector3(agent.Position.X, 0f, agent.Position.Y);
+            // 站在装卸平台上的单位，其调试图形也要画在平台面上：高度由场景射线采样得到。
+            var position = new Vector3(agent.Position.X, AiDebugShapeRenderer.SampleGroundHeight(agent.Position.X, agent.Position.Y), agent.Position.Y);
             var stateColor = EnemyAgentView.ResolveColor(agent.CurrentState);
 
             // 视野锥：颜色跟随状态，一眼能看出"这个扇形是哪个 AI 的"。
@@ -303,7 +304,7 @@ namespace RaidDemo.Diagnostics
             {
                 var targetPosition = new Vector3(
                     m_Snapshot.Target.Position.X,
-                    0f,
+                    AiDebugShapeRenderer.SampleGroundHeight(m_Snapshot.Target.Position.X, m_Snapshot.Target.Position.Y),
                     m_Snapshot.Target.Position.Y);
                 m_Shapes.DrawLine(position, targetPosition, SightLineColor);
             }

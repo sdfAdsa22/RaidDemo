@@ -138,7 +138,11 @@ namespace RaidDemo.AI
         private void FireOnce(Vector2F position, float facingDegrees, float spreadOffsetDegrees)
         {
             var weapon = m_Weapon.Weapon;
-            var origin = new Vector3(position.X, MuzzleHeightMeters, position.Y);
+
+            // 枪口高度同样要按射手脚下的地面高度抬起：否则站在平台上的单位会把子弹
+            // 从平台下方打出去（曳光贴地、打不到平台上的目标）。
+            var groundHeight = m_Director.GroundHeight?.SampleHeight(position) ?? 0f;
+            var origin = new Vector3(position.X, groundHeight + MuzzleHeightMeters, position.Y);
 
             // 方向取水平方向并叠加散布：与玩家完全一致，因此弹道在俯视角下与准星对得上。
             var direction2D = Vector2F.FromDegrees(facingDegrees + spreadOffsetDegrees);

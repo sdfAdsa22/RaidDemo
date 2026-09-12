@@ -148,14 +148,15 @@ namespace RaidDemo.Bootstrap
 
             var pathfinding = new NavMeshPathfindingService();
             m_AiDirector = new AiDirector(
-                // AI 的逻辑坐标只有平面，射线起点要按射手脚下的导航网格高度抬起，
-                // 否则站在装卸平台上的敌人会贴着地面开枪，打不到平台上的玩家。
-                new PhysicsHitProbe(liftOriginToGround: true),
+                // 射线不在这里做高度补偿：AI 感知与开火都会先用 GroundHeight 把两端
+                // 各自抬到脚下的地面高度，再由探测实现原样投射，避免重复抬高。
+                new PhysicsHitProbe(),
                 m_CombatWorld,
                 m_CombatTuning,
                 m_EventBus,
                 profile,
-                pathfinding);
+                pathfinding,
+                groundHeight: new NavMeshGroundHeightProvider());
 
             m_AiDirector.Bounds = new PlayAreaBounds(
                 new Vector2F(-AiPlayAreaHalfExtent, -AiPlayAreaHalfExtent),

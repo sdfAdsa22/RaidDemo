@@ -88,7 +88,23 @@ namespace RaidDemo.AI
         /// <param name="eyeHeight">眼高（米）。</param>
         public static Vector3 ToEyePosition(Vector2F position, float eyeHeight)
         {
-            return new Vector3(position.X, eyeHeight, position.Y);
+            return ToEyePosition(position, eyeHeight, 0f);
         }
+
+        /// <summary>由平面位置、眼高与脚下地面高度计算眼睛的世界坐标。</summary>
+        /// <param name="position">平面位置。</param>
+        /// <param name="eyeHeight">眼高（米）。</param>
+        /// <param name="groundHeight">脚下的地面高度（米），由场景侧的高度采样提供。</param>
+        public static Vector3 ToEyePosition(Vector2F position, float eyeHeight, float groundHeight)
+        {
+            return new Vector3(position.X, groundHeight + eyeHeight, position.Y);
+        }
+
+        /// <summary>把世界坐标沿 Y 轴抬起指定高度（用于目标中心跟随其脚下的地面高度）。</summary>
+        public static Vector3 LiftByHeight(Vector3 position, float height)
+        {
+            return new Vector3(position.x, position.y + height, position.z);
+        }
+
     }
 }

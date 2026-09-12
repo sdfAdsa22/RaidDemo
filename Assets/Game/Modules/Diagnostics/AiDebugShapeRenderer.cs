@@ -27,6 +27,22 @@ namespace RaidDemo.Diagnostics
         /// <summary>贴地图形的离地高度（米）。与弹道绘制的处理一致。</summary>
         private const float GroundHeight = 0.06f;
 
+        /// <summary>
+        /// 采样指定平面位置脚下的场景高度（米）。
+        /// </summary>
+        /// <remarks>
+        /// 调试图形必须与单位实际站立面一致，否则站在装卸平台上的敌人，
+        /// 视角锥会画在地面上，看图的人会误以为感知范围算错了。
+        /// 用物理射线而不是导航网格采样，是为了让诊断层不依赖额外的运行时服务。
+        /// </remarks>
+        public static float SampleGroundHeight(float x, float z)
+        {
+            var origin = new Vector3(x, 50f, z);
+            return Physics.Raycast(origin, Vector3.down, out var hit, 100f, ~0, QueryTriggerInteraction.Ignore)
+                ? hit.point.y
+                : 0f;
+        }
+
         private const float CircleWidth = 0.04f;
         private const float OutlineWidth = 0.05f;
         private const float LineWidth = 0.07f;
@@ -100,7 +116,7 @@ namespace RaidDemo.Diagnostics
 
             var count = Mathf.Max(8, segments);
             var line = Rent(count + 1, color, CircleWidth);
-            var basePosition = new Vector3(center.x, GroundHeight, center.z);
+            var basePosition = new Vector3(center.x, center.y + GroundHeight, center.z);
 
             for (var i = 0; i <= count; i++)
             {
@@ -133,7 +149,7 @@ namespace RaidDemo.Diagnostics
 
             var count = Mathf.Max(4, segments);
             var line = Rent(count + 3, color, OutlineWidth);
-            var basePosition = new Vector3(center.x, GroundHeight, center.z);
+            var basePosition = new Vector3(center.x, center.y + GroundHeight, center.z);
             var startDegrees = centerDegrees - (sweepDegrees * 0.5f);
 
             line.SetPosition(0, basePosition);
