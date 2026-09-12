@@ -35,6 +35,20 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>需要循环播放的剪辑（其余都是一次性动作）。</summary>
         private static readonly HashSet<string> LoopingClips = new HashSet<string> { "Idle", "Walk", "Run", "Duck" };
 
+        /// <summary>
+        /// 模型自带的整套武器（全部挂在右手节点下，且会同时显示）。
+        /// 只保留 <see cref="PreferredWeapon"/> 一把，其余删除——否则敌人身上会插着十几把武器，
+        /// 其中按 1.0 比例建模的那把看起来"枪特别大"。
+        /// </summary>
+        private static readonly HashSet<string> WeaponNodes = new HashSet<string>
+        {
+            "AK", "GrenadeLauncher", "Knife_1", "Knife_2", "Pistol", "Revolver", "Revolver_Small",
+            "RocketLauncher", "ShortCannon", "Shotgun", "Shovel", "SMG", "Sniper", "Sniper_2"
+        };
+
+        /// <summary>保留的主武器：AK 是这套模型里比例最正常的一把。</summary>
+        private const string PreferredWeapon = "AK";
+
         /// <summary>菜单入口：一键重建三个敌人的控制器与预制体。</summary>
         [MenuItem("RaidDemo/M7/重建敌人角色资产")]
         public static void BuildFromMenu()
@@ -201,6 +215,7 @@ namespace RaidDemo.Bootstrap.Editor
             // 解包后再改缩放：嵌套预制体实例上的覆盖在保存新预制体时可能被回退（M7-P-01）。
             PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
 
+            RemoveExtraWeapons(instance);
             var scale = FitToHeight(instance, TargetHeight);
             var animator = instance.AddComponent<Animator>();
             animator.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
@@ -213,6 +228,29 @@ namespace RaidDemo.Bootstrap.Editor
             Object.DestroyImmediate(container);
             AssetDatabase.SaveAssets();
             return $"{path} (scale={scale:F2})";
+        }
+
+        /// <summary>只保留一把主武器，其余武器节点删除。</summary>
+        private static void RemoveExtraWeapons(GameObject instance)
+        {
+            var toRemove = new List<GameObject>();
+            foreach (var child in instance.GetComponentsInChildren<Transform>(true))
+            {
+                if (child == instance.transform || !WeaponNodes.Contains(child.name))
+                {
+                    continue;
+                }
+
+                if (child.name != PreferredWeapon)
+                {
+                    toRemove.Add(child.gameObject);
+                }
+            }
+
+            foreach (var target in toRemove)
+            {
+                Object.DestroyImmediate(target);
+            }
         }
 
         private static float FitToHeight(GameObject instance, float targetHeight)
