@@ -58,6 +58,24 @@ namespace RaidDemo.Bootstrap.Editor
             Object.DestroyImmediate(body.GetComponent<Collider>());
             SetColor(body, new Color(0.25f, 0.6f, 0.95f));
 
+            // 头与朝向指示必须与战局里的角色一致：两个场景里「我」应当是同一个形象，
+            // 缺了头会让俯视下分不清正反，缺了朝向块则完全看不出在瞄哪边。
+            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            head.name = "Head";
+            head.transform.SetParent(player.transform, worldPositionStays: false);
+            head.transform.localPosition = new Vector3(0f, 1.4f, 0f);
+            head.transform.localScale = Vector3.one * 0.8f;
+            Object.DestroyImmediate(head.GetComponent<Collider>());
+            SetColor(head, new Color(0.85f, 0.72f, 0.2f));
+
+            var nose = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            nose.name = "FacingIndicator";
+            nose.transform.SetParent(player.transform, worldPositionStays: false);
+            nose.transform.localPosition = new Vector3(0f, 0.25f, 0.7f);
+            nose.transform.localScale = new Vector3(0.2f, 0.15f, 0.5f);
+            Object.DestroyImmediate(nose.GetComponent<Collider>());
+            SetColor(nose, new Color(0.95f, 0.35f, 0.2f));
+
             player.AddComponent<RaidDemo.Presentation.PlayerMotor>();
         }
 
@@ -120,7 +138,6 @@ namespace RaidDemo.Bootstrap.Editor
             string displayName,
             Vector3 position)
         {
-            host.transform.position = position;
             var marker = host.AddComponent<RaidDemo.Presentation.SafeHouseInteractable>();
             var serialized = new SerializedObject(marker);
             serialized.FindProperty("m_Kind").enumValueIndex = (int)kind;
@@ -292,6 +309,10 @@ namespace RaidDemo.Bootstrap.Editor
         {
             var host = new GameObject("Facility_Stash");
             host.transform.SetParent(parent, worldPositionStays: false);
+            // 先把宿主摆到设施位置，**再**创建子物体：子物体是按世界坐标造的，
+            // 若之后再挪宿主，子物体会被跟着推一次——表现为「设施被推到房间外面」，
+            // 而交互标记位置正确、提示照常出现，很难看出是哪一步错了。
+            host.transform.position = position;
 
             var box = CreateBox(
                 "StashBox",
@@ -308,6 +329,7 @@ namespace RaidDemo.Bootstrap.Editor
         {
             var host = new GameObject("Facility_Merchant");
             host.transform.SetParent(parent, worldPositionStays: false);
+            host.transform.position = position;
 
             var counter = CreateBox(
                 "Counter",
@@ -331,6 +353,7 @@ namespace RaidDemo.Bootstrap.Editor
         {
             var host = new GameObject("Facility_Exit");
             host.transform.SetParent(parent, worldPositionStays: false);
+            host.transform.position = position;
 
             var pad = CreateBox(
                 "Pad",
