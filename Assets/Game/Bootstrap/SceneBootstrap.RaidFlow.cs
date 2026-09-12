@@ -55,6 +55,12 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void UpdatePreparation()
         {
+            // 战局尚未开始时菜单需要鼠标；编辑器里点回窗口后不能被惯性锁回去。
+            if (RaidFlowController.Ensure().State == RaidFlowController.FlowState.MainMenu)
+            {
+                m_InputCollector?.ReleaseCursor();
+            }
+
             if (m_InventoryScreen == null || m_StashContainerId == 0)
             {
                 return;

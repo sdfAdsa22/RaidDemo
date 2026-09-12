@@ -131,6 +131,9 @@ namespace RaidDemo.UI
         public void SetVisible(bool visible)
         {
             m_IsVisible = visible;
+            // 菜单隐藏或重新显示时清掉"新游戏二次确认"，
+            // 否则返回菜单时会残留上一轮的确认文字。
+            ResetNewGameConfirm();
             if (m_Root != null)
             {
                 m_Root.gameObject.SetActive(visible);
@@ -176,6 +179,13 @@ namespace RaidDemo.UI
             // 否则在编辑器里点「退出」会毫无反应，看起来像坏了。
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
+                if (m_ConfirmNewGame)
+                {
+                    // 确认期间 Esc 先取消确认；直接退出会让玩家以为按钮坏了。
+                    ResetNewGameConfirm();
+                    return;
+                }
+
 #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;
 #else
@@ -186,6 +196,7 @@ namespace RaidDemo.UI
 
             if ((clicked && overContinue) || confirmed)
             {
+                ResetNewGameConfirm();
                 m_OnContinue.Invoke();
                 return;
             }

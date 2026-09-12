@@ -50,6 +50,7 @@ namespace RaidDemo.Bootstrap
         private bool m_PendingSprint;
         private SafeHouseInteractable m_Nearby;
         private SafeHouseUI m_Ui;
+        private RaidFlowController m_Flow;
 
         /// <summary>初始化顺序与战局一致：服务 → 命令 → 界面 → 表现。</summary>
         private void Awake()
@@ -104,6 +105,7 @@ namespace RaidDemo.Bootstrap
 
             // 启动时先显示极简主菜单（开始 / 退出）；从战局回来时直接进安全屋。
             var flow = RaidFlowController.Ensure();
+            m_Flow = flow;
             if (flow.State == RaidFlowController.FlowState.MainMenu)
             {
                 flow.ShowMainMenu();
@@ -149,6 +151,13 @@ namespace RaidDemo.Bootstrap
                 || (m_Ui != null && m_Ui.IsOpen)
                 || (m_MerchantScreen != null && m_MerchantScreen.IsOpen);
 
+            // 主菜单与结算界面属于"需要鼠标"的流程状态：
+            // 它们不是战局/安全屋里的操作面板，不能因为背包没开就锁光标。
+            var flow = m_Flow != null ? m_Flow : RaidFlowController.Ensure();
+            var needsMouse = flow.State == RaidFlowController.FlowState.MainMenu
+                || flow.State == RaidFlowController.FlowState.Result;
+            var uiBlocking = uiOpen || needsMouse;
+
             // 商人界面关闭后恢复背包的 Tab 输入；打开商人时会临时关掉它，
             // 避免两个全屏界面叠在一起。
             if (m_MerchantScreen != null
@@ -159,12 +168,21 @@ namespace RaidDemo.Bootstrap
                 m_InventoryScreen.InputEnabled = true;
             }
 
-            if (m_InputCollector != null && Application.isFocused && Cursor.lockState != CursorLockMode.Locked && !uiOpen)
+            var shouldLockCursor = CursorLockPolicy.ShouldLockCursor(uiOpen, needsMouse);
+            if (needsMouse)
+            {
+                // ReleaseCursor 不受"是否启用光标锁定"开关影响，能保证菜单一定可见。
+                m_InputCollector?.ReleaseCursor();
+            }
+            else if (shouldLockCursor
+                     && m_InputCollector != null
+                     && Application.isFocused
+                     && Cursor.lockState != CursorLockMode.Locked)
             {
                 m_InputCollector.SetCursorLock(true);
             }
 
-            if (uiOpen)
+            if (uiBlocking)
             {
                 m_MoveHandler.ClearIntent();
                 m_WeaponController?.SetTriggerHeld(false);
@@ -183,7 +201,7 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
             }
 
-            UpdateInteraction(uiOpen);
+            UpdateInteraction(uiBlocking);
         }
 
         /// <summary>
