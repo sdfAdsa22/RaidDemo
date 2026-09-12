@@ -260,11 +260,14 @@ namespace RaidDemo.UI
                 m_Root.SetActive(visible);
             }
 
-            // 打开界面时若有仓库、且当前没有别的东西占着右侧面板，就显示仓库。
-            // 放在这里而不是等装配层每帧来推：界面一打开就该是完整的样子。
+            // 打开界面时**如果什么容器都没指定**，就默认显示仓库（出击准备）。
+            //
+            // 条件必须是「当前没有打开任何容器」而不是「当前不是仓库」：
+            // 后者会把刚被显式打开的容器顶掉——在安全屋里按 E 开测试箱，
+            // 面板会立刻被替换成仓库，看起来就像「按 E 只会开仓库」。
             if (visible
                 && m_PrepStashContainerId > 0
-                && m_LootContainerId != m_PrepStashContainerId)
+                && m_LootContainerId == 0)
             {
                 OpenStash(m_PrepStashContainerId);
             }
