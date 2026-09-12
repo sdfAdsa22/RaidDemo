@@ -159,6 +159,18 @@ namespace RaidDemo.Bootstrap
             SaveNow();
             State = FlowState.SafeHouse;
             HideScreens();
+
+            // 主菜单可能出现两种场景：
+            // ① 启动场景 SafeHouse（菜单只是盖在上面）；
+            // ② 编辑器直接 Play 了 GreyboxRaid（SceneBootstrap 也会显示菜单）。
+            // 第二种情况下只切流程状态会留下一个 m_RaidActive=false 的战局场景，
+            // 看起来像游戏卡死。因此这里必须检查活动场景并真正加载安全屋。
+            var activeScene = SceneManager.GetActiveScene();
+            if (activeScene.name != SafeHouseSceneName)
+            {
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(SafeHouseSceneName);
+            }
         }
 
         /// <summary>
