@@ -50,9 +50,46 @@ namespace RaidDemo.Bootstrap.Editor
             Directory.CreateDirectory(ArtFolder);
             AssetDatabase.Refresh();
 
+            EnsureLoopingClips();
             var controllerPath = BuildController();
             var prefabPath = BuildPrefab(controllerPath);
             return $"controller={controllerPath}\nprefab={prefabPath}";
+        }
+
+        /// <summary>
+        /// 给循环类剪辑打开 Loop Time。
+        /// </summary>
+        /// <remarks>
+        /// 不打开的话，剪辑播放一次就停在最后一帧：角色位置仍被移动逻辑推着走，
+        /// 看起来就是"走两步之后开始滑步"。一次性动作（射击、倒地、拾取）必须保持不循环。
+        /// </remarks>
+        private static void EnsureLoopingClips()
+        {
+            var importer = AssetImporter.GetAtPath(ModelPath) as ModelImporter;
+            if (importer == null)
+            {
+                return;
+            }
+
+            var clips = importer.clipAnimations;
+            if (clips == null || clips.Length == 0)
+            {
+                clips = importer.defaultClipAnimations;
+            }
+
+            var looping = new HashSet<string> { "idle", "walk", "sprint", "holding-right", "holding-left", "holding-both" };
+            foreach (var clip in clips)
+            {
+                if (clip.name.StartsWith("__preview__"))
+                {
+                    continue;
+                }
+
+                clip.loopTime = looping.Contains(clip.name);
+            }
+
+            importer.clipAnimations = clips;
+            importer.SaveAndReimport();
         }
 
         /// <summary>创建动画控制器：Idle / ArmedIdle / Walk / Sprint / Shoot / Die。</summary>
@@ -155,7 +192,6 @@ namespace RaidDemo.Bootstrap.Editor
         private static string BuildPrefab(string controllerPath)
         {
             var path = ArtFolder + "/PlayerCharacter.prefab";
-            AssetDatabase.DeleteAsset(path);
 
             var model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
             var container = new GameObject("PlayerCharacter");

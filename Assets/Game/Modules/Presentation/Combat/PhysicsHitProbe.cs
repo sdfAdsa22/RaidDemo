@@ -1,5 +1,6 @@
 using RaidDemo.Combat;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace RaidDemo.Presentation
 {
@@ -15,12 +16,26 @@ namespace RaidDemo.Presentation
     {
         /// <summary>射线检测的层遮罩。默认检测所有层。</summary>
         private readonly int m_LayerMask;
+        private readonly bool m_LiftOriginToGround;
 
         /// <summary>创建射线检测实现。</summary>
         /// <param name="layerMask">层遮罩，默认检测所有层。</param>
         public PhysicsHitProbe(int layerMask = Physics.DefaultRaycastLayers)
+            : this(false, layerMask)
+        {
+        }
+
+        /// <summary>创建射线检测实现。</summary>
+        /// <param name="liftOriginToGround">
+        /// 是否把射线起点抬到"射手脚下的地面高度"。AI 的逻辑坐标只有平面（XZ），高度属于场景信息，
+        /// 不抬的话站在装卸平台上的敌人会把子弹从平台下方打出去，永远够不到平台上的目标。
+        /// 玩家开枪传入的已经是带高度的世界坐标，必须保持 false，否则会重复抬高。
+        /// </param>
+        /// <param name="layerMask">层遮罩，默认检测所有层。</param>
+        public PhysicsHitProbe(bool liftOriginToGround, int layerMask = Physics.DefaultRaycastLayers)
         {
             m_LayerMask = layerMask;
+            m_LiftOriginToGround = liftOriginToGround;
         }
 
         /// <inheritdoc />
@@ -30,6 +45,12 @@ namespace RaidDemo.Presentation
             if (maxDistance <= 0f)
             {
                 return false;
+            }
+
+            if (m_LiftOriginToGround
+                && NavMesh.SamplePosition(origin, out var navHit, 4f, NavMesh.AllAreas))
+            {
+                origin.y += navHit.position.y;
             }
 
             if (!Physics.Raycast(origin, direction, out var raycastHit, maxDistance, m_LayerMask))

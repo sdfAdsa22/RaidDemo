@@ -148,7 +148,9 @@ namespace RaidDemo.Bootstrap
 
             var pathfinding = new NavMeshPathfindingService();
             m_AiDirector = new AiDirector(
-                new PhysicsHitProbe(),
+                // AI 的逻辑坐标只有平面，射线起点要按射手脚下的导航网格高度抬起，
+                // 否则站在装卸平台上的敌人会贴着地面开枪，打不到平台上的玩家。
+                new PhysicsHitProbe(liftOriginToGround: true),
                 m_CombatWorld,
                 m_CombatTuning,
                 m_EventBus,
