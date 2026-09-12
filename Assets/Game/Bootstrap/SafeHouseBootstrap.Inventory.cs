@@ -76,6 +76,8 @@ namespace RaidDemo.Bootstrap
                 new BuyItemCommandHandler(m_Progress, m_ItemCatalog, m_TraderCatalog, m_EventBus));
             m_CommandRouter.Register<SellItemIntent>(
                 new SellItemCommandHandler(m_Progress, m_Registry, m_EventBus));
+            m_CommandRouter.Register<SellItemsIntent>(
+                new SellItemsCommandHandler(m_Progress, m_Registry, m_EventBus));
             m_CommandRouter.Register<QuestAcceptIntent>(
                 new QuestAcceptCommandHandler(m_Progress.Quests));
             m_CommandRouter.Register<QuestTrackIntent>(

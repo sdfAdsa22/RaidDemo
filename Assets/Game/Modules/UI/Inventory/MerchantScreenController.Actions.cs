@@ -30,7 +30,7 @@ namespace RaidDemo.UI
             m_StashView?.Refresh();
             RefreshShopRows();
             RefreshQuestRows();
-            RefreshSellPanel();
+            RefreshSellControls();
         }
 
         /// <summary>按当前页签显示对应内容。</summary>
@@ -39,11 +39,6 @@ namespace RaidDemo.UI
             if (m_BuyTabRoot != null)
             {
                 m_BuyTabRoot.gameObject.SetActive(m_ActiveTab == MerchantTab.Buy);
-            }
-
-            if (m_SellTabRoot != null)
-            {
-                m_SellTabRoot.gameObject.SetActive(m_ActiveTab == MerchantTab.Sell);
             }
 
             if (m_QuestTabRoot != null)

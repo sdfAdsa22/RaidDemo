@@ -31,6 +31,9 @@ namespace RaidDemo.UI
         private Image m_Outline;
         private Image m_Fill;
         private Text m_Label;
+        private Color m_BaseOutlineColor;
+        private Color m_BaseFillColor;
+        private bool m_Selected;
 
         /// <summary>本视图对应的物品实例。</summary>
         public ItemInstance Item { get; private set; }
@@ -68,15 +71,50 @@ namespace RaidDemo.UI
                 (sizeInCells.Height * cellSize) - (Padding * 2f));
 
             var color = RarityPalette.GetColor(item.Definition.Rarity);
+            m_BaseOutlineColor = new Color(color.r, color.g, color.b, OutlineAlpha);
+            m_BaseFillColor = new Color(
+                color.r * 0.45f, color.g * 0.45f, color.b * 0.45f, FillAlpha);
 
             m_Outline = EnsureImage("Outline", m_Rect, color);
-            m_Fill = EnsureImage("Fill", m_Outline.rectTransform, new Color(
-                color.r * 0.45f, color.g * 0.45f, color.b * 0.45f, FillAlpha));
+            m_Fill = EnsureImage("Fill", m_Outline.rectTransform, m_BaseFillColor);
             StretchToParent(m_Fill.rectTransform, 2f);
-            m_Outline.color = new Color(color.r, color.g, color.b, OutlineAlpha);
+            m_Outline.color = m_BaseOutlineColor;
             StretchToParent(m_Outline.rectTransform, 0f);
 
             m_Label = EnsureLabel("Label", m_Outline.rectTransform);
+            RefreshSelectionVisual();
+        }
+
+        /// <summary>
+        /// 设置选中高亮。
+        /// </summary>
+        /// <remarks>
+        /// 批量出售模式下，玩家需要一眼看出"哪些已经选进来了"。
+        /// 高亮只改变描边与填充色，不改变物品本身的数据。
+        /// </remarks>
+        public void SetSelected(bool selected)
+        {
+            m_Selected = selected;
+            RefreshSelectionVisual();
+        }
+
+        private void RefreshSelectionVisual()
+        {
+            if (m_Outline == null || m_Fill == null)
+            {
+                return;
+            }
+
+            if (!m_Selected)
+            {
+                m_Outline.color = m_BaseOutlineColor;
+                m_Fill.color = m_BaseFillColor;
+                return;
+            }
+
+            var selection = new Color(0.35f, 0.95f, 0.45f, 1f);
+            m_Outline.color = selection;
+            m_Fill.color = new Color(selection.r * 0.55f, selection.g * 0.55f, selection.b * 0.55f, FillAlpha);
         }
 
         /// <summary>刷新数量与名称文本。</summary>

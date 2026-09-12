@@ -109,6 +109,83 @@ namespace RaidDemo.Shared
         }
     }
 
+    /// <summary>批量出售里的一个物品引用：同一容器内的格子坐标。</summary>
+    /// <remarks>
+    /// 只写坐标而不是物品对象：服务端据此在权威仓库里查找物品，
+    /// 客户端无法凭空构造物品或指定价格。
+    /// </remarks>
+    public readonly struct SellItemRef
+    {
+        /// <summary>创建物品引用。</summary>
+        public SellItemRef(int cellX, int cellY)
+        {
+            CellX = cellX;
+            CellY = cellY;
+        }
+
+        /// <summary>物品所在格的横坐标。</summary>
+        public int CellX { get; }
+
+        /// <summary>物品所在格的纵坐标。</summary>
+        public int CellY { get; }
+    }
+
+    /// <summary>批量出售仓库物品。</summary>
+    /// <remarks>
+    /// <para>批量命令存在的意义不只是少发几条消息，而是**原子结算**：
+    /// 多件物品要么一起卖出，要么一件都不卖。若在界面层循环派发单件出售命令，
+    /// 中途一件失败就会出现"卖了一半、钱也只加了一半"的状态，
+    /// 自动存档还可能把这种中间状态写盘。</para>
+    /// </remarks>
+    public readonly struct SellItemsIntent : IGameCommand
+    {
+        /// <summary>命令类型标识。</summary>
+        public const string TypeId = "meta.sell_items";
+
+        /// <summary>创建批量出售意图。</summary>
+        public SellItemsIntent(
+            int playerId,
+            int containerId,
+            SellItemRef[] items,
+            uint sequence = 0u)
+        {
+            PlayerId = playerId;
+            ContainerId = containerId;
+            Items = items ?? new SellItemRef[0];
+            Sequence = sequence;
+        }
+
+        /// <inheritdoc />
+        public string CommandType
+        {
+            get { return TypeId; }
+        }
+
+        /// <inheritdoc />
+        public int PlayerId { get; }
+
+        /// <inheritdoc />
+        public uint Sequence { get; }
+
+        /// <inheritdoc />
+        public double Timestamp
+        {
+            get { return 0d; }
+        }
+
+        /// <summary>物品所在容器 ID。必须允许交易，当前只接受仓库。</summary>
+        public int ContainerId { get; }
+
+        /// <summary>要出售的物品格坐标列表。</summary>
+        public SellItemRef[] Items { get; }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            return $"SellItemsIntent(P{PlayerId}, c{ContainerId}, {Items.Length} 件)";
+        }
+    }
+
     /// <summary>接取任务。</summary>
     public readonly struct QuestAcceptIntent : IGameCommand
     {

@@ -126,5 +126,67 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(10000, m_Progress.Money);
             Assert.AreEqual(1, m_Progress.Loadout.Backpack.Items.Count);
         }
+
+        [Test]
+        public void 批量出售一次结算全部物品()
+        {
+            var bolt = m_Factory.Create(m_Bolt, 5);
+            var ammo = m_Factory.Create(m_Ammo, 30);
+            m_Progress.Stash.AutoPlace(bolt);
+            m_Progress.Stash.AutoPlace(ammo);
+            m_Progress.Stash.TryGetOrigin(bolt, out var boltOrigin);
+            m_Progress.Stash.TryGetOrigin(ammo, out var ammoOrigin);
+
+            var handler = new SellItemsCommandHandler(m_Progress, m_Registry, m_EventBus);
+            var result = handler.Execute(new SellItemsIntent(0, m_StashId, new[]
+            {
+                new SellItemRef(boltOrigin.X, boltOrigin.Y),
+                new SellItemRef(ammoOrigin.X, ammoOrigin.Y),
+            }));
+
+            var expected = TraderPricing.GetSellPrice(m_Bolt, 5)
+                + TraderPricing.GetSellPrice(m_Ammo, 30);
+            Assert.IsTrue(result.Success, result.Message);
+            Assert.AreEqual(10000 + expected, m_Progress.Money);
+            Assert.AreEqual(0, m_Progress.Stash.Items.Count);
+        }
+
+        [Test]
+        public void 批量出售包含无效格子时不改钱也不扣物()
+        {
+            var bolt = m_Factory.Create(m_Bolt, 1);
+            m_Progress.Stash.AutoPlace(bolt);
+            m_Progress.Stash.TryGetOrigin(bolt, out var origin);
+
+            var handler = new SellItemsCommandHandler(m_Progress, m_Registry, m_EventBus);
+            var result = handler.Execute(new SellItemsIntent(0, m_StashId, new[]
+            {
+                new SellItemRef(origin.X, origin.Y),
+                new SellItemRef(9, 7),
+            }));
+
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual(10000, m_Progress.Money, "有无效格子时不能扣钱。");
+            Assert.AreEqual(1, m_Progress.Stash.Items.Count, "有无效格子时不能卖出一部分。");
+        }
+
+        [Test]
+        public void 批量出售重复引用同一格只结算一次()
+        {
+            var bolt = m_Factory.Create(m_Bolt, 3);
+            m_Progress.Stash.AutoPlace(bolt);
+            m_Progress.Stash.TryGetOrigin(bolt, out var origin);
+
+            var handler = new SellItemsCommandHandler(m_Progress, m_Registry, m_EventBus);
+            var result = handler.Execute(new SellItemsIntent(0, m_StashId, new[]
+            {
+                new SellItemRef(origin.X, origin.Y),
+                new SellItemRef(origin.X, origin.Y),
+            }));
+
+            Assert.IsTrue(result.Success, result.Message);
+            Assert.AreEqual(10000 + TraderPricing.GetSellPrice(m_Bolt, 3), m_Progress.Money);
+            Assert.AreEqual(0, m_Progress.Stash.Items.Count);
+        }
     }
 }

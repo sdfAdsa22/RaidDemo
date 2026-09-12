@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
@@ -73,10 +74,19 @@ namespace RaidDemo.UI
         private Text m_StatusLabel;
         private float m_StatusRemaining;
 
-        private ItemInstance m_SelectedStashItem;
-        private GridPoint m_SelectedStashCell;
-        private ItemInstance m_PendingSellItem;
-        private GridPoint m_PendingSellCell;
+        /// <summary>是否处于批量出售模式。</summary>
+        private bool m_SellMode;
+
+        /// <summary>批量出售模式下已选中的物品。</summary>
+        private readonly List<SellCandidate> m_SellSelection = new List<SellCandidate>();
+
+        /// <summary>右键菜单当前指向的物品。</summary>
+        private ItemInstance m_ContextItem;
+        private GridPoint m_ContextCell;
+
+        /// <summary>等待二次确认的出售引用与总价。</summary>
+        private SellItemRef[] m_PendingSellRefs;
+        private int m_PendingSellTotal;
 
         /// <summary>界面是否打开。装配层据此冻结角色输入。</summary>
         public bool IsOpen
@@ -112,6 +122,7 @@ namespace RaidDemo.UI
                 m_Progress.Changed += OnMetaChanged;
             }
 
+            ExitSellMode();
             RefreshAll();
             SetVisible(false);
         }
@@ -124,6 +135,7 @@ namespace RaidDemo.UI
                 return;
             }
 
+            ExitSellMode();
             RefreshAll();
             SetVisible(true);
         }
@@ -137,7 +149,8 @@ namespace RaidDemo.UI
             }
 
             CancelSellConfirm();
-            ClearSelection();
+            CloseSellMenu();
+            ExitSellMode();
             SetVisible(false);
         }
 
@@ -172,6 +185,14 @@ namespace RaidDemo.UI
                 {
                     CancelSellConfirm();
                 }
+                else if (m_SellMenuRoot != null && m_SellMenuRoot.activeSelf)
+                {
+                    CloseSellMenu();
+                }
+                else if (m_SellMode)
+                {
+                    ExitSellMode();
+                }
                 else
                 {
                     Close();
@@ -192,19 +213,31 @@ namespace RaidDemo.UI
                 return;
             }
 
+            if (m_SellMenuRoot != null && m_SellMenuRoot.activeSelf)
+            {
+                UpdateSellMenuInput(pointer);
+                return;
+            }
+
+            UpdateSellControlsInput(pointer);
+            if (m_SellMode)
+            {
+                UpdateSellModeInput(pointer);
+                return;
+            }
+
             UpdateTabInput(pointer);
             if (m_ActiveTab == MerchantTab.Buy)
             {
                 UpdateBuyInput(pointer);
             }
-            else if (m_ActiveTab == MerchantTab.Sell)
-            {
-                UpdateSellInput(pointer);
-            }
             else
             {
                 UpdateQuestInput(pointer);
             }
+
+            // 非出售模式下，右键仓库物品弹出出售菜单。
+            TryOpenSellMenu(pointer);
         }
 
         private void SetVisible(bool visible)
@@ -239,10 +272,5 @@ namespace RaidDemo.UI
             m_StatusRemaining = StatusSeconds;
         }
 
-        private void ClearSelection()
-        {
-            m_SelectedStashItem = null;
-            m_SelectedStashCell = default;
-        }
     }
 }

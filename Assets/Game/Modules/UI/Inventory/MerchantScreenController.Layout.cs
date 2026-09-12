@@ -19,8 +19,7 @@ namespace RaidDemo.UI
         private enum MerchantTab
         {
             Buy = 0,
-            Sell = 1,
-            Quest = 2,
+            Quest = 1,
         }
 
         /// <summary>页签按钮。</summary>
@@ -58,11 +57,13 @@ namespace RaidDemo.UI
 
         private MerchantTab m_ActiveTab = MerchantTab.Buy;
         private RectTransform m_BuyTabRoot;
-        private RectTransform m_SellTabRoot;
         private RectTransform m_QuestTabRoot;
-        private Text m_SellSelectionLabel;
-        private Text m_SellDetailLabel;
-        private RaidButtonWidget m_SellButton;
+        private Text m_SellInfoLabel;
+        private RaidButtonWidget m_SellToggleButton;
+        private RaidButtonWidget m_SellCancelButton;
+        private GameObject m_SellMenuRoot;
+        private RaidButtonWidget m_SellMenuButton;
+        private RaidButtonWidget m_SellMenuCancelButton;
         private GameObject m_ConfirmRoot;
         private Text m_ConfirmLabel;
         private RaidButtonWidget m_ConfirmButton;
@@ -93,9 +94,10 @@ namespace RaidDemo.UI
 
             BuildTabs(panel);
             BuildBuyTab(panel);
-            BuildSellTab(panel);
             BuildQuestTab(panel);
             BuildStashView(panel);
+            BuildSellControls(panel);
+            BuildSellContextMenu(panel);
             BuildConfirmPanel(panel);
 
             m_StatusLabel = RaidScreenFactory.CreateLabel(
@@ -109,7 +111,7 @@ namespace RaidDemo.UI
         /// <summary>顶部三个页签按钮。</summary>
         private void BuildTabs(RectTransform panel)
         {
-            var captions = new[] { "购买", "出售", "任务" };
+            var captions = new[] { "购买", "任务" };
             for (var i = 0; i < captions.Length; i++)
             {
                 var button = RaidScreenFactory.CreateButton(
@@ -170,31 +172,49 @@ namespace RaidDemo.UI
             }
         }
 
-        /// <summary>出售页：选中物品信息与出售按钮。</summary>
-        private void BuildSellTab(RectTransform panel)
+        /// <summary>仓库下方的常驻出售入口：右键快捷出售 + 批量出售模式。</summary>
+        private void BuildSellControls(RectTransform panel)
         {
-            var host = CreateTabRoot(panel, "SellTab");
-            m_SellTabRoot = host;
+            m_SellInfoLabel = RaidScreenFactory.CreateLabel(
+                panel, "右键仓库物品可直接出售；点击「出售」可多选批量出售。",
+                new Vector2(900f, 566f), new Vector2(560f, 24f),
+                15, TextAnchor.MiddleLeft, DimColor);
 
-            RaidScreenFactory.CreateLabel(
-                host, "在右侧仓库中左键选择物品，右键可直接出售。",
-                new Vector2(0f, 70f), new Vector2(820f, 26f),
-                16, TextAnchor.MiddleLeft, DimColor);
-
-            m_SellSelectionLabel = RaidScreenFactory.CreateLabel(
-                host, "未选择物品",
-                new Vector2(0f, 110f), new Vector2(820f, 30f),
-                20, TextAnchor.MiddleLeft, TextColor);
-
-            m_SellDetailLabel = RaidScreenFactory.CreateLabel(
-                host, string.Empty,
-                new Vector2(0f, 148f), new Vector2(820f, 26f),
-                16, TextAnchor.MiddleLeft, DimColor);
-
-            m_SellButton = RaidScreenFactory.CreateButton(
-                host, "出售选中物品",
-                new Vector2(0f, 200f), new Vector2(180f, 46f),
+            m_SellToggleButton = RaidScreenFactory.CreateButton(
+                panel, "出售",
+                new Vector2(900f, 598f), new Vector2(170f, 44f),
                 ButtonColor, ButtonHoverColor);
+
+            m_SellCancelButton = RaidScreenFactory.CreateButton(
+                panel, "取消",
+                new Vector2(1086f, 598f), new Vector2(120f, 44f),
+                DisabledColor, TabHoverColor);
+            m_SellCancelButton.Rect.gameObject.SetActive(false);
+        }
+
+        /// <summary>右键物品后弹出的出售菜单。</summary>
+        private void BuildSellContextMenu(RectTransform panel)
+        {
+            var host = new GameObject("SellMenu", typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)host.transform;
+            rect.SetParent(panel, worldPositionStays: false);
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.sizeDelta = new Vector2(180f, 92f);
+            host.GetComponent<Image>().color = ConfirmPanelColor;
+
+            m_SellMenuButton = RaidScreenFactory.CreateButton(
+                rect, "出售",
+                new Vector2(10f, 8f), new Vector2(160f, 36f),
+                ButtonColor, ButtonHoverColor);
+            m_SellMenuCancelButton = RaidScreenFactory.CreateButton(
+                rect, "取消",
+                new Vector2(10f, 48f), new Vector2(160f, 36f),
+                DisabledColor, TabHoverColor);
+
+            m_SellMenuRoot = host;
+            host.SetActive(false);
         }
 
         /// <summary>任务页：五个固定任务。</summary>
