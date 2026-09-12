@@ -129,5 +129,24 @@ namespace RaidDemo.Input
             var keyboard = Keyboard.current;
             return keyboard != null && keyboard.hKey.wasPressedThisFrame;
         }
+
+        /// <summary>
+        /// 读取本帧的暂停输入（默认 Esc）。
+        /// </summary>
+        /// <returns>本帧是否按下了暂停键。</returns>
+        /// <remarks>
+        /// 暂停键与医疗键一样直接读键盘：它只有一个绑定，不值得新增输入动作。
+        /// 脚本化输入模式下返回 false，保持测试输入完全可控。
+        /// </remarks>
+        public bool ReadPauseIntent()
+        {
+            if (UseScriptedInput)
+            {
+                return false;
+            }
+
+            var keyboard = Keyboard.current;
+            return keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
+        }
     }
 }

@@ -147,13 +147,34 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            var flow = m_Flow != null ? m_Flow : RaidFlowController.Ensure();
+            var escapePressed = m_InputCollector != null && m_InputCollector.ReadPauseIntent();
+
+            if (flow.IsPaused)
+            {
+                if (escapePressed)
+                {
+                    flow.ResumeFromPause();
+                }
+
+                return;
+            }
+
             var uiOpen = (m_InventoryScreen != null && m_InventoryScreen.IsOpen)
                 || (m_Ui != null && m_Ui.IsOpen)
                 || (m_MerchantScreen != null && m_MerchantScreen.IsOpen);
 
+            // 安全屋里按 Esc 打开暂停菜单；界面打开时 Esc 先交给界面自己处理。
+            if (!uiOpen
+                && flow.State == RaidFlowController.FlowState.SafeHouse
+                && escapePressed)
+            {
+                flow.ShowPauseMenu(warnAbandon: false);
+                return;
+            }
+
             // 主菜单与结算界面属于"需要鼠标"的流程状态：
             // 它们不是战局/安全屋里的操作面板，不能因为背包没开就锁光标。
-            var flow = m_Flow != null ? m_Flow : RaidFlowController.Ensure();
             var needsMouse = flow.State == RaidFlowController.FlowState.MainMenu
                 || flow.State == RaidFlowController.FlowState.Result;
             var uiBlocking = uiOpen || needsMouse;

@@ -113,6 +113,7 @@ namespace RaidDemo.Bootstrap
 
             m_ResultScreen = gameObject.AddComponent<RaidResultScreen>();
             m_ResultScreen.Initialize(GoToSafeHouse);
+            InitializePauseMenu();
             HookProgress(Progress);
         }
 
@@ -125,6 +126,7 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public void ShowMainMenu()
         {
+            HidePauseMenu();
             State = FlowState.MainMenu;
             Time.timeScale = 0f;
             m_ResultScreen.SetVisible(false);
@@ -208,6 +210,7 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public void ShowResult(RaidResult result, string questSummary = null)
         {
+            HidePauseMenu();
             State = FlowState.Result;
             m_MenuScreen.SetVisible(false);
             m_ResultScreen.Show(result, questSummary);
@@ -218,6 +221,7 @@ namespace RaidDemo.Bootstrap
         /// <summary>隐藏全部流程界面（进入战局时调用）。</summary>
         public void HideScreens()
         {
+            HidePauseMenu();
             m_MenuScreen.SetVisible(false);
             m_ResultScreen.SetVisible(false);
             Time.timeScale = 1f;

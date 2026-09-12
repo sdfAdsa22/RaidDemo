@@ -148,6 +148,20 @@ namespace RaidDemo.Bootstrap
 
         private void Update()
         {
+            var flow = RaidFlowController.Ensure();
+            var escapePressed = m_InputCollector != null && m_InputCollector.ReadPauseIntent();
+
+            if (flow.IsPaused)
+            {
+                // 暂停期间只接受"继续"；其它输入全部冻结。
+                if (escapePressed)
+                {
+                    flow.ResumeFromPause();
+                }
+
+                return;
+            }
+
             // 主菜单状态下战局逻辑一律不推进：菜单只是「站在地图上的一个界面」，
             // 此时角色不该移动、敌人不该思考、计时不该走。
             if (m_MoveHandler == null || !m_RaidActive)
@@ -157,8 +171,13 @@ namespace RaidDemo.Bootstrap
             }
 
             var inventoryOpen = m_InventoryScreen != null && m_InventoryScreen.IsOpen;
-            var flowState = RaidFlowController.Ensure().State;
-            var resultOpen = flowState == RaidFlowController.FlowState.Result;
+            var resultOpen = flow.State == RaidFlowController.FlowState.Result;
+
+            if (!inventoryOpen && !resultOpen && escapePressed)
+            {
+                flow.ShowPauseMenu(warnAbandon: true);
+                return;
+            }
 
             // 阵亡期间也屏蔽操作：否则玩家在倒计时里还能跑动与开枪，
             // 会让"已经死了"这件事完全无法从画面上看出来。
