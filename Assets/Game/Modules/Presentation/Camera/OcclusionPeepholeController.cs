@@ -17,6 +17,11 @@ namespace RaidDemo.Presentation
     ///
     /// <para><b>角色不可见时半径写 0：</b>着色器只在半径大于 0 时判定，
     /// 因此角色不在镜头里、或功能被关掉时不会有任何像素被丢弃。</para>
+    ///
+    /// <para><b>为什么还要一道「真遮挡」闸门：</b>着色器只比较「这个像素比角色胸口更近」，
+    /// 于是墙顶的边缘、平台顶面这类只是**擦过**视线、并没有真正挡住角色的面也会被抠出洞，
+    /// 看起来像"没被遮挡却透明了"。因此在写半径之前先做一次 CPU 判定：
+    /// 从相机朝角色身上打三条射线（头 / 胸 / 膝），至少两条被挡才认为角色真的被遮挡。</para>
     /// </remarks>
     [DisallowMultipleComponent]
     public sealed class OcclusionPeepholeController : MonoBehaviour
@@ -43,6 +48,28 @@ namespace RaidDemo.Presentation
         /// <summary>功能开关。关掉后立即收孔，便于对照排查。</summary>
         [SerializeField] private bool m_Enabled = true;
 
+        /// <summary>
+        /// 闸门采样点相对角色根节点的高度（米）：头、胸、膝。
+        /// </summary>
+        /// <remarks>三点分别覆盖上、中、下三段身体：只挡住膝盖（比如躲在矮墙后）时角色仍然露着上身，
+        /// 不需要开孔；只有两处以上被挡才说明"看不见人了"。</remarks>
+        private static readonly float[] GateSampleHeights = { 1.5f, 0.95f, 0.35f };
+
+        /// <summary>至少几个采样点被挡住才开孔。</summary>
+        [SerializeField] private int m_GateRequiredHits = 2;
+
+        /// <summary>射线在角色身前留出的余量（米），避免把角色自己的碰撞体算成遮挡。</summary>
+        [SerializeField] private float m_GateMargin = 0.4f;
+
+        /// <summary>参与遮挡判定的层。默认全部；敌人与角色自身在代码里被排除。</summary>
+        [SerializeField] private LayerMask m_OccluderMask = ~0;
+
+        /// <summary>射线命中缓冲，避免每帧分配。</summary>
+        private readonly RaycastHit[] m_GateHits = new RaycastHit[8];
+
+        /// <summary>本帧闸门判定结果：角色是否真的被挡住。供调试与验收读取。</summary>
+        public bool IsOccluded { get; private set; }
+
         /// <summary>绑定跟随目标与相机。</summary>
         public void Bind(Transform target, Camera camera)
         {
@@ -59,6 +86,7 @@ namespace RaidDemo.Presentation
         {
             if (!m_Enabled)
             {
+                IsOccluded = false;
                 ClearPeephole();
                 return;
             }
@@ -67,11 +95,89 @@ namespace RaidDemo.Presentation
             if (m_Target == null || camera == null
                 || !TryResolvePeephole(camera, m_Target.position, m_TargetHeightOffset, m_RadiusScreenHeightRatio, out var parameters))
             {
+                IsOccluded = false;
+                ClearPeephole();
+                return;
+            }
+
+            // 闸门：角色没被真正挡住就不开孔。
+            IsOccluded = IsTargetOccluded(camera, m_Target);
+            if (!IsOccluded)
+            {
                 ClearPeephole();
                 return;
             }
 
             Shader.SetGlobalVector(PeepholeParamsId, parameters);
+        }
+
+        /// <summary>
+        /// 判定角色是否被不透明物体挡住：对头 / 胸 / 膝三个采样点各打一条射线，统计被挡数量。
+        /// </summary>
+        /// <remarks>
+        /// <para>角色自身的碰撞体与其它单位（敌人）不算遮挡：前者会把角色判成"永远被挡住"，
+        /// 后者会让玩家把敌人当掩体看穿——都不合理。</para>
+        /// <para>射线在角色身前留 <see cref="m_GateMargin"/> 的余量，避免贴着身体的面被算成遮挡。</para>
+        /// </remarks>
+        private bool IsTargetOccluded(Camera camera, Transform target)
+        {
+            var origin = camera.transform.position;
+            var hits = 0;
+            for (var i = 0; i < GateSampleHeights.Length; i++)
+            {
+                var sample = target.position + (Vector3.up * GateSampleHeights[i]);
+                if (IsBlocked(origin, sample))
+                {
+                    hits++;
+                }
+            }
+
+            return hits >= Mathf.Clamp(m_GateRequiredHits, 1, GateSampleHeights.Length);
+        }
+
+        /// <summary>判断相机到某个采样点之间是否存在有效遮挡。</summary>
+        private bool IsBlocked(Vector3 origin, Vector3 point)
+        {
+            var delta = point - origin;
+            var distance = delta.magnitude;
+            if (distance <= m_GateMargin + 0.05f)
+            {
+                return false;
+            }
+
+            var count = Physics.RaycastNonAlloc(
+                origin,
+                delta / distance,
+                m_GateHits,
+                distance - m_GateMargin,
+                m_OccluderMask,
+                QueryTriggerInteraction.Ignore);
+
+            for (var i = 0; i < count; i++)
+            {
+                var collider = m_GateHits[i].collider;
+                if (collider == null || IsTargetCollider(collider))
+                {
+                    continue;
+                }
+
+                // 敌人不算遮挡物：否则玩家躲在敌人背后就能看穿它。
+                if (collider.GetComponentInParent<EnemyAgentView>() != null)
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>该碰撞体是否属于跟随目标自身。</summary>
+        private bool IsTargetCollider(Collider collider)
+        {
+            var candidate = collider.transform;
+            return m_Target != null && (candidate == m_Target || candidate.IsChildOf(m_Target));
         }
 
         /// <summary>
