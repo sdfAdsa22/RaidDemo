@@ -71,6 +71,14 @@ namespace RaidDemo.Bootstrap
                 targetView.Initialize(m_PlayerCombatantId, colorFeedback: false);
             }
 
+            // 弹道与枪声：与战局一样挂在同一个「战斗效果」节点上。
+            // 它们都只订阅开火事件，因此拿到事件总线就能工作。
+            var effectsHost = new GameObject("CombatEffects");
+            effectsHost.transform.SetParent(transform, worldPositionStays: false);
+            effectsHost.AddComponent<TracerRenderer>().Bind(m_EventBus);
+            var weaponAudio = effectsHost.AddComponent<WeaponAudioPlayer>();
+            weaponAudio.Bind(m_EventBus);
+
             var viewHost = new GameObject("PlayerWeaponView");
             viewHost.transform.SetParent(transform, worldPositionStays: false);
             m_WeaponView = viewHost.AddComponent<PlayerWeaponView>();
