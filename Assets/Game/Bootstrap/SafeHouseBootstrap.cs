@@ -184,6 +184,11 @@ namespace RaidDemo.Bootstrap
 
             m_WeaponController.SetTriggerHeld(wantsToFire);
             UpdateWeaponPresentation();
+
+            // 控制器的时间推进必须每帧调用：射速间隔与换弹进度都在它内部累计，
+            // 不推进的话「按 R 没反应、开枪也不响」——而界面上看不出任何异常。
+            m_WeaponController.Tick(Time.deltaTime);
+
             if (!wantsToFire)
             {
                 return;

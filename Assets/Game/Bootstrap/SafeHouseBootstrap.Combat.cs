@@ -98,6 +98,17 @@ namespace RaidDemo.Bootstrap
         private void UpdateWeaponPresentation()
         {
             var weapon = m_Loadout?.Equipment?.Get(EquipmentSlot.PrimaryWeapon);
+
+            // 必须把「手上是什么武器」同步给控制器：弹匣容量、装弹、射速全部由它管理。
+            // 漏掉这一步的症状很有迷惑性——界面上武器名是有的（那是这里直接读装备槽显示的），
+            // 但弹药数是「-- / --」、按 R 没反应、开枪也打不响。
+            var stats = weapon?.Definition?.WeaponStats;
+            if (m_WeaponController.SyncEquippedWeapon(stats) && stats != null)
+            {
+                // 准星最大距离由当前武器射程决定，与战局同一条规则。
+                m_InputCollector?.SetMaxAimDistance(stats.RangeMeters);
+            }
+
             if (!ReferenceEquals(weapon, m_LastShownWeapon))
             {
                 m_LastShownWeapon = weapon;
