@@ -20,8 +20,15 @@ namespace RaidDemo.UI
     /// </remarks>
     public sealed partial class InventoryScreenController
     {
-        /// <summary>菜单宽度（像素）。</summary>
-        private const float MenuWidth = 200f;
+        /// <summary>
+        /// 菜单宽度（像素）。
+        /// </summary>
+        /// <remarks>
+        /// 取 100：菜单项只有两三个字，宽度收到刚好容纳文字即可。
+        /// 之前 200 宽是为了好看，实际观感是「一块横着的板子压在背包上」，
+        /// 反而挡住更多格子。
+        /// </remarks>
+        private const float MenuWidth = 100f;
 
         /// <summary>单行高度（像素）。</summary>
         private const float MenuRowHeight = 30f;
