@@ -60,8 +60,15 @@ namespace RaidDemo.Bootstrap
         /// <summary>弹药挂的格数。固定为一行，横向排列。</summary>
         [SerializeField] private int m_AmmoPouchCells = 5;
 
-        /// <summary>承载上限（千克）。取值依据见 EncumbranceProfile.CapacityKg 的说明。</summary>
-        [SerializeField] private float m_CarryCapacityKg = 20f;
+        /// <summary>
+        /// 承载上限（千克）。
+        /// </summary>
+        /// <remarks>
+        /// 从 20 提高到 50：旧值下一套基础装备（步枪 + 头盔 + 背心 ≈ 14.7 kg）就已经进入重装，
+        /// 玩家还没开始搜刮就跑不动了。50 kg 让「穿装备」与「装战利品」不再互相挤占，
+        /// 而贪婪的代价仍然由重量与速度承担。
+        /// </remarks>
+        [SerializeField] private float m_CarryCapacityKg = 50f;
 
         private EventBus m_EventBus;
         private ServiceLocator m_Services;

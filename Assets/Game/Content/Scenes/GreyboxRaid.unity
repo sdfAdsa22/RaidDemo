@@ -1549,7 +1549,7 @@ MonoBehaviour:
   m_ItemCatalog: {fileID: 11400000, guid: c78f8df07b1aa304db6a2ad2574712f9, type: 2}
   m_BackpackSize: {x: 5, y: 5}
   m_AmmoPouchCells: 5
-  m_CarryCapacityKg: 20
+  m_CarryCapacityKg: 50
 --- !u!114 &128994743
 MonoBehaviour:
   m_ObjectHideFlags: 0

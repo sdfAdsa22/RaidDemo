@@ -21,7 +21,7 @@ namespace RaidDemo.Inventory
         /// 再塞一件值钱小物件就会越过上限。上限必须落在"稍微贪一点就会超"的位置，
         /// 否则负重系统在对局里永远看不出效果。
         /// </remarks>
-        public float CapacityKg = 20f;
+        public float CapacityKg = 50f;
 
         /// <summary>
         /// 超重的衰减跨度：从 1.0 倍上限衰减到 1.5 倍上限触底。

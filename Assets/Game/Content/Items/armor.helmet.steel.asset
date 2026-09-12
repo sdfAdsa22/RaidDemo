@@ -18,7 +18,7 @@ MonoBehaviour:
   m_Rarity: 1
   m_Width: 2
   m_Height: 2
-  m_WeightKg: 2
+  m_WeightKg: 1.2
   m_BaseValue: 4500
   m_MaxStack: 1
   m_CanRotate: 0

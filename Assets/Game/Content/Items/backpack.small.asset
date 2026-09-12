@@ -23,6 +23,6 @@ MonoBehaviour:
   m_MaxStack: 1
   m_CanRotate: 0
   m_IsContainer: 1
-  m_ContainerWidth: 4
-  m_ContainerHeight: 4
+  m_ContainerWidth: 6
+  m_ContainerHeight: 6
   m_Behavior: {fileID: 0}
