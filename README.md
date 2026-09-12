@@ -377,12 +377,15 @@
 | [Quaternius Toon Shooter Game Kit](https://quaternius.com/packs/toonshootergamekit.html) | AI 敌人、木箱 / 纸箱 / 铁丝网 / 沙袋、远景工业建筑 | CC0 | quaternius.com |
 | [Kenney City Kit (Industrial)](https://kenney.nl/assets/city-kit-industrial) | 集装箱堆场（shipping-container-a/b/c）与水塔 / 储罐 | CC0 | kenney.nl |
 | [Kenney Nature Kit](https://kenney.nl/assets/nature-kit) | 地图外圈远景山脊（cliff / rock 模块） | CC0 | kenney.nl |
-| [Broken Vector Low Poly Cliff Pack](https://brokenvector.itch.io/low-poly-cliff-pack) | 盆地主墙的悬崖装饰瓦片 | 免费商用，**未授权再分发原始文件** | brokenvector.itch.io |
+| [Broken Vector Low Poly Cliff Pack](https://brokenvector.itch.io/low-poly-cliff-pack) | 盆地主墙的悬崖装饰瓦片 | 免费商用；**作者在官方群说明允许分发**（包内无授权文件，说明见包内 `AUTHORIZATION.md`） | brokenvector.itch.io |
 | [Fertile Soil Modular Terrain](https://itch.io/) | 草地色板与模块化造型参考 | CC0 | itch.io |
 
-> **关于 Broken Vector**：该资源包的授权允许在游戏中使用，但**不允许把原始文件再分发到公开仓库**。
-> 因此它的原始文件只存在于本机的候选暂存区（`Assets/Game/Content/External/_Inbox/`，已被 `.gitignore` 忽略），
-> 场景生成器在找不到该素材时会自动回退为纯程序化土墙——**别人克隆仓库后依然能得到一张完整可玩的地图**。
+> **关于 Broken Vector**：该包的原始文件里**没有任何 license / readme**，早期按 itch 资源页与惯例推断的
+> "未授权再分发"已经不成立——**作者在官方交流群中说明允许分发，项目负责人于 2026-09-12 确认**。
+> 现在它作为正式素材随仓库提交（见 `Assets/Game/Content/External/BrokenVector/CliffPack/AUTHORIZATION.md`）。
+>
+> 场景生成器同时保留了"素材缺失时回退为程序化土墙"的路径：换素材版本、或别人只拿了部分素材包时，
+> **克隆仓库后依然能得到一张完整可玩的地图**。
 
 > 批次 0 启用了 **Git LFS**（见 [ADR-006](Docs/Decisions/ADR-006-采用GitLFS管理大型美术资源.md)）。
 

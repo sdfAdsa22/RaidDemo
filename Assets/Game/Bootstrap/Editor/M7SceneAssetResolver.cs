@@ -16,10 +16,9 @@ namespace RaidDemo.Bootstrap.Editor
     ///
     /// <para>把两个位置都写成候选，好处是：确认前场景就能看到真实观感；
     /// 确认后把文件夹一移就自动走正式路径，代码一行都不用改。
-    /// 完全找不到素材时返回 null，由调用方回退到灰盒几何——
-    /// 这样**别人克隆仓库后即使没有这些素材也能生成一个可运行的地图**
-    /// （尤其是 Broken Vector 悬崖包：它的授权不允许再分发原始文件，
-    /// 所以它永远不会进仓库，回退路径是必须存在的，而不是可选优化）。</para>
+    /// 完全找不到素材时返回 null，由调用方回退到程序化几何——
+    /// 这样**别人克隆仓库后即使某个素材包没拿到，也能生成一张完整可玩的地图**。
+    /// 回退路径因此是必须存在的：它保证"素材缺失"永远不会表现为"地图坏了"。</para>
     /// </remarks>
     public static class M7SceneAssetResolver
     {
@@ -50,7 +49,11 @@ namespace RaidDemo.Bootstrap.Editor
             InboxRoot + "/QuaterniusToonShooter/Environment/FBX"
         };
 
-        /// <summary>Broken Vector 悬崖包（只存在暂存区，永远不入库）。</summary>
+        /// <summary>
+        /// Broken Vector 悬崖包。
+        /// </summary>
+        /// <remarks>正式目录优先、暂存区兜底：该包已由负责人确认可随仓库分发（见包内 AUTHORIZATION.md），
+        /// 因此正式目录是它的常规位置；暂存区路径保留，方便换版本时先试装再提升。</remarks>
         private static readonly string[] CliffFolders =
         {
             ExternalRoot + "/BrokenVector/CliffPack",
