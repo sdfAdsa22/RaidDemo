@@ -224,7 +224,7 @@ namespace RaidDemo.Raid
                 "测试箱",
                 ContainerFlavor.Crate,
                 6,
-                4,
+                5,
                 new LootTable("loot.debug", "测试箱掉落", 1, new[]
                 {
                     Entry("ammo.5.45.standard", 1, 30, 30),

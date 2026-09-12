@@ -55,9 +55,13 @@ namespace RaidDemo.Raid
             // 先放必定产出的条目：测试箱与任务奖励箱靠它保证「一定有什么」。
             if (fixedContents != null)
             {
-                for (var i = 0; i < fixedContents.Count; i++)
+                // **按占地从大到小放**：小件先放会把空间切碎，最后大件反而放不进去。
+                // 这条教训在 M2 的灰盒填充里已经吃过一次（背包塞不进装满小件的箱子），
+                // 当时的做法就是排序，这里沿用同一条规则。
+                var ordered = SortByFootprint(fixedContents);
+                for (var i = 0; i < ordered.Count; i++)
                 {
-                    if (PlaceFixed(target, fixedContents[i]))
+                    if (PlaceFixed(target, ordered[i]))
                     {
                         placed++;
                     }
@@ -90,6 +94,21 @@ namespace RaidDemo.Raid
             }
 
             return placed;
+        }
+
+        /// <summary>把固定产出条目按占地从大到小排序。取不到定义的条目排在最后。</summary>
+        private List<LootTableEntry> SortByFootprint(IReadOnlyList<LootTableEntry> entries)
+        {
+            var ordered = new List<LootTableEntry>(entries);
+            ordered.Sort((left, right) => Footprint(right).CompareTo(Footprint(left)));
+            return ordered;
+        }
+
+        /// <summary>条目对应物品的占地格数；目录里找不到时返回 0。</summary>
+        private int Footprint(LootTableEntry entry)
+        {
+            var definition = m_Catalog != null ? m_Catalog.Get(entry.ItemId) : null;
+            return definition != null ? definition.GridSize.CellCount : 0;
         }
 
         /// <summary>放置一条必定产出的配置。数量取 MinCount，放不下时返回 false。</summary>
