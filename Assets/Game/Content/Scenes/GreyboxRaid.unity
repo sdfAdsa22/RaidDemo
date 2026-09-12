@@ -10731,6 +10731,7 @@ MonoBehaviour:
   m_CameraController: {fileID: 213958453}
   m_Crosshair: {fileID: 0}
   m_ItemCatalog: {fileID: 11400000, guid: c78f8df07b1aa304db6a2ad2574712f9, type: 2}
+  m_PresentationCatalog: {fileID: 11400000, guid: 9b5e9ead7a9646b4782a8a080ce030e7, type: 2}
   m_CarryCapacityKg: 50
 --- !u!114 &1191761248
 MonoBehaviour:

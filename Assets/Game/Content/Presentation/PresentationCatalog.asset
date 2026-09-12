@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a487aa09e1ad984d87c8d8d81781b6e, type: 3}
+  m_Name: PresentationCatalog
+  m_EditorClassIdentifier: RaidDemo.Presentation::RaidDemo.Presentation.PresentationCatalog
+  m_Audio: {fileID: 11400000, guid: 7847872bda9d2bf4c895fc34738c2229, type: 2}
+  m_RifleWeaponPrefab: {fileID: 3769420007951657483, guid: 279fc7ce223e5d2468fe55f39d9ef2b7, type: 3}
+  m_PistolWeaponPrefab: {fileID: 428816534921247050, guid: 10961d9c7ccadb94a8384b77fb52ac72, type: 3}
+  m_MuzzleFlashPrefab: {fileID: 5131590034443407313, guid: 6cb77c6c587906b4792d6e2b979863ce, type: 3}
+  m_ImpactSparkPrefab: {fileID: 8922675939398521961, guid: cc32a1a056dd003458b2d2a4394f81ca, type: 3}
+  m_ImpactDustPrefab: {fileID: 2725729683819602947, guid: f6725b0498d7ff34e8d0d7b995e44eaa, type: 3}
+  m_ImpactFleshPrefab: {fileID: 4093384041635255389, guid: 33bd2d1024c005c49b51bcfba2c0e0b2, type: 3}

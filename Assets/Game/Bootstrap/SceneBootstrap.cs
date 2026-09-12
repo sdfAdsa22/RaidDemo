@@ -55,6 +55,12 @@ namespace RaidDemo.Bootstrap
         [SerializeField] private ItemCatalog m_ItemCatalog;
 
         /// <summary>
+        /// 表现层资产目录：音效、武器模型与战斗特效。
+        /// </summary>
+        /// <remarks>留空时全部表现自动退回灰盒与静默，游戏逻辑不受影响。</remarks>
+        [SerializeField] private PresentationCatalog m_PresentationCatalog;
+
+        /// <summary>
         /// 承载上限（千克）。
         /// </summary>
         /// <remarks>

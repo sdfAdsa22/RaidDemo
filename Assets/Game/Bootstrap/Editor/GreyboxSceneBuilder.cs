@@ -230,6 +230,12 @@ namespace RaidDemo.Bootstrap.Editor
                 AssetDatabase.LoadAssetAtPath<RaidDemo.Data.ItemCatalog>(
                     "Assets/Game/Content/Items/ItemCatalog.asset");
 
+            // 表现层资产目录（音效 / 武器模型 / 战斗特效）。与物品目录一样由编辑器装配写入，
+            // 漏掉它的症状是"场景能跑但没有任何声音与枪口特效"。
+            serialized.FindProperty("m_PresentationCatalog").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<RaidDemo.Presentation.PresentationCatalog>(
+                    M7PresentationCatalogBuilder.CatalogPath);
+
             // 战局参数写进场景：它们是需要反复调的游戏节奏数值，
             // 放在 Inspector 里改比每次重新生成场景快得多。
             serialized.FindProperty("m_RaidDurationSeconds").floatValue = RaidDurationSeconds;

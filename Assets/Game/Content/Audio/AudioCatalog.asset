@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d993525c6ad29ef428444a232779ceec, type: 3}
+  m_Name: AudioCatalog
+  m_EditorClassIdentifier: RaidDemo.Presentation::RaidDemo.Presentation.AudioCatalog
+  m_RifleShots:
+  - {fileID: 8300000, guid: d73e0ee7c9936324ca12498bab2b7388, type: 3}
+  - {fileID: 8300000, guid: 1c57a3e35ccb48940a2e3f529ef102c5, type: 3}
+  m_PistolShots:
+  - {fileID: 8300000, guid: 506796029a08b834b872ce8ca4c0a46c, type: 3}
+  - {fileID: 8300000, guid: e5521a5b06fb36c4ab29934c65d00d32, type: 3}
+  m_DryFire: {fileID: 8300000, guid: dab729997efa46a46af2cbebe0c94c91, type: 3}
+  m_MagazineOut: {fileID: 8300000, guid: 1a4ad78ea34fdbe43a526423576847c0, type: 3}
+  m_MagazineIn: {fileID: 8300000, guid: 066837d57f62a1c4c8b4c4772249d6c7, type: 3}
+  m_BoltClose: {fileID: 8300000, guid: a0db10da57f5f1c47b6420c0f06b2f06, type: 3}
+  m_WeaponSwitch: {fileID: 8300000, guid: 0cbadeba6c6069941b6f161c9ed876d0, type: 3}
+  m_ImpactFlesh:
+  - {fileID: 8300000, guid: 58451aa6cc899804d852b8a32d26cf9d, type: 3}
+  - {fileID: 8300000, guid: df5af313e17dbac4896fed9b9cc9c281, type: 3}
+  - {fileID: 8300000, guid: c14c1510aed01e74a85e15ec6b5fab2e, type: 3}
+  m_ImpactHard:
+  - {fileID: 8300000, guid: 2a7f58ba6cdc30c4db0018efab6cbb11, type: 3}
+  - {fileID: 8300000, guid: ab1abac438f9d864a90ef709b93a336f, type: 3}
+  - {fileID: 8300000, guid: 10826d11df92957479605925a16c5ffd, type: 3}
+  m_FootstepGrass:
+  - {fileID: 8300000, guid: 7589bfb3fe099f447b7b540c2f586f62, type: 3}
+  - {fileID: 8300000, guid: 6af8bb1f1bfaa774eb51baa52bcd0acc, type: 3}
+  - {fileID: 8300000, guid: 2deee57b4108ec54c85475d1b8bbef9f, type: 3}
+  - {fileID: 8300000, guid: 4d04399b7200db64bb12cd793fe38f33, type: 3}
+  m_FootstepHard:
+  - {fileID: 8300000, guid: 813485a02da262a4aa4d952200fa52b1, type: 3}
+  - {fileID: 8300000, guid: 50cc473ed2367b04db8e59c7a350d159, type: 3}
+  - {fileID: 8300000, guid: 25dbe4d859e1ff84da1f5f92ac60bb39, type: 3}
+  m_LootOpen: {fileID: 8300000, guid: 919fdaf0126ffad41b9eb2e48318465a, type: 3}
+  m_LootRummage:
+  - {fileID: 8300000, guid: d8815c9c1b5cd1a4cba8933b6ce2c9c4, type: 3}
+  - {fileID: 8300000, guid: 6e5ed06f257e9064abb28272948a87b8, type: 3}
+  m_LootPickup: {fileID: 8300000, guid: 0fecaa6ffec05884abdaacb4443a584f, type: 3}
+  m_ExtractionTick: {fileID: 8300000, guid: 4c8c6afc23148df4381faa762ab61abe, type: 3}
+  m_RaidSuccess: {fileID: 8300000, guid: 96a7adde75c774e4fb960d1b2fb456a3, type: 3}
+  m_RaidFail: {fileID: 8300000, guid: d6a4c3732c65c0248826e9319ef2c26e, type: 3}

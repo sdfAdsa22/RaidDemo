@@ -21,6 +21,11 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public sealed partial class SafeHouseBootstrap
     {
+        /// <summary>表现层资产目录：音效、武器模型与战斗特效。</summary>
+        /// <remarks>字段定义放在战斗装配这一部分，与它的唯一使用点相邻；
+        /// 主文件已接近工程规定的 400 行上限。</remarks>
+        [SerializeField] private PresentationCatalog m_PresentationCatalog;
+
         /// <summary>玩家生命上限。靶场里不会掉血，但 HUD 需要一个数值。</summary>
         private const int PlayerMaxHealth = 100;
 
@@ -33,6 +38,8 @@ namespace RaidDemo.Bootstrap
         private PlayerWeaponController m_WeaponController;
         private PlayerWeaponView m_WeaponView;
         private CombatHud m_CombatHud;
+        private AudioService m_AudioService;
+        private GameAudioDirector m_GameAudio;
         private int m_PlayerCombatantId;
 
         /// <summary>上一帧显示在手上的武器，用于判断「换枪了没有」。</summary>
@@ -71,18 +78,45 @@ namespace RaidDemo.Bootstrap
                 targetView.Initialize(m_PlayerCombatantId, colorFeedback: false);
             }
 
-            // 弹道与枪声：与战局一样挂在同一个「战斗效果」节点上。
+            // 弹道、音效与特效：与战局一样挂在同一个「战斗效果」节点上。
             // 它们都只订阅开火事件，因此拿到事件总线就能工作。
             var effectsHost = new GameObject("CombatEffects");
             effectsHost.transform.SetParent(transform, worldPositionStays: false);
             effectsHost.AddComponent<TracerRenderer>().Bind(m_EventBus);
-            var weaponAudio = effectsHost.AddComponent<WeaponAudioPlayer>();
-            weaponAudio.Bind(m_EventBus);
+
+            var catalog = m_PresentationCatalog;
+            var playerId = m_InputCollector != null ? m_InputCollector.PlayerId : 0;
+            var playerTransform = m_PlayerMotor != null ? m_PlayerMotor.transform : null;
+
+            m_AudioService = effectsHost.AddComponent<AudioService>();
+            m_AudioService.Initialize(catalog != null ? catalog.Audio : null);
+
+            var vfx = effectsHost.AddComponent<CombatVfxDirector>();
+            vfx.Initialize(
+                catalog != null ? catalog.MuzzleFlashPrefab : null,
+                catalog != null ? catalog.ImpactSparkPrefab : null,
+                catalog != null ? catalog.ImpactDustPrefab : null,
+                catalog != null ? catalog.ImpactFleshPrefab : null);
+            vfx.Bind(m_EventBus);
+
+            var audioDirectorHost = new GameObject("GameAudioDirector");
+            audioDirectorHost.transform.SetParent(transform, worldPositionStays: false);
+            m_GameAudio = audioDirectorHost.AddComponent<GameAudioDirector>();
+            m_GameAudio.Bind(m_EventBus, m_AudioService, playerTransform, playerId);
+
+            if (playerTransform != null)
+            {
+                var footsteps = effectsHost.AddComponent<FootstepAudioDirector>();
+                footsteps.Bind(m_EventBus, m_AudioService, playerTransform, playerId);
+            }
 
             var viewHost = new GameObject("PlayerWeaponView");
             viewHost.transform.SetParent(transform, worldPositionStays: false);
             m_WeaponView = viewHost.AddComponent<PlayerWeaponView>();
-            m_WeaponView.Build(m_PlayerMotor != null ? m_PlayerMotor.transform : transform);
+            m_WeaponView.Build(
+                playerTransform != null ? playerTransform : transform,
+                catalog != null ? catalog.RifleWeaponPrefab : null,
+                catalog != null ? catalog.PistolWeaponPrefab : null);
 
             var hudHost = new GameObject("CombatHud");
             hudHost.transform.SetParent(transform, worldPositionStays: false);
@@ -111,8 +145,11 @@ namespace RaidDemo.Bootstrap
             // 于是「枪响了、子弹也飞了」，但永远打不到眼前的靶子。
             if (m_PlayerMotor != null && m_WeaponController != null)
             {
+                // 有真实武器模型时枪口取枪管末端，模型缺失时退回"角色位置抬高"。
                 m_WeaponController.SetMuzzlePosition(
-                    m_PlayerMotor.transform.position + (Vector3.up * 1.2f));
+                    m_WeaponView != null && m_WeaponView.IsEquipped
+                        ? m_WeaponView.MuzzleWorldPosition
+                        : m_PlayerMotor.transform.position + (Vector3.up * 1.2f));
             }
 
             // 必须把「手上是什么武器」同步给控制器：弹匣容量、装弹、射速全部由它管理。
@@ -132,6 +169,7 @@ namespace RaidDemo.Bootstrap
                 m_CombatHud?.SetWeapon(
                     weapon != null ? weapon.Definition.DisplayName : null,
                     weapon?.Definition?.WeaponStats?.CaliberId);
+                m_GameAudio?.SetLocalWeaponGridWidth(m_WeaponLengthCells);
             }
 
             if (m_WeaponView != null && m_PlayerMotor != null && m_WeaponController != null)

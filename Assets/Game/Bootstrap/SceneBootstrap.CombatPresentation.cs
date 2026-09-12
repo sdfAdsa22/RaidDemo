@@ -36,13 +36,49 @@ namespace RaidDemo.Bootstrap
             var tracer = effectsHost.AddComponent<TracerRenderer>();
             tracer.Bind(m_EventBus);
 
-            m_WeaponAudio = effectsHost.AddComponent<WeaponAudioPlayer>();
-            m_WeaponAudio.Bind(m_EventBus);
+            // 表现层资产目录：音效、武器模型、战斗特效的唯一来源。
+            // 目录为空时下面每一项都会自行退化成"没有声音 / 灰盒枪 / 没有特效"，游戏照常可玩。
+            var catalog = m_PresentationCatalog;
+
+            m_AudioService = effectsHost.AddComponent<AudioService>();
+            m_AudioService.Initialize(catalog != null ? catalog.Audio : null);
+
+            var vfx = effectsHost.AddComponent<CombatVfxDirector>();
+            vfx.Initialize(
+                catalog != null ? catalog.MuzzleFlashPrefab : null,
+                catalog != null ? catalog.ImpactSparkPrefab : null,
+                catalog != null ? catalog.ImpactDustPrefab : null,
+                catalog != null ? catalog.ImpactFleshPrefab : null);
+            vfx.Bind(m_EventBus);
+
+            var audioDirectorHost = new GameObject("GameAudioDirector");
+            audioDirectorHost.transform.SetParent(transform, worldPositionStays: false);
+            m_GameAudio = audioDirectorHost.AddComponent<GameAudioDirector>();
+            m_GameAudio.Bind(
+                m_EventBus,
+                m_AudioService,
+                m_PlayerMotor != null ? m_PlayerMotor.transform : null,
+                m_InputCollector != null ? m_InputCollector.PlayerId : 0);
+
+            // 脚步单独一个组件：它关心的是移动事件，与战斗无关，
+            // 放在同一个组件里会让"开枪的音效"和"走路的音效"改一处要动两处。
+            if (m_PlayerMotor != null)
+            {
+                var footsteps = effectsHost.AddComponent<FootstepAudioDirector>();
+                footsteps.Bind(
+                    m_EventBus,
+                    m_AudioService,
+                    m_PlayerMotor.transform,
+                    m_InputCollector != null ? m_InputCollector.PlayerId : 0);
+            }
 
             var viewHost = new GameObject("PlayerWeaponView");
             viewHost.transform.SetParent(transform, worldPositionStays: false);
             m_WeaponView = viewHost.AddComponent<PlayerWeaponView>();
-            m_WeaponView.Build(m_PlayerMotor != null ? m_PlayerMotor.transform : transform);
+            m_WeaponView.Build(
+                m_PlayerMotor != null ? m_PlayerMotor.transform : transform,
+                catalog != null ? catalog.RifleWeaponPrefab : null,
+                catalog != null ? catalog.PistolWeaponPrefab : null);
 
             var hudHost = new GameObject("CombatHud");
             hudHost.transform.SetParent(transform, worldPositionStays: false);
@@ -219,10 +255,9 @@ namespace RaidDemo.Bootstrap
                 weaponItem != null ? weaponItem.Definition.DisplayName : null,
                 stats != null ? stats.CaliberId : null);
 
-            m_WeaponAudio?.SetVariant(
-                m_WeaponLengthCells >= 3
-                    ? WeaponAudioPlayer.ShotVariant.Heavy
-                    : WeaponAudioPlayer.ShotVariant.Light);
+            // 枪声、武器模型、枪口火焰共用同一条"长枪 / 短枪"判定，
+            // 三者的切换点因此永远一致：不会出现"换了手枪、模型变了、枪声还是步枪"。
+            m_GameAudio?.SetLocalWeaponGridWidth(m_WeaponLengthCells);
         }
 
         /// <summary>让灰盒武器模型跟随角色与瞄准方向。</summary>

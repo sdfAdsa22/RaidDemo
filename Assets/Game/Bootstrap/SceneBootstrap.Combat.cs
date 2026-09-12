@@ -49,7 +49,8 @@ namespace RaidDemo.Bootstrap
         private PlayerWeapon m_PlayerWeapon;
         private PlayerWeaponController m_WeaponController;
         private PlayerWeaponView m_WeaponView;
-        private WeaponAudioPlayer m_WeaponAudio;
+        private AudioService m_AudioService;
+        private GameAudioDirector m_GameAudio;
         private CombatHud m_CombatHud;
 
         /// <summary>当前武器在背包里占的格数。用于推算灰盒枪身长度与枪声变体。</summary>
@@ -111,6 +112,13 @@ namespace RaidDemo.Bootstrap
         /// <summary>取枪口世界坐标。</summary>
         private Vector3 ResolveMuzzlePosition()
         {
+            // 有真实武器模型时，枪口就是枪管末端：弹道、枪口火焰、命中判定全部从那里出发。
+            // 模型缺失时退回到"角色位置抬高一点"，与灰盒时代的取值一致。
+            if (m_WeaponView != null && m_WeaponView.IsEquipped)
+            {
+                return m_WeaponView.MuzzleWorldPosition;
+            }
+
             if (m_PlayerMotor == null)
             {
                 return transform.position + (Vector3.up * MuzzleHeight);

@@ -107,6 +107,12 @@ namespace RaidDemo.Bootstrap.Editor
             bootstrapSerialized.FindProperty("m_ItemCatalog").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<RaidDemo.Data.ItemCatalog>(
                     "Assets/Game/Content/Items/ItemCatalog.asset");
+
+            // 表现层资产目录（音效 / 武器模型 / 战斗特效）：安全屋也要能试枪，
+            // 缺少它时靶场会变成"打出去没有声音、没有枪口火焰"。
+            bootstrapSerialized.FindProperty("m_PresentationCatalog").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<RaidDemo.Presentation.PresentationCatalog>(
+                    M7PresentationCatalogBuilder.CatalogPath);
             bootstrapSerialized.ApplyModifiedPropertiesWithoutUndo();
 
             var actions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(
