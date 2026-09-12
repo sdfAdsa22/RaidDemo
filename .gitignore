@@ -93,3 +93,4 @@ desktop.ini
 # 只有负责人确认采用的最终版本，才从 _Inbox 移到 External/<来源>/<资源包>/ 并提交。
 # 好处：Unity 能正常导入预览，同时 Git 里永远不会出现"试用后淘汰"的素材及其历史。
 [Aa]ssets/Game/Content/External/_Inbox/
+[Aa]ssets/Game/Content/External/_Inbox.meta
