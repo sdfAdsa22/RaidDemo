@@ -26,9 +26,11 @@ namespace RaidDemo.Bootstrap.Editor
 
             for (var i = 0; i < s_ExtractionZones.Length; i++)
             {
-                var (zoneId, displayName, center, radius) = s_ExtractionZones[i];
+                var (zoneId, displayName, center, groundY, radius) = s_ExtractionZones[i];
                 var root = new GameObject($"Extraction_{zoneId:D2}_{displayName}");
-                var origin = new Vector3(center.x, 0f, center.y);
+                // 撤离点可能位于谷底、也可能位于塬面，因此必须使用布局表给出的地面高度；
+                // 若写死为 0，坡顶的三个撤离点会整体沉到土墙里。
+                var origin = new Vector3(center.x, groundY, center.y);
                 root.transform.position = origin;
                 root.transform.SetParent(parent, worldPositionStays: true);
 
@@ -81,6 +83,12 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>创建全部战利品容器（实体箱体 + 场景标记）。</summary>
+        /// <remarks>
+        /// M7 批次 2 起，普通箱体换成 Toon Shooter 的木箱与纸箱预制体；
+        /// 保险柜与开发期测试箱继续用灰盒方块（前者是金属箱，后者本来就只存在于安全屋）。
+        /// 无论走哪条路径，都会在同一个对象上挂 <c>LootSpawnPoint</c>，
+        /// 因此搜刮逻辑对「箱子长什么样」完全无感。
+        /// </remarks>
         private static void CreateLootContainers()
         {
             var parent = CreateGroup("Loot");
@@ -88,20 +96,61 @@ namespace RaidDemo.Bootstrap.Editor
             for (var i = 0; i < s_LootPlacements.Length; i++)
             {
                 var (definitionId, position, groundY, yaw) = s_LootPlacements[i];
-                var visual = ResolveLootVisual(definitionId);
-                var container = CreateBox(
-                    $"Loot_{i + 1:D2}_{definitionId}",
-                    new Vector3(position.x, groundY + (visual.Size.y * 0.5f), position.y),
-                    visual.Size,
-                    parent);
-                container.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-                SetMaterialColor(container, visual.Color);
+                var name = $"Loot_{i + 1:D2}_{definitionId}";
+                var prefabName = ResolveLootPrefab(definitionId);
+                var instance = prefabName == null
+                    ? null
+                    : InstantiateProp(prefabName, new Vector3(position.x, groundY, position.y), yaw, parent);
+
+                GameObject container;
+                if (instance != null)
+                {
+                    instance.name = name;
+                    container = instance;
+                }
+                else
+                {
+                    var visual = ResolveLootVisual(definitionId);
+                    container = CreateBox(
+                        name,
+                        new Vector3(position.x, groundY + (visual.Size.y * 0.5f), position.y),
+                        visual.Size,
+                        parent);
+                    container.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+                    SetMaterialColor(container, visual.Color);
+                }
 
                 // 标记组件写的是「按哪个定义生成容器」，位置信息由它自己的 Transform 提供。
                 var marker = container.AddComponent<RaidDemo.Presentation.LootSpawnPoint>();
                 var serialized = new UnityEditor.SerializedObject(marker);
                 serialized.FindProperty("m_ContainerDefinitionId").stringValue = definitionId;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>
+        /// 按容器定义挑选外观预制体；返回 null 表示继续使用灰盒方块。
+        /// </summary>
+        /// <remarks>
+        /// 映射写成「定义 ID → 预制体名」而不是反过来，是为了尊重数据层的主权：
+        /// 容器定义是玩法数据（价值、掉落表、搜索时长），外观只是它的一个表现属性。
+        /// 将来新增容器类型时，这张表加一行即可，不需要动数据资产。
+        /// </remarks>
+        private static string ResolveLootPrefab(string definitionId)
+        {
+            switch (definitionId)
+            {
+                case "crate.common":
+                    return "Prop_Box_Cardboard_B";
+                case "crate.ammo":
+                    return "Prop_Crate_Wood";
+                case "crate.weapon":
+                    return "Prop_Crate_Wood";
+                case "crate.medical":
+                    return "Prop_Box_Cardboard_A";
+                default:
+                    // safe.rare（保险柜）与 crate.debug（开发期测试箱）保持灰盒外观。
+                    return null;
             }
         }
 

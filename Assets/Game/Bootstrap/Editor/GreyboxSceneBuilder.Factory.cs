@@ -27,9 +27,16 @@ namespace RaidDemo.Bootstrap.Editor
 
         /// <summary>创建一个带碰撞体的方块，作为灰盒几何体。</summary>
         /// <param name="name">对象名。</param>
-        /// <param name="center">世界坐标下的几何中心。</param>
+        /// <param name="center">几何中心（布局坐标：谷底地面为 y 等于 0）。</param>
         /// <param name="size">长宽高（米）。</param>
         /// <param name="parent">父节点，可为 null。</param>
+        /// <remarks>
+        /// <para>布局坐标到世界坐标的换算统一在这里完成：调用方给出的 y 是「离谷底多高」，
+        /// 工厂再减去 <c>ValleyFloorY</c>。这样布局表不必知道地图被下沉了 6 米，
+        /// 将来盆地深浅调整时也只需要改一处常量。</para>
+        /// <para>使用世界坐标摆放、再以 <c>worldPositionStays</c> 挂到父节点下：
+        /// 父节点（分区根）不承载任何变换，只用于层级归类，避免出现「父节点一动整片区跟着漂」的隐性耦合。</para>
+        /// </remarks>
         private static GameObject CreateBox(
             string name,
             Vector3 center,
@@ -38,7 +45,7 @@ namespace RaidDemo.Bootstrap.Editor
         {
             var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
             box.name = name;
-            box.transform.position = center;
+            box.transform.position = new Vector3(center.x, center.y + ValleyFloorY, center.z);
             box.transform.localScale = size;
             if (parent != null)
             {
@@ -160,7 +167,7 @@ namespace RaidDemo.Bootstrap.Editor
         {
             var decoration = GameObject.CreatePrimitive(primitive);
             decoration.name = name;
-            decoration.transform.position = position;
+            decoration.transform.position = new Vector3(position.x, position.y + ValleyFloorY, position.z);
             decoration.transform.localScale = scale;
             if (parent != null)
             {

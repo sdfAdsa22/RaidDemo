@@ -18,6 +18,7 @@
         "RaidDemo.Raid",
         "RaidDemo.Meta",
         "RaidDemo.UI",
+        "RaidDemo.Bootstrap.Editor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

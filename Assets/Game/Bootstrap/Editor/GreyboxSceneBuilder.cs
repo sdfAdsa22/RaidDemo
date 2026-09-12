@@ -15,12 +15,14 @@ namespace RaidDemo.Bootstrap.Editor
     /// 二是便于版本控制，生成脚本本身是文本，而场景文件是复杂 YAML，冲突极难处理；
     /// 三是调整布局只需改常量，不必在编辑器里逐个拖动对象。</para>
     ///
-    /// <para><b>文件拆分</b>：本类按职责拆成三个 partial 文件，
+    /// <para><b>文件拆分</b>：本类按职责拆成多个 partial 文件，
     /// 既是为了遵守项目「单文件不超过 400 行」的规定，也让改动的影响范围一目了然：</para>
     /// <list type="bullet">
-    /// <item><description>本文件：入口流程、光照、地面、玩家、启动对象；</description></item>
+    /// <item><description>本文件：入口流程、光照、玩家、启动对象；</description></item>
     /// <item><description><c>GreyboxSceneBuilder.Factory</c>：几何体工厂（方块、墙、坡道、材质）；</description></item>
     /// <item><description><c>GreyboxSceneBuilder.Layout</c>：地图分区布局（厂房、堆场、装卸平台、撤离点、战利品）。</description></item>
+    /// <item><description><c>GreyboxSceneBuilder.Terrain</c>：M7 批次 2 的下沉盆地地形、悬崖装饰与远景山体；</description></item>
+    /// <item><description><c>GreyboxSceneBuilder.Props</c>：外部素材预制体的摆放与坐标换算。</description></item>
     /// </list>
     ///
     /// <para>本工具只在编辑器中运行，不参与游戏构建。</para>
@@ -30,19 +32,8 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>生成场景的输出路径（仓库相对路径）。</summary>
         private const string ScenePath = "Assets/Game/Content/Scenes/GreyboxRaid.unity";
 
-        /// <summary>地面边长（米）。</summary>
-        /// <remarks>
-        /// 60x60 是权衡后的尺寸：AI 视距只有 9 米、武器射程 8~12 米，
-        /// 地图再大就只是让玩家在空地上跑，搜刮节奏反而变差。尺寸属于打磨项，
-        /// 先把闭环跑通更重要。
-        /// </remarks>
-        private const float GroundSize = 60f;
-
-        /// <summary>外围围墙高度（米）。</summary>
-        private const float WallHeight = 4f;
-
-        /// <summary>外围围墙厚度（米）。</summary>
-        private const float WallThickness = 0.8f;
+        // M7 批次 2 起，地面与外围围墙由下沉盆地地形取代（见 GreyboxSceneBuilder.Terrain）：
+        // 谷底范围 56×56 米，外围是 6 米高的土墙与 4 米宽的塬面，不再使用平直围墙。
 
         /// <summary>
         /// 玩家出生点。
@@ -116,13 +107,20 @@ namespace RaidDemo.Bootstrap.Editor
                 NewSceneSetup.EmptyScene,
                 NewSceneMode.Single);
 
+            // 先把外部素材加工成项目层预制体：场景只引用 Art/Props 下的预制体，
+            // 这样换素材时场景与代码都不需要改。
+            M7PropPrefabBuilder.BuildAll();
+
             CreateLighting();
-            CreateGround();
-            CreatePerimeterWalls();
+            CreateBasinTerrain();
+            CreateBoundaryBarriers();
+            CreateCliffRing();
+            CreateFarRidge();
             CreateFactoryZone();
             CreateContainerYardZone();
             CreateLoadingDockZone();
             CreateOuterRing();
+            CreateIndustrialLandmarks();
             CreateExtractionZones();
             CreateLootContainers();
             CreatePlayer();
@@ -137,6 +135,13 @@ namespace RaidDemo.Bootstrap.Editor
             AssetDatabase.Refresh();
 
             Debug.Log($"[RaidDemo] 灰盒场景已生成：{ScenePath}");
+
+            // 素材缺失只提示一次：场景已经按程序化/灰盒外观生成完毕，仍然可以正常运行。
+            var missing = M7SceneAssetResolver.BuildMissingReport();
+            if (!string.IsNullOrEmpty(missing))
+            {
+                Debug.LogWarning(missing);
+            }
         }
 
         /// <summary>创建平行光与天空盒设置，保证灰盒场景可辨识。</summary>
@@ -149,31 +154,6 @@ namespace RaidDemo.Bootstrap.Editor
             light.color = new Color(1f, 0.97f, 0.9f);
             light.shadows = LightShadows.Soft;
             lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-        }
-
-        /// <summary>创建地面。</summary>
-        /// <remarks>
-        /// <para>地面上额外挂一个 <see cref="NavMeshSurface"/>，但**不在这里烘焙**：
-        /// 导航网格由启动层在运行时调用 <c>BuildNavMesh()</c> 生成。</para>
-        ///
-        /// <para>这样选择的原因是本场景由代码生成：若在编辑器里预先烘焙，数据会与布局脱节，
-        /// 改了箱子的位置却忘记重新烘焙时，AI 会绕着已经不存在的箱子走——
-        /// 这种问题从画面上完全看不出来，只能靠人偶然发现。运行时烘焙保证导航网格
-        /// 永远与当前布局一致，而灰盒地图只有 60x60，这点开销可以忽略。</para>
-        /// </remarks>
-        private static void CreateGround()
-        {
-            var ground = CreateBox(
-                "Ground",
-                new Vector3(0f, -0.5f, 0f),
-                new Vector3(GroundSize, 1f, GroundSize));
-            SetMaterialColor(ground, new Color(0.32f, 0.34f, 0.36f));
-
-            // 采集方式显式指定而不是依赖默认值：默认值随包版本变过，
-            // 而「哪些物体参与烘焙」直接决定 AI 能不能绕过集装箱。
-            var surface = ground.AddComponent<NavMeshSurface>();
-            surface.collectObjects = CollectObjects.All;
-            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
         }
 
         /// <summary>
@@ -191,7 +171,9 @@ namespace RaidDemo.Bootstrap.Editor
         private static void CreatePlayer()
         {
             var player = new GameObject("Player");
-            player.transform.position = PlayerSpawn;
+            // 出生点写的是布局坐标（谷底为 0），这里换算成世界坐标；
+            // 玩家初始高度必须落在谷底，否则 PlayerMotor 第一次地面采样会从错误的高度开始。
+            player.transform.position = new Vector3(PlayerSpawn.x, ValleyFloorY, PlayerSpawn.z);
 
             // 碰撞体放在根节点并居中于身体，使碰撞范围与视觉体积一致。
             var collider = player.AddComponent<CapsuleCollider>();

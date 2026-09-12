@@ -11,8 +11,13 @@ namespace RaidDemo.Bootstrap.Editor
     /// 是两件会分别变化的事。分开之后，调地图只需要改数据表里的一行数字，
     /// 不必读懂创建逻辑；也方便一眼核对「这块地方到底放了什么」。</para>
     ///
-    /// <para><b>坐标约定：</b>X 轴向东为正、Z 轴向北为正，地面范围为 ±30 米。
+    /// <para><b>坐标约定：</b>X 轴向东为正、Z 轴向北为正，Y 轴以**谷底地面为 0**
+    /// （M7 批次 2 起地图是下沉盆地，谷底在世界坐标的 -6 米处，换算由灰盒工厂统一完成）。
     /// 斜俯视相机从南向北看，因此屏幕上方是 +Z、屏幕右方是 +X。</para>
+    ///
+    /// <para><b>可活动范围：</b>谷底平地是 ±28 米的方形，外围一圈 6 米高的土墙，
+    /// 墙顶是 32~36 米的塬面。四条通道穿透土墙：北/东/西三条上坡道与南侧一条平进谷口，
+    /// 因此布局表里所有摆放物的坐标都必须落在 ±28 之内。</para>
     ///
     /// <para><b>四分区</b>：主厂房（西，室内近战）、集装箱堆场（东，主搜刮区）、
     /// 装卸平台（南，高地伏击）、外围环道（外圈，撤离点所在，撤离前的最后一段路）。</para>
@@ -20,19 +25,32 @@ namespace RaidDemo.Bootstrap.Editor
     public static partial class GreyboxSceneBuilder
     {
         /// <summary>集装箱标准尺寸（长 x 高 x 宽）。</summary>
+        /// <remarks>灰盒回退路径使用的占位尺寸；使用正式素材时以预制体的实际尺寸为准。</remarks>
         private static readonly Vector3 ContainerSize = new Vector3(6f, 3f, 2.5f);
 
-        /// <summary>外墙与围栏的配色。</summary>
-        private static readonly Color PerimeterColor = new Color(0.45f, 0.43f, 0.40f);
+        /// <summary>Kenney 集装箱预制体的名义高度（米），用于计算堆叠层高。</summary>
+        private const float StackedContainerHeight = 2.62f;
+
+        /// <summary>集装箱预制体型号，按摆放序号轮换，制造色彩变化。</summary>
+        private static readonly string[] s_ContainerPrefabNames =
+        {
+            "Prop_Container_A", "Prop_Container_B", "Prop_Container_C"
+        };
+
+        /// <summary>
+        /// 集装箱模型自带朝向与布局表朝向之间的差值（度）。
+        /// </summary>
+        /// <remarks>布局表约定 yaw 等于 0 时长边沿 X 轴。Kenney 的集装箱长边沿模型本地 Z 轴，
+        /// 因此这里补 90 度（数值由实测模型包围盒得出：长 0.82、宽 0.37 个模型单位）。
+        /// 把差值收敛成一个常量，比在每个调用点手改朝向更不容易出错。</remarks>
+        private const float ContainerModelYawOffset = 90f;
 
         /// <summary>建筑墙体配色。</summary>
-        private static readonly Color BuildingColor = new Color(0.52f, 0.50f, 0.47f);
+        /// <remarks>偏冷的暗绿色：M7 的参考观感是「草地上的绿仓库」，与暖色的集装箱形成对比。</remarks>
+        private static readonly Color BuildingColor = new Color(0.30f, 0.42f, 0.34f);
 
         /// <summary>室内隔断配色，比外墙略深以便在俯视下分辨「承重墙」与「隔断」。</summary>
         private static readonly Color PartitionColor = new Color(0.44f, 0.43f, 0.42f);
-
-        /// <summary>围栏配色。</summary>
-        private static readonly Color FenceColor = new Color(0.58f, 0.58f, 0.60f);
 
         /// <summary>厂区内设备与货架的配色。</summary>
         private static readonly Color MachineryColor = new Color(0.40f, 0.44f, 0.48f);
@@ -87,18 +105,27 @@ namespace RaidDemo.Bootstrap.Editor
         /// 撤离点布局。
         /// </summary>
         /// <remarks>
-        /// <para>三个撤离点刻意分布在地图的三个方向：北门（开阔，最危险）、
-        /// 西南角（厂房侧，路程短）、东南货场（堆场侧，物资多）。
-        /// 玩家可以按自己的贪心程度选择「就近撤」还是「再搜一处再走」。</para>
+        /// <para><b>M7 批次 2 改为「三条坡道顶 + 南侧谷口」</b>：盆地地形的上下通道就是撤离路径，
+        /// 玩家必须先决定「从哪条坡爬出去」，再决定什么时候开始读秒。
+        /// 三个坡顶撤离点分布在北、东、西三面，彼此距离很远，贪婪决策的空间因此比平地版本更大：
+        /// 在东北角搜完还想贪一个箱子，就得横穿整张地图去西坡，或者就近从北坡走。</para>
+        ///
+        /// <para>南谷口是平进平出的那条路，位置就在出生点南边，看起来最好走——
+        /// 但它是唯一的低处出口，视野最差，被堵住时也最难脱身。</para>
+        ///
+        /// <para><b>GroundY 的含义：</b>撤离点所在的地面高度（谷底为 0）。
+        /// 坡顶在塬面上，因此是 <see cref="BasinTerrainProfile.RimHeight"/>;
+        /// 谷口在谷底，因此是 0。</para>
         ///
         /// <para>全部无条件可用、不要求钥匙：本项目的压力来自玩家的贪心决策，
         /// 而不是来自「找不到撤离点」这种外部障碍。</para>
         /// </remarks>
-        private static readonly (int ZoneId, string DisplayName, Vector2 Center, float Radius)[] s_ExtractionZones =
+        private static readonly (int ZoneId, string DisplayName, Vector2 Center, float GroundY, float Radius)[] s_ExtractionZones =
         {
-            (1, "北门", new Vector2(0f, 25.5f), 3.5f),
-            (2, "西南角", new Vector2(-25f, -25f), 3.5f),
-            (3, "东南货场", new Vector2(25f, -25f), 3.5f),
+            (1, "北坡顶", new Vector2(0f, 34f), BasinTerrainProfile.RimHeight, 2.0f),
+            (2, "东坡顶", new Vector2(34f, 0f), BasinTerrainProfile.RimHeight, 2.0f),
+            (3, "西坡顶", new Vector2(-34f, 0f), BasinTerrainProfile.RimHeight, 2.0f),
+            (4, "南谷口", new Vector2(BasinTerrainProfile.SouthCanyonCenterX, -29.5f), 0f, 2.0f),
         };
 
         /// <summary>
@@ -137,18 +164,6 @@ namespace RaidDemo.Bootstrap.Editor
             ("crate.common", new Vector2(0f, 20f), 0f, 0f),
 
         };
-
-        /// <summary>创建四面外围围墙，把玩家限制在场景内。</summary>
-        private static void CreatePerimeterWalls()
-        {
-            var parent = CreateGroup("Perimeter");
-            var half = (GroundSize * 0.5f) - (WallThickness * 0.5f);
-
-            CreateWall("Wall_North", 0f, half, GroundSize, true, WallHeight, WallThickness, parent, PerimeterColor);
-            CreateWall("Wall_South", 0f, -half, GroundSize, true, WallHeight, WallThickness, parent, PerimeterColor);
-            CreateWall("Wall_East", half, 0f, GroundSize, false, WallHeight, WallThickness, parent, PerimeterColor);
-            CreateWall("Wall_West", -half, 0f, GroundSize, false, WallHeight, WallThickness, parent, PerimeterColor);
-        }
 
         /// <summary>
         /// 创建主厂房：西侧的长条形建筑，室内近战交火区。
@@ -227,6 +242,12 @@ namespace RaidDemo.Bootstrap.Editor
         /// <param name="position">底面中心位置（y 取 0）。</param>
         /// <param name="yawDegrees">水平朝向。</param>
         /// <param name="layers">层数。</param>
+        /// <remarks>
+        /// <para>M7 批次 2 起外观改为 Kenney City Kit (Industrial) 的集装箱预制体（型号 a/b/c 按序号轮换），
+        /// 缺少素材时回退到原来的灰盒方块——两条路径的占地尺寸接近，回退时地图仍然可用。</para>
+        /// <para>朝向会额外加上 <see cref="ContainerModelYawOffset"/>：素材的长边朝向与本项目布局表的约定
+        /// 不一定一致，把差值收敛成一个常量，比在每个调用点手改 90 度更不容易出错。</para>
+        /// </remarks>
         private static void CreateContainer(
             Transform parent,
             int index,
@@ -234,16 +255,32 @@ namespace RaidDemo.Bootstrap.Editor
             float yawDegrees,
             int layers)
         {
+            var prefabName = s_ContainerPrefabNames[index % s_ContainerPrefabNames.Length];
+            var prefab = M7PropPrefabBuilder.LoadPrefab(prefabName);
+
+            // 预制体是实际尺寸（2.59 米高），灰盒占位是 3 米；堆叠层高必须各用各的，
+            // 否则第二层会悬在箱顶上方约 0.4 米处。
+            var layerHeight = prefab != null ? StackedContainerHeight : ContainerSize.y;
+
             for (var layer = 0; layer < layers; layer++)
             {
-                var center = new Vector3(
-                    position.x,
-                    (ContainerSize.y * (layer + 0.5f)),
-                    position.z);
+                var bottom = new Vector3(position.x, layerHeight * layer, position.z);
                 var name = layers > 1
                     ? $"Container_{index:D2}_L{layer + 1}"
                     : $"Container_{index:D2}";
 
+                if (prefab != null)
+                {
+                    InstantiateProp(
+                        prefab,
+                        name,
+                        bottom,
+                        yawDegrees + ContainerModelYawOffset,
+                        parent);
+                    continue;
+                }
+
+                var center = new Vector3(bottom.x, bottom.y + (ContainerSize.y * 0.5f), bottom.z);
                 var container = CreateBox(name, center, ContainerSize, parent);
                 container.transform.rotation = Quaternion.Euler(0f, yawDegrees, 0f);
 
@@ -254,95 +291,6 @@ namespace RaidDemo.Bootstrap.Editor
                     ? new Color(0.82f, 0.48f, 0.22f)
                     : new Color(0.68f, 0.38f, 0.18f);
                 SetMaterialColor(container, containerColor);
-            }
-        }
-
-        /// <summary>
-        /// 创建装卸平台：南侧的高台与两条坡道。
-        /// </summary>
-        /// <remarks>
-        /// <para>高台是本作唯一的高低差：站在上面能越过大部分掩体看到堆场，
-        /// 但上去只有两条坡道，撤离时也容易被堵。它同时验证了三件事——
-        /// 玩家地面吸附、玩家移动碰撞的坡道处理、AI 的导航网格高度采样。</para>
-        ///
-        /// <para>坡道正对平台北侧边缘，从地面直接接上平台面。高端刻意向台体内多伸入
-        /// 0.5 米：如果坡道的高端刚好停在台缘，坡道板的厚度端面会在台缘前留下一条
-        /// 极窄的斜面缝——向下射线会先打到端面而不是坡道顶面，角色在这里会被卡住。
-        /// 伸入台体后，坡道顶面连续覆盖到台面下方，衔接处不再有可见的端面。</para>
-        /// </remarks>
-        private static void CreateLoadingDockZone()
-        {
-            var parent = CreateGroup("Zone_LoadingDock");
-
-            // 台体
-            var platform = CreateBox(
-                "Dock_Platform",
-                new Vector3(DockCenterX, DockHeight * 0.5f, DockCenterZ),
-                new Vector3(22f, DockHeight, 9f),
-                parent);
-            SetMaterialColor(platform, DockColor);
-
-            // 两条坡道，分别位于台体东、西两端，让上下台都有两条路
-            CreateRamp("Dock_Ramp_West", -4f, -15f, -19.5f, 3.5f, DockHeight, 0.3f, parent);
-            CreateRamp("Dock_Ramp_East", 8f, -15f, -19.5f, 3.5f, DockHeight, 0.3f, parent);
-
-            // 台上的货箱与挡墙：挡墙沿西、东两端布置，留着北面朝向坡道
-            var dockProps = new (Vector3 Position, Vector3 Size, Color Color)[]
-            {
-                (new Vector3(-3f, DockHeight, -25f), new Vector3(2f, 1.4f, 2f), new Color(0.62f, 0.50f, 0.32f)),
-                (new Vector3(5f, DockHeight, -26f), new Vector3(2.5f, 1.2f, 2f), new Color(0.58f, 0.47f, 0.30f)),
-                (new Vector3(-8.4f, DockHeight, -23.5f), new Vector3(0.8f, 0.9f, 9f), BarrierColor),
-                (new Vector3(12.4f, DockHeight, -23.5f), new Vector3(0.8f, 0.9f, 9f), BarrierColor),
-            };
-
-            for (var i = 0; i < dockProps.Length; i++)
-            {
-                var (position, size, color) = dockProps[i];
-                var prop = CreateBox(
-                    $"Dock_Prop_{i + 1:D2}",
-                    new Vector3(position.x, position.y + (size.y * 0.5f), position.z),
-                    size,
-                    parent);
-                SetMaterialColor(prop, color);
-            }
-        }
-
-        /// <summary>
-        /// 创建外围环道：围栏与散落的混凝土掩体。
-        /// </summary>
-        /// <remarks>
-        /// 外围是玩家往返于各分区与撤离点之间的必经之路，如果完全空旷，
-        /// 就会退化成「谁先看见谁赢」的长距离对枪。几段围栏把环道切成有拐角的走廊，
-        /// 让移动本身也需要判断。
-        /// </remarks>
-        private static void CreateOuterRing()
-        {
-            var parent = CreateGroup("Zone_OuterRing");
-            const float fenceHeight = 2.2f;
-            const float fenceThickness = 0.25f;
-
-            CreateWall("Fence_SpawnEast", 3f, -10f, 8f, false, fenceHeight, fenceThickness, parent, FenceColor);
-            CreateWall("Fence_NorthMid", -16f, 18f, 8f, true, fenceHeight, fenceThickness, parent, FenceColor);
-            CreateWall("Fence_DockEast", 16f, -15f, 6f, false, fenceHeight, fenceThickness, parent, FenceColor);
-            CreateWall("Fence_YardNorth", 20f, 26f, 10f, true, fenceHeight, fenceThickness, parent, FenceColor);
-
-            var barriers = new (Vector3 Position, Vector3 Size)[]
-            {
-                (new Vector3(-14f, 0f, 22f), new Vector3(3f, 1.4f, 0.8f)),
-                (new Vector3(6f, 0f, 22f), new Vector3(3f, 1.4f, 0.8f)),
-                (new Vector3(-26f, 0f, -20f), new Vector3(0.8f, 1.4f, 3f)),
-                (new Vector3(28f, 0f, 14f), new Vector3(0.8f, 1.4f, 3f)),
-            };
-
-            for (var i = 0; i < barriers.Length; i++)
-            {
-                var (position, size) = barriers[i];
-                var barrier = CreateBox(
-                    $"Ring_Barrier_{i + 1:D2}",
-                    new Vector3(position.x, size.y * 0.5f, position.z),
-                    size,
-                    parent);
-                SetMaterialColor(barrier, BarrierColor);
             }
         }
 

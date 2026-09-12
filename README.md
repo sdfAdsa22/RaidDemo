@@ -13,7 +13,9 @@
 ![平台](https://img.shields.io/badge/platform-Windows-blue)
 ![渲染管线](https://img.shields.io/badge/URP-17.6.0-green)
 
-> **当前开发状态**：`M6 局外系统` **全部完成**（2026-09-12，批次 1~4）。
+> **当前开发状态**：`M7 打磨与美术替换` **进行中**——批次 0（素材收口）、批次 1（角色与动画）、
+> **批次 2（下沉盆地地形 + 场景道具）已完成**（2026-09-12，362 项测试全绿）。
+> `M6 局外系统` 已全部完成（批次 1~4）。
 > 现在的完整循环是：**启动 → 主菜单（继续 / 新游戏）→ 安全屋（准备装备 / 买装备 / 接任务 / 试枪 / 选地图）→ 战局 → 撤离或阵亡 → 结算 → 回安全屋**。
 > 局外部分已经能存东西、也能真的丢东西：**撤离把战利品存进仓库，阵亡、超时或中途强退则连身上带的一起丢**；
 > **战利品可以卖给商人，金币可以购买下一套装备，五个固定任务与本地存档把很多局串成一条进度线**。
@@ -87,7 +89,7 @@
 | M4 | AI 系统（含开发者模式） | **已完成**（2026-09-11 验收通过，当前 312 项测试全绿） |
 | M5 | 战局闭环（首个垂直切片） | **已完成**（2026-09-11，326 项测试全绿） |
 | M6 | 局外系统与经济循环 | **全部完成**（2026-09-12，345 项测试全绿）：仓库跨战局存活、撤离入库、阵亡真的丢装备、安全屋、商人买卖与 75% 收购价、五个固定任务、JSON 本地存档与「强退视同阵亡」。见 [`Docs/Modules/06_Meta.md`](Docs/Modules/06_Meta.md) |
-| M7 | 打磨与美术替换 | **进行中**（批次 0 完成；批次 1 进行中：玩家角色已换成 Kenney 角色并接入战局与安全屋，敌人替换待做） |
+| M7 | 打磨与美术替换 | **进行中**（2026-09-12，362 项测试全绿）：批次 0 素材收口 + Git LFS ✅；批次 1 角色与动画（玩家 Kenney 角色、敌人 Toon Shooter 三型）✅；**批次 2 场景与道具**✅——战局地图改为**下沉盆地**（谷底 -6 米、四通道、四个撤离点）、纯草地 + 橙黏土土墙 + 远景山脊，集装箱 / 木箱 / 纸箱 / 铁丝网 / 沙袋全部替换为正式素材，相机加遮挡回避；待做：批次 3 音效与 VFX、批次 4 UI 美化与角色选择、批次 5 性能、批次 6 验收 |
 | M8 | 交付物 | 未开始 |
 | M9 | 联机（专用服务器 + PVE 合作） | 未开始 |
 | M10 | 热更新（资源 + 代码） | 未开始 |
@@ -365,11 +367,24 @@
 
 ## 素材来源与授权
 
-> ⚠️ 本节将在 M7 选型完成后补全。届时列出全部采用的外部资源，包括名称、作者、来源链接与授权协议。
+**当前状态**：M0~M6 全部使用程序化生成的灰盒资源；M7 批次 0 完成素材调研与技术准备，
+批次 1 / 2 开始引入正式素材。完整台账见
+[`Docs/Assets/M7_素材使用与归档清单.md`](Docs/Assets/M7_素材使用与归档清单.md)。
 
-**当前状态**：M0~M6 使用程序化生成的灰盒资源，未引入任何外部素材；M7 批次 0 已完成素材调研与技术准备，
-候选短名单见 [`Docs/Assets/M7_素材选型与技术标准.md`](Docs/Assets/M7_素材选型与技术标准.md)（**待负责人拍板**），
-批次 0 同时启用了 **Git LFS**（见 [ADR-006](Docs/Decisions/ADR-006-采用GitLFS管理大型美术资源.md)）。
+| 资源 | 用途 | 授权 | 来源 |
+| --- | --- | --- | --- |
+| [Kenney Mini Characters](https://kenney.nl/assets/mini-characters) | 玩家角色与 384 段动画 | CC0 | kenney.nl |
+| [Quaternius Toon Shooter Game Kit](https://quaternius.com/packs/toonshootergamekit.html) | AI 敌人、木箱 / 纸箱 / 铁丝网 / 沙袋、远景工业建筑 | CC0 | quaternius.com |
+| [Kenney City Kit (Industrial)](https://kenney.nl/assets/city-kit-industrial) | 集装箱堆场（shipping-container-a/b/c）与水塔 / 储罐 | CC0 | kenney.nl |
+| [Kenney Nature Kit](https://kenney.nl/assets/nature-kit) | 地图外圈远景山脊（cliff / rock 模块） | CC0 | kenney.nl |
+| [Broken Vector Low Poly Cliff Pack](https://brokenvector.itch.io/low-poly-cliff-pack) | 盆地主墙的悬崖装饰瓦片 | 免费商用，**未授权再分发原始文件** | brokenvector.itch.io |
+| [Fertile Soil Modular Terrain](https://itch.io/) | 草地色板与模块化造型参考 | CC0 | itch.io |
+
+> **关于 Broken Vector**：该资源包的授权允许在游戏中使用，但**不允许把原始文件再分发到公开仓库**。
+> 因此它的原始文件只存在于本机的候选暂存区（`Assets/Game/Content/External/_Inbox/`，已被 `.gitignore` 忽略），
+> 场景生成器在找不到该素材时会自动回退为纯程序化土墙——**别人克隆仓库后依然能得到一张完整可玩的地图**。
+
+> 批次 0 启用了 **Git LFS**（见 [ADR-006](Docs/Decisions/ADR-006-采用GitLFS管理大型美术资源.md)）。
 
 > **克隆须知**：本仓库自 M7 起使用 Git LFS 管理模型、贴图与音视频文件。请先安装
 > [Git LFS](https://git-lfs.com)，再执行 `git clone`；否则这些文件只会是指针文件。

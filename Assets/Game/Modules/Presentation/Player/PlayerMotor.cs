@@ -31,8 +31,17 @@ namespace RaidDemo.Presentation
         /// </remarks>
         [SerializeField] private bool m_SnapToGround = true;
 
-        /// <summary>地面探测的起始高度（米）。探测从角色头顶上方这么高的位置向下打射线。</summary>
-        [SerializeField] private float m_GroundProbeHeight = 4f;
+        /// <summary>
+        /// 地面探测的起始高度（米）。探测从角色头顶上方这么高的位置向下打射线，总长是它的两倍。
+        /// </summary>
+        /// <remarks>
+        /// M7 批次 2 把地图改成下沉盆地后，地形高差达到 6 米（谷底 -6、塬面 0），
+        /// 原来的 4 米只覆盖 8 米总长，站在塬面边缘走下坡道时可能探不到脚下的地面。
+        /// 提到 8 米（总长 16 米）后，无论是从装卸平台跳下还是从塬面沿坡道下行，
+        /// 射线都能命中真正的地面。向上方向的过滤仍由 <see cref="MaxStepUpHeight"/> 负责，
+        /// 因此「栅栏顶被当成地面」这类问题不会因为探得更远而复现。
+        /// </remarks>
+        [SerializeField] private float m_GroundProbeHeight = 8f;
 
         /// <summary>
         /// 地面吸附允许的最大抬升高度（米）。

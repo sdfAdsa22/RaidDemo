@@ -30,6 +30,13 @@ namespace RaidDemo.Presentation
         /// <summary>身体半径（米）。</summary>
         private const float BodyRadius = 0.4f;
 
+        /// <summary>
+        /// 落地采样的搜索半径（米）。必须 ≥ 地图最大高差 + 余量，
+        /// 且必须与 <see cref="NavMeshGroundHeightProvider.SampleHeight"/> 用的半径一致
+        /// （当前地形为下沉盆地，最大高差 6 米，故取 12 米）。
+        /// </summary>
+        private const float GroundSampleRadiusMeters = 12f;
+
         private static readonly Color PatrolColor = new Color(0.35f, 0.72f, 0.42f);
         private static readonly Color InvestigateColor = new Color(0.92f, 0.76f, 0.25f);
         private static readonly Color AlertColor = new Color(1f, 0.58f, 0.16f);
@@ -224,12 +231,17 @@ namespace RaidDemo.Presentation
         ///
         /// <para>采样点要抬到单位当前位置的上方再往下找：若直接拿 y 等于 0 的点去采样，
         /// 站在平台上时该点位于台体内部，采样要么失败、要么把结果拉回地面，
-        /// 表现为「敌人半个身子埋进台面」，而这在俯视角下很难与「敌人被击倒」区分。</para>
+        /// 表现为「敌人半个身子埋进台面」，而这在俯视角下很难与「敌人被击倒」区分。
+        /// 抬高采样是为了让探测点脱离台体内部。</para>
+        ///
+        /// <para><b>搜索半径必须给足：</b>单位刚出生时脚底还没落地，<c>transform.position.y</c>
+        /// 可能离脚下地面很远（下沉盆地的谷底与出生点相差数米）。半径不够时采样失败、
+        /// 回退成 0，敌人会一直浮在 y=0 的空中，而现象与"地形没做对"几乎无法区分。</para>
         /// </remarks>
         private float ResolveGroundHeight(Vector2F position)
         {
             var probe = new Vector3(position.X, transform.position.y + 2f, position.Y);
-            if (NavMesh.SamplePosition(probe, out var hit, 4f, NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(probe, out var hit, GroundSampleRadiusMeters, NavMesh.AllAreas))
             {
                 return hit.position.y;
             }
