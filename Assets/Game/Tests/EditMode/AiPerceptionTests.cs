@@ -205,6 +205,18 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
+        public void Profile_默认反应时间符合当前手感设定()
+        {
+            // 这两个数值直接决定"AI 打起来怕不怕人"，属于会被反复调整的手感参数。
+            // 用测试把它们锁住，是为了让每次调整都必须显式改一次这里——
+            // 避免某次重构悄悄把默认值带回旧版本，而症状只是"感觉 AI 变迟钝了"。
+            var profile = new AIPerceptionProfile();
+
+            Assert.AreEqual(1f, profile.GuaranteedReactionSeconds, 0.001f, "必定发现后的开火延迟应为 1 秒。");
+            Assert.AreEqual(3f, profile.AlertConfirmSeconds, 0.001f, "警惕升级为交战应为 3 秒。");
+        }
+
+        [Test]
         public void Profile_Validate_RejectsEngagementDistanceOutsideGuaranteedRange()
         {
             // 期望交战距离一旦超过必定发现距离，AI 会停在"看得见但不该开火"的位置上站着不开枪。

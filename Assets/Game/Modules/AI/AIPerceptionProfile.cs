@@ -124,7 +124,7 @@ namespace RaidDemo.AI
         /// 非视觉来源进入交战时的反应时间（秒）。
         /// </summary>
         /// <remarks>
-        /// 用于"遭到攻击"这类情形：被打中时必须立刻反应，不能套用 2 秒的观察时间。
+        /// 用于"遭到攻击"这类情形：被打中时必须立刻反应，不能套用 1 秒的观察时间。
         /// 必定发现与警惕确认各有自己的时间（见 <see cref="GuaranteedReactionSeconds"/>
         /// 与 <see cref="AlertConfirmSeconds"/>）。
         /// </remarks>
@@ -135,9 +135,11 @@ namespace RaidDemo.AI
         /// </summary>
         /// <remarks>
         /// 玩家在 6 米内被"一定发现"是规则，但**发现不等于立刻开火**：
-        /// 两秒的窗口让贴脸遭遇仍有转身、换位或抢先开枪的机会。
+        /// 一秒的窗口让贴脸遭遇仍有转身或抢先开枪的机会。
+        /// 窗口从 2 秒收紧到 1 秒，是因为 2 秒在贴脸距离下足够玩家白打一整个弹匣，
+        /// AI 的威胁感被削得太多；1 秒仍然留给玩家一次抢枪的机会。
         /// </remarks>
-        public float GuaranteedReactionSeconds = 2f;
+        public float GuaranteedReactionSeconds = 1f;
 
         /// <summary>
         /// 警惕升级为交战所需的持续观察时长（秒）。
@@ -146,8 +148,10 @@ namespace RaidDemo.AI
         /// 6~9 米内的目标只会引起怀疑：AI 会停下当前动作、转向目标、缓慢逼近并盯着看。
         /// 只有连续观察满这段时间仍然没有跟丢，才升级为交战。
         /// 这段时间也是玩家"侧身躲开或者拉开距离"的机会窗口。
+        /// 从 5 秒收紧到 3 秒：5 秒足够玩家在警惕状态下从容绕后或换弹，
+        /// 3 秒既保留反应空间，又让"被盯上"这件事有实际压力。
         /// </remarks>
-        public float AlertConfirmSeconds = 5f;
+        public float AlertConfirmSeconds = 3f;
 
         /// <summary>警惕状态下的靠近速度（米/秒）。慢于调查速度：此时还不确定。</summary>
         public float AlertSpeed = 2.5f;
