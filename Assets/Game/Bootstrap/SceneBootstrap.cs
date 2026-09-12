@@ -83,6 +83,9 @@ namespace RaidDemo.Bootstrap
         private int m_BackpackContainerId;
         private int m_AmmoPouchContainerId;
 
+        /// <summary>仓库的容器 ID（本场景内有效；网格本身跨场景存活）。</summary>
+        private int m_StashContainerId;
+
         /// <summary>上一帧的负重状态。只有它发生变化时才重新计算移动修正并广播事件。</summary>
         private EncumbranceState m_LastEncumbranceState = EncumbranceState.Light;
 

@@ -1,5 +1,6 @@
 using RaidDemo.Raid;
 using RaidDemo.UI;
+using RaidDemo.Meta;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -41,6 +42,15 @@ namespace RaidDemo.Bootstrap
 
         private MainMenuScreen m_MenuScreen;
         private RaidResultScreen m_ResultScreen;
+
+        /// <summary>
+        /// 局外进度（仓库）。
+        /// </summary>
+        /// <remarks>
+        /// 放在流程控制器上而不是场景里：它标记了 DontDestroyOnLoad，
+        /// 而每开一局都会重新加载场景——放在场景里的东西活不过一局。
+        /// </remarks>
+        public MetaProgress Progress { get; } = new MetaProgress();
 
         /// <summary>当前流程状态。</summary>
         public FlowState State { get; private set; } = FlowState.MainMenu;

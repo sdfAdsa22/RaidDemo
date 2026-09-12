@@ -42,6 +42,11 @@ namespace RaidDemo.Bootstrap
             m_BackpackContainerId = m_ContainerRegistry.Register(backpack, ContainerKind.PlayerBackpack);
             m_AmmoPouchContainerId = m_ContainerRegistry.Register(ammoPouch, ContainerKind.AmmoPouch);
 
+            // 仓库：网格来自跨场景存活的局外进度，这里只是把它登记进本场景的注册表。
+            // 同一份网格会被每一局反复登记，物品因此跨局保留。
+            var progress = RaidFlowController.Ensure().Progress;
+            m_StashContainerId = m_ContainerRegistry.Register(progress.Stash, ContainerKind.Stash);
+
             // 战利品容器不再在这里创建：M5 的容器散布在地图上，
             // 由 InitializeRaid 按场景标记逐个生成（见 SceneBootstrap.Raid.cs）。
             // 这一段只负责「随身携带的那几件东西」。
