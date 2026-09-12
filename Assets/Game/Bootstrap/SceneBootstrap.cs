@@ -54,12 +54,6 @@ namespace RaidDemo.Bootstrap
         /// <summary>物品目录。留空时背包系统仍然可用，但没有可搜刮的物品。</summary>
         [SerializeField] private ItemCatalog m_ItemCatalog;
 
-        /// <summary>主背包的网格尺寸（列 x 行）。</summary>
-        [SerializeField] private Vector2Int m_BackpackSize = new Vector2Int(5, 5);
-
-        /// <summary>弹药挂的格数。固定为一行，横向排列。</summary>
-        [SerializeField] private int m_AmmoPouchCells = 5;
-
         /// <summary>
         /// 承载上限（千克）。
         /// </summary>
@@ -153,6 +147,7 @@ namespace RaidDemo.Bootstrap
             // 此时角色不该移动、敌人不该思考、计时不该走。
             if (m_MoveHandler == null || !m_RaidActive)
             {
+                UpdatePreparation();
                 return;
             }
 
@@ -284,8 +279,9 @@ namespace RaidDemo.Bootstrap
             }
             else
             {
-                // 战局未开始：禁止背包界面响应按键，否则在主菜单里按 Tab 会弹出背包面板。
-                m_InventoryScreen.InputEnabled = false;
+                // 战局未开始：界面仍然接受输入，因为主菜单阶段就是「出击准备」——
+                // 玩家按 Tab 打开仓库，把装备与弹药搬到身上，再按 Enter 出发。
+                m_InventoryScreen.InputEnabled = true;
                 if (m_CombatHud != null)
                 {
                     m_CombatHud.SetVisible(false);

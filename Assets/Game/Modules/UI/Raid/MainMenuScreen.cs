@@ -91,6 +91,13 @@ namespace RaidDemo.UI
 
             RaidScreenFactory.CreateLabel(
                 panel,
+                "出击前按 Tab 打开仓库：把装备与弹药拖到身上，再按 Enter 出发。\n"
+                + "阵亡会连身上带的一起丢，所以「带什么出门」就是这一局的赌注。",
+                new Vector2(48f, 420f), new Vector2(700f, 60f),
+                16, TextAnchor.UpperLeft, HintColor);
+
+            RaidScreenFactory.CreateLabel(
+                panel,
                 "单人 · Windows · 一局 8 分钟",
                 new Vector2(48f, 500f), new Vector2(700f, 26f),
                 15, TextAnchor.MiddleLeft, HintColor);

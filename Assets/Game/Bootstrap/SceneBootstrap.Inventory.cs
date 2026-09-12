@@ -28,23 +28,14 @@ namespace RaidDemo.Bootstrap
                 m_EncumbranceProfile = new EncumbranceProfile();
             }
 
-            var backpack = CreateGrid(m_BackpackSize, "主背包");
-
-            // 弹药挂：一行五格，只收弹药。规则写在网格自身的分类过滤上，
-            // 因此拖拽、堆叠、拆分、整理全部自动可用。
-            var ammoPouch = new InventoryGrid(
-                m_AmmoPouchCells,
-                1,
-                "弹药挂",
-                acceptedCategory: ItemCategory.Ammo);
-
-            m_Loadout = new PlayerLoadout(backpack, new EquipmentLoadout(), ammoPouch);
-            m_BackpackContainerId = m_ContainerRegistry.Register(backpack, ContainerKind.PlayerBackpack);
-            m_AmmoPouchContainerId = m_ContainerRegistry.Register(ammoPouch, ContainerKind.AmmoPouch);
-
-            // 仓库：网格来自跨场景存活的局外进度，这里只是把它登记进本场景的注册表。
-            // 同一份网格会被每一局反复登记，物品因此跨局保留。
+            // 随身携带物来自跨场景存活的局外进度：出击准备就是在它上面做的，
+            // 而每开一局都会重载场景——若在这里新建，玩家准备完一按出击就白准备了。
             var progress = RaidFlowController.Ensure().Progress;
+            m_Loadout = progress.Loadout;
+            m_BackpackContainerId = m_ContainerRegistry.Register(m_Loadout.Backpack, ContainerKind.PlayerBackpack);
+            m_AmmoPouchContainerId = m_ContainerRegistry.Register(m_Loadout.AmmoPouch, ContainerKind.AmmoPouch);
+
+            // 仓库：同一份网格会被每一局反复登记，物品因此跨局保留。
             m_StashContainerId = m_ContainerRegistry.Register(progress.Stash, ContainerKind.Stash);
 
             // 战利品容器不再在这里创建：M5 的容器散布在地图上，
@@ -77,10 +68,14 @@ namespace RaidDemo.Bootstrap
                 RequestUseItemAt);
 
             UpdateEncumbrance(true);
-        }
 
-        /// <summary>没有装备背包时的口袋容量（列 x 行）。</summary>
-        private static readonly Vector2Int PocketSize = new Vector2Int(5, 5);
+            // 换装与容量同步必须**在主菜单阶段就生效**：出击准备就是要在这里换背包与护甲。
+            // 这两个订阅原先写在战局装配里，那样玩家在准备界面换背包不会改格子数，
+            // 要等进了战局才突然变大。
+            m_ArmorSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshPlayerArmor());
+            m_BackpackSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshBackpackCapacity());
+            RefreshBackpackCapacity();
+        }
 
         /// <summary>
         /// 按当前装备的背包重算随身容量。
@@ -104,7 +99,7 @@ namespace RaidDemo.Bootstrap
             var equipped = m_Loadout.Equipment?.Get(EquipmentSlot.Backpack)?.Definition;
             var size = equipped != null && equipped.IsContainer
                 ? equipped.ContainerGridSize
-                : new GridSize(PocketSize.x, PocketSize.y);
+                : new GridSize(RaidDemo.Meta.MetaProgress.PocketWidth, RaidDemo.Meta.MetaProgress.PocketHeight);
 
             var current = m_Loadout.Backpack;
             if (current != null && current.Width == size.Width && current.Height == size.Height)

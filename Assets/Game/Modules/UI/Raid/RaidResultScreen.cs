@@ -156,8 +156,8 @@ namespace RaidDemo.UI
             FillItemRows(items);
 
             m_NoteLabel.text = failed
-                ? "本阶段阵亡不真正扣除物品（仓库将在 M6 落地），这里如实显示损失价值。"
-                : "这些物资将在 M6 接入仓库与经济循环。";
+                ? "随身携带的装备与物资已全部丢失；仓库里的物品不受影响。"
+                : "带出的物品已存入仓库，可在出击准备界面查看。";
 
             SetVisible(true);
         }

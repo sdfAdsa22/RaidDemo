@@ -163,8 +163,6 @@ namespace RaidDemo.Bootstrap
             m_LootSearchSubscription = m_EventBus.Subscribe<LootSearchCompletedEvent>(OnLootSearchCompleted);
             m_ExtractionSubscription = m_EventBus.Subscribe<ExtractionCompletedEvent>(OnExtractionCompleted);
             m_ItemUseSubscription = m_EventBus.Subscribe<ItemUseCompletedEvent>(OnItemUseCompleted);
-            m_ArmorSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshPlayerArmor());
-            m_BackpackSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshBackpackCapacity());
 
             // 带入价值必须在开战前统计，之后背包里的东西就分不清「本来就有的」与「刚搜到的」了。
             m_RaidSession.Start(m_BroughtInValue);

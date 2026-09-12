@@ -149,6 +149,20 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 单独显示或隐藏主菜单面板。
+        /// </summary>
+        /// <param name="visible">是否显示。</param>
+        /// <remarks>
+        /// 用于「出击准备」：玩家在主菜单里按下 Tab 打开仓库整理装备时，
+        /// 菜单必须让开，否则它的遮罩会盖在背包面板上（菜单层级 300 &gt; 背包 200）。
+        /// 关掉背包后菜单要回来，否则玩家会以为退回主菜单了。
+        /// </remarks>
+        public void SetMenuVisible(bool visible)
+        {
+            m_MenuScreen.SetVisible(visible);
+        }
+
+        /// <summary>
         /// 重新加载当前场景。
         /// </summary>
         /// <remarks>

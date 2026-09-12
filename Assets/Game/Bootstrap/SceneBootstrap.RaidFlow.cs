@@ -43,6 +43,34 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 主菜单阶段的「出击准备」：把仓库面板接到背包界面上，并让菜单让位。
+        /// </summary>
+        /// <remarks>
+        /// <para>复用背包界面而不是新做一个准备界面：它已经有装备槽、背包、弹药挂与拖拽规则，
+        /// 而「仓库」对界面来说只是一个容器。唯一要做的就是把它绑到右侧那块面板上——
+        /// 战局里那块显示战利品，主菜单里显示仓库。</para>
+        ///
+        /// <para>菜单必须让开：它的遮罩层级（300）高于背包（200），
+        /// 不让位的话玩家会看到「按了 Tab 但什么都没发生」。</para>
+        /// </remarks>
+        private void UpdatePreparation()
+        {
+            if (m_InventoryScreen == null || m_StashContainerId == 0)
+            {
+                return;
+            }
+
+            var open = m_InventoryScreen.IsOpen;
+            if (open && m_InventoryScreen.LootContainerId != m_StashContainerId)
+            {
+                // 把右侧面板绑到仓库；标题直接用「仓库」，与战局里的「战利品：XXX」区分开。
+                m_InventoryScreen.OpenLootContainer(m_StashContainerId, "仓库");
+            }
+
+            RaidFlowController.Ensure().SetMenuVisible(!open);
+        }
+
+        /// <summary>
         /// 处理医疗品的使用：按键、读条、完成后的回血与消耗。
         /// </summary>
         /// <remarks>
@@ -191,72 +219,6 @@ namespace RaidDemo.Bootstrap
             return picked;
         }
 
-        /// <summary>使用完成：回血并把物品消耗掉。</summary>
-        private void OnItemUseCompleted(ItemUseCompletedEvent evt)
-        {
-            var item = evt.Item;
-            var medical = ResolveMedical(item);
-            if (medical == null)
-            {
-                return;
-            }
-
-            if (m_CombatWorld != null && m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
-            {
-                var healed = Mathf.Min(state.Health + medical.HealAmount, PlayerMaxHealth);
-                state.SetHealth(healed);
-            }
-
-            ConsumeOne(item);
-            if (m_RaidHud != null)
-            {
-                m_RaidHud.ShowHeal(medical.HealAmount);
-            }
-        }
-
-        /// <summary>
-        /// 从堆叠里扣掉一件。
-        /// </summary>
-        /// <remarks>
-        /// 数量大于 1 时用 <c>Split(1)</c> 让原堆减一，拆出来的那一件直接丢弃；
-        /// 只剩一件时整件从格子里移除。两条路径都走物品自身的 API，
-        /// 不直接改数量，避免绕开堆叠规则。
-        /// </remarks>
-        private void ConsumeOne(ItemInstance item)
-        {
-            var grid = FindOwningGrid(item);
-            if (grid == null)
-            {
-                return;
-            }
-
-            if (item.StackCount > 1)
-            {
-                item.Split(1);
-                return;
-            }
-
-            grid.Remove(item);
-        }
-
-        /// <summary>找出某个物品实例当前在哪个随身容器里。</summary>
-        private InventoryGrid FindOwningGrid(ItemInstance item)
-        {
-            var backpack = m_Loadout?.Backpack;
-            if (backpack != null && backpack.Contains(item))
-            {
-                return backpack;
-            }
-
-            var pouch = m_Loadout?.AmmoPouch;
-            if (pouch != null && pouch.Contains(item))
-            {
-                return pouch;
-            }
-
-            return null;
-        }
-
         /// <summary>处理搜刮交互：寻找附近容器、接收交互键、推进读条。</summary>
         private void UpdateLootSearch(
             float deltaTime,
@@ -384,6 +346,28 @@ namespace RaidDemo.Bootstrap
                 evt.ElapsedSeconds,
                 m_BroughtInValue,
                 m_Loadout);
+
+            // 局外结算：这一局的东西到底留不留得下来。
+            // 撤离成功 → 全部搬进仓库；阵亡或超时 → 随身携带物**直接丢弃**（仓库不受影响）。
+            // 这是「装备真的会丢」的唯一实现点，也是 M6 批次 2 的核心。
+            var progress = RaidFlowController.Ensure().Progress;
+            if (evt.Outcome == RaidOutcome.Extracted)
+            {
+                var deposited = progress.DepositLoadoutToStash();
+                if (progress.LastDepositFailures > 0)
+                {
+                    Debug.LogWarning(
+                        $"[RaidDemo] 仓库放不下，{progress.LastDepositFailures} 件物品未能入库。"
+                        + "请先清理仓库再出击。");
+                }
+
+                Debug.Log($"[RaidDemo] 撤离成功，{deposited} 件物品已入库。");
+            }
+            else
+            {
+                // 阵亡与超时同档处理：随身的东西没了，仓库绝对安全。
+                progress.ClearLoadout();
+            }
 
             RaidFlowController.Ensure().ShowResult(result);
         }
