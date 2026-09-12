@@ -179,13 +179,7 @@ namespace RaidDemo.Bootstrap.Editor
             lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
         }
 
-        /// <summary>
-        /// 三个靶子，沿东侧排开。
-        /// </summary>
-        /// <remarks>
-        /// 靶子不进战斗层的单位表（见 <c>ShootingTarget</c> 的说明），
-        /// 因此它们不会出现在击杀统计里，也不会被 AI 当成目标。
-        /// </remarks>
+        /// <summary>三个靶子，沿东侧排开。靶子不进战斗层的单位表（见 ShootingTarget 的说明）。</summary>
         private static void CreateTargets()
         {
             var root = new GameObject("Targets").transform;
@@ -291,10 +285,7 @@ namespace RaidDemo.Bootstrap.Editor
             CreateWall("Wall_North", 0f, halfZ, RoomWidth, true, room, wallColor);
         }
 
-        /// <summary>
-        /// 三处设施：仓库（西）、商人（中）、出口（东），沿北墙一字排开。
-        /// </summary>
-        /// <remarks>排成一排是为了**一眼看全**：从南侧出生抬头就知道这里能做什么。设施变多后再分区。</remarks>
+        /// <summary>设施：仓库（西）、商人（中）、出口（东）沿北墙排开，测试箱在仓库前方。</summary>
         private static void CreateFacilities()
         {
             var root = new GameObject("Facilities").transform;
@@ -302,6 +293,27 @@ namespace RaidDemo.Bootstrap.Editor
             CreateStashBox(root, new Vector3(-8f, 0f, 5f));
             CreateMerchantStall(root, new Vector3(-2f, 0f, 5f));
             CreateExitGate(root, new Vector3(5f, 0f, 5f));
+            CreateDebugCrate(root, new Vector3(-8f, 0f, 1.5f));
+        }
+
+        /// <summary>
+        /// 开发期测试箱：固定产出武器、护甲、头盔、背包，摆在仓库前方。
+        /// </summary>
+        /// <remarks>品红色是刻意的：它必须一眼就能与任何正式物件区分开。交付前删除。</remarks>
+        private static void CreateDebugCrate(Transform parent, Vector3 position)
+        {
+            var host = new GameObject("Facility_DebugCrate");
+            host.transform.SetParent(parent, worldPositionStays: false);
+            host.transform.position = position;
+
+            var box = CreateBox(
+                "TestCrate",
+                position + new Vector3(0f, 0.6f, 0f),
+                new Vector3(1.6f, 1.2f, 1.2f),
+                host.transform);
+            SetColor(box, new Color(0.85f, 0.25f, 0.85f));
+
+            AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.DebugCrate, "测试箱", position);
         }
 
         /// <summary>仓库箱：一个带交互标记的箱子。</summary>

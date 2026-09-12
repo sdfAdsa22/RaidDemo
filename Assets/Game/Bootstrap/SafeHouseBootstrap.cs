@@ -259,6 +259,11 @@ namespace RaidDemo.Bootstrap
                     m_Ui?.ShowHint("商人：交易功能在批次 3 开放");
                     break;
 
+                case SafeHouseInteractable.Kind.DebugCrate:
+                    // 与战利品共用同一块右侧面板；开完拿走即可，箱子本身不会再生。
+                    m_InventoryScreen?.OpenLootContainer(m_DebugCrateContainerId, "测试箱");
+                    break;
+
                 default:
                     m_Ui?.ShowHint("任务板：批次 4 开放");
                     break;

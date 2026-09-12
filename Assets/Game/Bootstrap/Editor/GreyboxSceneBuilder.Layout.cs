@@ -136,9 +136,6 @@ namespace RaidDemo.Bootstrap.Editor
             ("crate.ammo", new Vector2(22f, -20f), 0f, 0f),
             ("crate.common", new Vector2(0f, 20f), 0f, 0f),
 
-            // 测试箱：出生点旁边，固定产出武器 / 护甲 / 头盔 / 背包。
-            // **交付前删除这一行**（连同 LootContainerCatalog 里的 crate.debug）。
-            ("crate.debug", new Vector2(-1.5f, 1.5f), 0f, 0f),
         };
 
         /// <summary>创建四面外围围墙，把玩家限制在场景内。</summary>
