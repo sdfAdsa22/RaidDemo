@@ -79,6 +79,7 @@ namespace RaidDemo.Bootstrap
             m_CommandRouter.Register(m_MoveHandler);
 
             InitializeInventory();
+            InitializeCombat();
 
             if (m_PlayerMotor != null)
             {
@@ -139,10 +140,12 @@ namespace RaidDemo.Bootstrap
             if (uiOpen)
             {
                 m_MoveHandler.ClearIntent();
+                m_WeaponController?.SetTriggerHeld(false);
             }
             else
             {
                 CollectInput();
+                UpdateWeapon();
             }
 
             m_MoveHandler.Tick(Time.deltaTime);
@@ -154,6 +157,41 @@ namespace RaidDemo.Bootstrap
             }
 
             UpdateInteraction(uiOpen);
+        }
+
+        /// <summary>
+        /// 读取战斗输入并派发命令。与战局用同一条链路，因此手感一致。
+        /// </summary>
+        private void UpdateWeapon()
+        {
+            if (m_WeaponController == null || m_InputCollector == null)
+            {
+                return;
+            }
+
+            // 瞄准方向来自鼠标在角色平面上的投影点，与战局完全相同。
+            var aim = m_InputCollector.LookDirection;
+            m_WeaponController.SetAimDirection(aim);
+            m_WeaponController.SetAimWorldPoint(m_InputCollector.AimWorldPosition);
+
+            m_InputCollector.ReadCombatIntent(out var wantsToFire, out var wantsToReload);
+
+            if (wantsToReload)
+            {
+                m_CommandRouter.Dispatch(new PlayerReloadIntent(
+                    m_InputCollector.PlayerId, ++m_CommandSequence));
+            }
+
+            m_WeaponController.SetTriggerHeld(wantsToFire);
+            if (!wantsToFire)
+            {
+                return;
+            }
+
+            m_CommandRouter.Dispatch(new PlayerFireIntent(
+                m_InputCollector.PlayerId,
+                aim,
+                ++m_CommandSequence));
         }
 
         /// <summary>读取输入并派发移动命令。与战局用同一条链路，手感因此完全一致。</summary>
