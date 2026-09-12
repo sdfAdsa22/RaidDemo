@@ -116,9 +116,10 @@ namespace RaidDemo.UI
             // 战利品与仓库放在**右侧独立一列**：它们与随身物品是两处东西，
             // 竖着叠在背包下方既挤又容易压出面板边界（仓库是 10 列宽）。
             //
-            // 这块面板在这里**只算位置、不创建**：战局里的容器只有搜刮读条完成后才需要出现，
-            // 准备界面的仓库由装配层显式打开（见 OpenLootContainer / OpenStash）。
-            m_LootAnchorTopLeft = new Vector2(600f, 56f);
+            // 横坐标必须**按背包实际宽度推算**，不能写死：背包由装备决定（5x5 / 6x6 / 7x7），
+            // 写死 600 时，换成 6x6 的背包就会与这一列压在一起（宽度变成 336，超出预留的 320）。
+            var backpackColumnWidth = backpack.Width * InventoryGridView.CellSize;
+            m_LootAnchorTopLeft = new Vector2(280f + backpackColumnWidth + 40f, 56f);
         }
 
         /// <summary>创建设备槽一列。</summary>
