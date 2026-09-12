@@ -39,10 +39,20 @@ namespace RaidDemo.Presentation
         private AiAgent m_Agent;
         private CombatTargetView m_TargetView;
         private Transform m_FacingIndicator;
+        private GameObject m_CharacterPrefab;
+        private Animator m_Animator;
+        private Vector3 m_LastPosition;
+        private float m_SmoothedSpeed;
         private IDisposable m_StateSubscription;
         private IDisposable m_DamageSubscription;
+        private IDisposable m_FireSubscription;
         private AiStateId m_LastState = AiStateId.Patrol;
         private bool m_Destroyed;
+
+        private static readonly int SpeedId = Animator.StringToHash("Speed");
+        private static readonly int ShootId = Animator.StringToHash("Shoot");
+        private static readonly int DieId = Animator.StringToHash("Die");
+        private static readonly int HitId = Animator.StringToHash("Hit");
 
         /// <summary>绑定的 AI 单位。供装配与调试读取。</summary>
         public AiAgent Agent
@@ -57,7 +67,14 @@ namespace RaidDemo.Presentation
         /// <param name="eventBus">事件总线，用于接收状态变化与伤害事件。</param>
         public void Initialize(AiAgent agent, EventBus eventBus)
         {
+            Initialize(agent, eventBus, null);
+        }
+
+        /// <summary>绑定 AI 单位与角色预制体；预制体为空时退化为灰盒胶囊外观。</summary>
+        public void Initialize(AiAgent agent, EventBus eventBus, GameObject characterPrefab)
+        {
             m_Agent = agent;
+            m_CharacterPrefab = characterPrefab;
             BuildVisual();
 
             m_TargetView = gameObject.AddComponent<CombatTargetView>();
@@ -71,6 +88,7 @@ namespace RaidDemo.Presentation
 
             m_StateSubscription = eventBus.Subscribe<AiStateChangedEvent>(OnStateChanged);
             m_DamageSubscription = eventBus.Subscribe<DamageAppliedEvent>(OnDamageApplied);
+            m_FireSubscription = eventBus.Subscribe<WeaponFiredEvent>(OnWeaponFired);
 
             SyncTransform();
         }
@@ -79,12 +97,30 @@ namespace RaidDemo.Presentation
         {
             m_StateSubscription?.Dispose();
             m_DamageSubscription?.Dispose();
+            m_FireSubscription?.Dispose();
         }
 
         private void Update()
         {
             SyncLifeState();
             SyncTransform();
+            SyncAnimation();
+        }
+
+        /// <summary>把移动速度写进 Animator，驱动 Idle / Walk / Run 三态。</summary>
+        /// <remarks>速度由位置差分得到：AI 逻辑层不暴露速度，而表现层只需要"看起来在走还是跑"。</remarks>
+        private void SyncAnimation()
+        {
+            if (m_Animator == null || m_Agent == null)
+            {
+                return;
+            }
+
+            var delta = transform.position - m_LastPosition;
+            m_LastPosition = transform.position;
+            var speed = Time.deltaTime > 0.0001f ? delta.magnitude / Time.deltaTime : 0f;
+            m_SmoothedSpeed = Mathf.Lerp(m_SmoothedSpeed, speed, 0.35f);
+            m_Animator.SetFloat(SpeedId, m_SmoothedSpeed);
         }
 
         /// <summary>
@@ -111,6 +147,7 @@ namespace RaidDemo.Presentation
         {
             m_Destroyed = true;
             m_TargetView?.MarkDestroyed();
+            m_Animator?.SetTrigger(DieId);
 
             // 朝向指示条在死亡后失去意义，藏起来避免看起来还活着。
             if (m_FacingIndicator != null)
@@ -145,7 +182,19 @@ namespace RaidDemo.Presentation
                 return;
             }
 
+            m_Animator?.SetTrigger(HitId);
             m_TargetView.FlashHit();
+        }
+
+        /// <summary>只有本单位开枪才播放射击动作。</summary>
+        private void OnWeaponFired(WeaponFiredEvent evt)
+        {
+            if (m_Animator == null || m_Agent == null || evt.ShooterId != m_Agent.CombatantId)
+            {
+                return;
+            }
+
+            m_Animator.SetTrigger(ShootId);
         }
 
         /// <summary>把逻辑层的平面位置与朝向搬到 Transform 上。</summary>
@@ -227,6 +276,19 @@ namespace RaidDemo.Presentation
             collider.height = BodyHeight;
             collider.radius = BodyRadius;
             collider.center = new Vector3(0f, BodyHeight * 0.5f, 0f);
+
+            // M7 批次 1：优先使用正式角色模型（自带 Animator 与状态动画）。
+            // 碰撞体仍然只有一个、仍在根节点上——射线判定与单位标识的翻译不变。
+            if (m_CharacterPrefab != null)
+            {
+                var visual = Instantiate(m_CharacterPrefab, transform);
+                visual.name = "Character";
+                visual.transform.localPosition = Vector3.zero;
+                visual.transform.localRotation = Quaternion.identity;
+                m_Animator = visual.GetComponentInChildren<Animator>();
+                m_LastPosition = transform.position;
+                return;
+            }
 
             var bodyHeight = BodyHeight - (BodyRadius * 2f);
             var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);

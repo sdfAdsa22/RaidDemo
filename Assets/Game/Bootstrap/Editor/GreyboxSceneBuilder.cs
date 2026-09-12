@@ -254,6 +254,26 @@ namespace RaidDemo.Bootstrap.Editor
             serialized.FindProperty("m_ExtractionDurationSeconds").floatValue = ExtractionDurationSeconds;
             serialized.FindProperty("m_LootSearchDurationSeconds").floatValue = LootSearchDurationSeconds;
             serialized.FindProperty("m_LootSearchRangeMeters").floatValue = LootSearchRangeMeters;
+
+            // 敌人角色外观：三个 Toon Shooter 角色轮换使用（M7 批次 1）。
+            // 预制体为空时 EnemyAgentView 会退化为灰盒胶囊，因此这里允许装配失败。
+            var enemyPrefabs = serialized.FindProperty("m_EnemyCharacterPrefabs");
+            if (enemyPrefabs != null)
+            {
+                var paths = new[]
+                {
+                    "Assets/Game/Content/Art/Characters/Enemies/Character_Soldier.prefab",
+                    "Assets/Game/Content/Art/Characters/Enemies/Character_Hazmat.prefab",
+                    "Assets/Game/Content/Art/Characters/Enemies/Character_Enemy.prefab"
+                };
+                enemyPrefabs.arraySize = paths.Length;
+                for (var i = 0; i < paths.Length; i++)
+                {
+                    enemyPrefabs.GetArrayElementAtIndex(i).objectReferenceValue =
+                        AssetDatabase.LoadAssetAtPath<GameObject>(paths[i]);
+                }
+            }
+
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             var actions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(

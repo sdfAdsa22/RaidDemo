@@ -92,6 +92,9 @@ namespace RaidDemo.Bootstrap
 
         private AiDirector m_AiDirector;
         private EnemyAgentView[] m_EnemyViews;
+
+        /// <summary>敌人角色预制体（Soldier / Hazmat / Enemy 轮换）。由场景生成器装配。</summary>
+        [SerializeField] private GameObject[] m_EnemyCharacterPrefabs;
         private CombatTargetView m_PlayerTargetView;
         private DamageScreenFlash m_DamageFlash;
         private NavMeshSurface m_NavMeshSurface;
@@ -291,7 +294,10 @@ namespace RaidDemo.Bootstrap
                 host.transform.SetParent(root.transform, worldPositionStays: false);
 
                 var view = host.AddComponent<EnemyAgentView>();
-                view.Initialize(agent, m_EventBus);
+                var characterPrefab = m_EnemyCharacterPrefabs != null && m_EnemyCharacterPrefabs.Length > 0
+                    ? m_EnemyCharacterPrefabs[i % m_EnemyCharacterPrefabs.Length]
+                    : null;
+                view.Initialize(agent, m_EventBus, characterPrefab);
                 m_EnemyViews[i] = view;
             }
         }
