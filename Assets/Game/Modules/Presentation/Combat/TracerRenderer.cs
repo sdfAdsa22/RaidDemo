@@ -129,7 +129,12 @@ namespace RaidDemo.Presentation
         /// <summary>把世界坐标压到地面高度，稍微抬高一点避免与地板重叠闪烁。</summary>
         private static Vector3 ProjectToGround(Vector3 point)
         {
-            return new Vector3(point.x, GroundOffset, point.z);
+            // 保留弹道点的真实高度，只加一个小偏移避免与地面/平台面 z-fighting。
+            //
+            // 历史：这里曾经把 Y 强制压成 GroundOffset（"贴地画线"），在平地上看不出问题；
+            // 但装卸平台高 1.25 米，站在平台上的敌人开枪时弹道就被画到平台下面去了——
+            // 表现为"敌人开火了但看不见弹道"，实际上子弹是打中的。
+            return new Vector3(point.x, point.y + GroundOffset, point.z);
         }
 
         /// <summary>取一条可用的线段渲染器，池空时创建新的。</summary>
