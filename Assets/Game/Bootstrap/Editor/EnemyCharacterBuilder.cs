@@ -33,7 +33,17 @@ namespace RaidDemo.Bootstrap.Editor
         };
 
         /// <summary>需要循环播放的剪辑（其余都是一次性动作）。</summary>
-        private static readonly HashSet<string> LoopingClips = new HashSet<string> { "Idle", "Walk", "Run", "Duck" };
+        /// <remarks>
+        /// <para>名单里的 <c>Walk_Shoot</c> / <c>Run_Gun</c> / <c>Run_Shoot</c> 不是"额外想循环的动作"，
+        /// 而是会被兜底链当成走路或跑步播放的剪辑：士兵模型没有 Walk，走路状态取的就是 Run_Gun。
+        /// 它们漏在名单外，表现就是"敌人正常走 0.73 秒，然后保持最后一帧姿势在地面上滑行"。</para>
+        /// <para>这份名单只是一次性批量校准；真正防止漏网的是
+        /// <see cref="EnsureStateLoops"/>，它按"用途"在绑定循环状态时再确认一次。</para>
+        /// </remarks>
+        private static readonly HashSet<string> LoopingClips = new HashSet<string>
+        {
+            "Idle", "Walk", "Run", "Duck", "Walk_Shoot", "Run_Gun", "Run_Shoot"
+        };
 
         /// <summary>
         /// 模型自带的整套武器（全部挂在右手节点下，且会同时显示）。
@@ -65,10 +75,12 @@ namespace RaidDemo.Bootstrap.Editor
             var summary = new System.Text.StringBuilder();
             foreach (var name in CharacterNames)
             {
-                EnsureLoopingClips(name);
+                var loopSettingsChanged = EnsureLoopingClips(name);
                 var controllerPath = BuildController(name);
                 var prefabPath = BuildPrefab(name, controllerPath);
-                summary.Append(prefabPath).Append('\n');
+                summary.Append(prefabPath)
+                    .Append(loopSettingsChanged ? "（循环设置已校准）" : string.Empty)
+                    .Append('\n');
             }
 
             return summary.ToString();
@@ -83,31 +95,10 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>
         /// 给循环类剪辑打开 Loop Time（与玩家角色同一处理，否则会"走两步就滑步"）。
         /// </summary>
-        private static void EnsureLoopingClips(string characterName)
+        /// <returns>导入设置发生变化时为 <c>true</c>。</returns>
+        private static bool EnsureLoopingClips(string characterName)
         {
-            var path = ModelPath(characterName);
-            var importer = AssetImporter.GetAtPath(path) as ModelImporter;
-            if (importer == null)
-            {
-                return;
-            }
-
-            var clips = importer.clipAnimations;
-            if (clips == null || clips.Length == 0)
-            {
-                clips = importer.defaultClipAnimations;
-            }
-
-            foreach (var clip in clips)
-            {
-                var shortName = clip.name.Contains("|")
-                    ? clip.name.Substring(clip.name.LastIndexOf('|') + 1)
-                    : clip.name;
-                clip.loopTime = LoopingClips.Contains(shortName);
-            }
-
-            importer.clipAnimations = clips;
-            importer.SaveAndReimport();
+            return CharacterAnimationLoopTool.ApplyLoopTable(ModelPath(characterName), LoopingClips);
         }
 
         /// <summary>按名称片段取动画剪辑（剪辑名形如 CharacterArmature|Idle）。</summary>
@@ -169,6 +160,12 @@ namespace RaidDemo.Bootstrap.Editor
             var hit = AddState(machine, characterName, "HitReact");
             machine.defaultState = idle;
 
+            // 冒烟确认：Idle / Walk / Run 是"会一直循环下去"的状态，
+            // 万一兜底链选中的剪辑还没开循环，这里当场修掉（详见 CharacterAnimationLoopTool）。
+            EnsureStateLoops(characterName, idle);
+            EnsureStateLoops(characterName, walk);
+            EnsureStateLoops(characterName, run);
+
             AddTransition(idle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
             AddTransition(walk, run, 0.12f, ("Speed", AnimatorConditionMode.Greater, 4.5f));
             AddTransition(run, walk, 0.12f, ("Speed", AnimatorConditionMode.Less, 4.5f));
@@ -200,6 +197,43 @@ namespace RaidDemo.Bootstrap.Editor
 
             AssetDatabase.SaveAssets();
             return path;
+        }
+
+        /// <summary>
+        /// 确认循环状态绑定的剪辑真的会循环，必要时就地打开 Loop Time 并换上新对象。
+        /// </summary>
+        /// <param name="characterName">角色名（用于定位模型资产）。</param>
+        /// <param name="state">刚创建好的循环语义状态。</param>
+        /// <remarks>
+        /// <para>按"用途"而不是"名字"判断：状态会被长期停留在里面，它绑的剪辑就必须循环，
+        /// 名字叫 Walk、Run_Gun 还是别的都无所谓。这条规则比 <see cref="LoopingClips"/> 名单硬，
+        /// 将来换模型（新角色可能只有 Run 没有 Walk）也不会再出现"走一小段后定格滑行"。</para>
+        /// <para>修不了的时候只报错、不抛异常：控制器其余部分仍然可用，
+        /// 但要让人在控制台里一眼看到"这个敌人的循环动画没救回来"。</para>
+        /// </remarks>
+        private static void EnsureStateLoops(string characterName, AnimatorState state)
+        {
+            var clip = state.motion as AnimationClip;
+            if (clip == null || CharacterAnimationLoopTool.IsLooping(clip))
+            {
+                return;
+            }
+
+            var modelPath = ModelPath(characterName);
+            var reloaded = CharacterAnimationLoopTool.EnsureLooping(modelPath, clip);
+            if (reloaded == null)
+            {
+                Debug.LogError(
+                    $"[EnemyCharacterBuilder] {characterName} 的循环状态 {state.name} 绑定了不循环的剪辑 " +
+                    $"{clip.name}，且无法写入导入设置：敌人会保持姿势滑行。");
+                return;
+            }
+
+            // 重新导入会让旧对象失效，必须把状态指向新对象，否则动画控制器会引用一个空壳。
+            state.motion = reloaded;
+            Debug.LogWarning(
+                $"[EnemyCharacterBuilder] {characterName} 的循环状态 {state.name} 用了不循环的剪辑 " +
+                $"{reloaded.name}，已在构建期自动打开 Loop Time。");
         }
 
         private static AnimatorState AddState(

@@ -34,6 +34,18 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>跑步阈值（米/秒），需与移动配置的冲刺阈值一致。</summary>
         private const float SprintThreshold = 5f;
 
+        /// <summary>
+        /// 需要循环播放的剪辑（Kenney 剪辑名是小写、不带模型前缀）。
+        /// </summary>
+        /// <remarks>
+        /// 不在名单里的是一次性动作（射击、倒地），它们必须保持不循环。
+        /// 校准逻辑与"漏勾"后果见 <see cref="CharacterAnimationLoopTool"/>。
+        /// </remarks>
+        private static readonly HashSet<string> LoopingClips = new HashSet<string>
+        {
+            "idle", "walk", "sprint", "holding-right", "holding-left", "holding-both"
+        };
+
         /// <summary>菜单入口：一键重建动画控制器与角色预制体。</summary>
         [MenuItem("RaidDemo/M7/重建玩家角色资产")]
         public static void BuildFromMenu()
@@ -50,10 +62,11 @@ namespace RaidDemo.Bootstrap.Editor
             Directory.CreateDirectory(ArtFolder);
             AssetDatabase.Refresh();
 
-            EnsureLoopingClips();
+            var loopSettingsChanged = EnsureLoopingClips();
             var controllerPath = BuildController();
             var prefabPath = BuildPrefab(controllerPath);
-            return $"controller={controllerPath}\nprefab={prefabPath}";
+            var loopNote = loopSettingsChanged ? "（循环设置已校准）" : string.Empty;
+            return $"controller={controllerPath}{loopNote}\nprefab={prefabPath}";
         }
 
         /// <summary>
@@ -63,33 +76,10 @@ namespace RaidDemo.Bootstrap.Editor
         /// 不打开的话，剪辑播放一次就停在最后一帧：角色位置仍被移动逻辑推着走，
         /// 看起来就是"走两步之后开始滑步"。一次性动作（射击、倒地、拾取）必须保持不循环。
         /// </remarks>
-        private static void EnsureLoopingClips()
+        /// <returns>导入设置发生变化时为 <c>true</c>。</returns>
+        private static bool EnsureLoopingClips()
         {
-            var importer = AssetImporter.GetAtPath(ModelPath) as ModelImporter;
-            if (importer == null)
-            {
-                return;
-            }
-
-            var clips = importer.clipAnimations;
-            if (clips == null || clips.Length == 0)
-            {
-                clips = importer.defaultClipAnimations;
-            }
-
-            var looping = new HashSet<string> { "idle", "walk", "sprint", "holding-right", "holding-left", "holding-both" };
-            foreach (var clip in clips)
-            {
-                if (clip.name.StartsWith("__preview__"))
-                {
-                    continue;
-                }
-
-                clip.loopTime = looping.Contains(clip.name);
-            }
-
-            importer.clipAnimations = clips;
-            importer.SaveAndReimport();
+            return CharacterAnimationLoopTool.ApplyLoopTable(ModelPath, LoopingClips);
         }
 
         /// <summary>创建动画控制器：Idle / ArmedIdle / Walk / Sprint / Shoot / Die。</summary>
@@ -114,6 +104,13 @@ namespace RaidDemo.Bootstrap.Editor
 
             machine.defaultState = idle;
 
+            // 与敌人构建器同一道保险：会长期停留的状态必须绑循环剪辑，
+            // 否则玩家会出现"走两步后保持姿势滑行"（M7 批次 1 已经踩过一次）。
+            EnsureStateLoops(idle);
+            EnsureStateLoops(armedIdle);
+            EnsureStateLoops(walk);
+            EnsureStateLoops(sprint);
+
             AddTransition(idle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
             AddTransition(armedIdle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
             AddTransition(walk, idle, 0.15f, ("Speed", AnimatorConditionMode.Less, 0.2f), ("Armed", AnimatorConditionMode.IfNot, 0f));
@@ -137,6 +134,39 @@ namespace RaidDemo.Bootstrap.Editor
 
             AssetDatabase.SaveAssets();
             return path;
+        }
+
+        /// <summary>
+        /// 确认循环状态绑定的剪辑真的会循环，必要时就地打开 Loop Time 并换上新对象。
+        /// </summary>
+        /// <param name="state">刚创建好的循环语义状态（Idle / Walk / Sprint 这类）。</param>
+        /// <remarks>
+        /// 这是 <see cref="LoopingClips"/> 名单之外的"按用途"校验：名单靠名字，
+        /// 换素材、换命名时容易漏；状态是循环语义，它绑的剪辑就必须循环。
+        /// 修不了时只报错不抛异常，控制器其余部分仍然可用。
+        /// </remarks>
+        private static void EnsureStateLoops(AnimatorState state)
+        {
+            var clip = state.motion as AnimationClip;
+            if (clip == null || CharacterAnimationLoopTool.IsLooping(clip))
+            {
+                return;
+            }
+
+            var reloaded = CharacterAnimationLoopTool.EnsureLooping(ModelPath, clip);
+            if (reloaded == null)
+            {
+                Debug.LogError(
+                    $"[PlayerCharacterBuilder] 循环状态 {state.name} 绑定了不循环的剪辑 {clip.name}，" +
+                    "且无法写入导入设置：玩家会保持姿势滑行。");
+                return;
+            }
+
+            // 重新导入会让旧对象失效，必须把状态指向新对象。
+            state.motion = reloaded;
+            Debug.LogWarning(
+                $"[PlayerCharacterBuilder] 循环状态 {state.name} 用了不循环的剪辑 {reloaded.name}，" +
+                "已在构建期自动打开 Loop Time。");
         }
 
         /// <summary>添加一个状态并绑定 Kenney 动画剪辑（自动跳过 __preview__ 副本）。</summary>
@@ -175,15 +205,7 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>从模型文件里按名称取动画剪辑。</summary>
         private static AnimationClip LoadClip(string clipName)
         {
-            foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(ModelPath))
-            {
-                if (asset is AnimationClip clip && clip.name == clipName)
-                {
-                    return clip;
-                }
-            }
-
-            return null;
+            return CharacterAnimationLoopTool.FindClip(ModelPath, clipName);
         }
 
         /// <summary>

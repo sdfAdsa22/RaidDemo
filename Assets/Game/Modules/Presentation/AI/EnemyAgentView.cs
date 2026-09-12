@@ -42,6 +42,14 @@ namespace RaidDemo.Presentation
         private GameObject m_CharacterPrefab;
         private Animator m_Animator;
         private Vector3 m_LastPosition;
+
+        /// <summary>是否已经采过一次位置。第一次采样只用来对齐基准，不参与速度计算。</summary>
+        /// <remarks>
+        /// 敌人宿主对象是在原点建好、再被搬到 AI 逻辑位置上的。那一次位移属于"装配"而不是"移动"，
+        /// 但位置差分分不出来——少了这道闸门，出生瞬间会被算成每秒几百米的速度，
+        /// 动画状态机随即切进走路/跑步并要花十几帧才衰减回来，表现就是"敌人一出生就原地跑一段"。
+        /// </remarks>
+        private bool m_HasPositionSample;
         private float m_SmoothedSpeed;
         private IDisposable m_StateSubscription;
         private IDisposable m_DamageSubscription;
@@ -119,8 +127,16 @@ namespace RaidDemo.Presentation
                 return;
             }
 
-            var delta = transform.position - m_LastPosition;
-            m_LastPosition = transform.position;
+            var position = transform.position;
+            if (!m_HasPositionSample)
+            {
+                m_HasPositionSample = true;
+                m_LastPosition = position;
+                return;
+            }
+
+            var delta = position - m_LastPosition;
+            m_LastPosition = position;
             var speed = Time.deltaTime > 0.0001f ? delta.magnitude / Time.deltaTime : 0f;
             m_SmoothedSpeed = Mathf.Lerp(m_SmoothedSpeed, speed, 0.35f);
             m_Animator.SetFloat(SpeedId, m_SmoothedSpeed);
@@ -291,7 +307,6 @@ namespace RaidDemo.Presentation
                 visual.transform.localPosition = Vector3.zero;
                 visual.transform.localRotation = Quaternion.identity;
                 m_Animator = visual.GetComponentInChildren<Animator>();
-                m_LastPosition = transform.position;
                 return;
             }
 
