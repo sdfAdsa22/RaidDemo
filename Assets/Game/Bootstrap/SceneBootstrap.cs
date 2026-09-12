@@ -275,6 +275,8 @@ namespace RaidDemo.Bootstrap
                 InitializeAi();
                 InitializeRaid();
                 m_RaidActive = true;
+                // 战局里右侧面板留给战利品，不自动显示仓库。
+                m_InventoryScreen.SetStashContainer(0);
                 flow.HideScreens();
             }
             else
@@ -282,6 +284,9 @@ namespace RaidDemo.Bootstrap
                 // 战局未开始：界面仍然接受输入，因为主菜单阶段就是「出击准备」——
                 // 玩家按 Tab 打开仓库，把装备与弹药搬到身上，再按 Enter 出发。
                 m_InventoryScreen.InputEnabled = true;
+                // 准备界面：界面打开时右侧面板显示仓库（战局里这个值会被清掉，
+                // 那时右侧面板只在搜刮读条完成后出现）。
+                m_InventoryScreen.SetStashContainer(m_StashContainerId);
                 if (m_CombatHud != null)
                 {
                     m_CombatHud.SetVisible(false);

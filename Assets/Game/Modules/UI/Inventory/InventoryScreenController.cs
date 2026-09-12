@@ -29,7 +29,15 @@ namespace RaidDemo.UI
         private const float ReferenceHeight = 1080f;
 
         /// <summary>面板尺寸与位置（像素）。</summary>
-        private const float PanelWidth = 900f;
+        /// <summary>
+        /// 面板宽度（像素）。
+        /// </summary>
+        /// <remarks>
+        /// 从 900 加宽到 1500：右侧要放得下仓库（10x8 = 560 像素宽），
+        /// 而 900 宽时它只能挤在背包下方、还会压出面板边界。
+        /// 1920 参考分辨率下 1500 仍留有余量。
+        /// </remarks>
+        private const float PanelWidth = 1500f;
 
         private const float PanelHeight = 820f;
 
@@ -75,6 +83,16 @@ namespace RaidDemo.UI
 
         /// <summary>当前展示在面板里的战利品容器 ID。0 表示没有打开任何容器。</summary>
         private int m_LootContainerId;
+
+        /// <summary>
+        /// 准备界面用的仓库容器 ID；0 表示本场景没有仓库。
+        /// </summary>
+        /// <remarks>
+        /// 由装配层在登记仓库后写入。界面打开时**主动**把它绑到右侧面板上，
+        /// 而不是每帧去问装配层「现在该显示什么」——被动等待会带来
+        /// 「界面已经开了、面板还空着」的一帧延迟，而且依赖主循环真的在跑。
+        /// </remarks>
+        private int m_PrepStashContainerId;
 
         private int m_AmmoPouchContainerId;
         private EncumbranceProfile m_EncumbranceProfile;
@@ -219,6 +237,16 @@ namespace RaidDemo.UI
         public void OpenStash(int containerId)
         {
             OpenContainerView(containerId, "仓库");
+        }
+
+        /// <summary>
+        /// 设置「准备界面」要显示的仓库容器。
+        /// </summary>
+        /// <param name="containerId">仓库容器 ID；0 表示本场景没有仓库。</param>
+        /// <remarks>由装配层在登记仓库之后调用一次。</remarks>
+        public void SetStashContainer(int containerId)
+        {
+            m_PrepStashContainerId = containerId;
         }
 
         /// <summary>打开指定容器并显示界面。</summary>

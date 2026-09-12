@@ -106,18 +106,19 @@ namespace RaidDemo.UI
             var backpack = m_Loadout.Backpack;
             m_BackpackView = CreateGridView(rootRect, backpack, m_BackpackContainerId, "主背包", new Vector2(280f, 56f));
 
-            // 弹药挂夹在背包与战利品面板之间：它是随身物品的一部分，
-            // 放在背包正下方符合「背包里的东西」这个心理分组。
-            //
-            // 战利品面板在这里**只算位置、不创建**：M5 的容器散布在地图上，
-            // 只有玩家搜刮读条完成后才需要它出现（见 OpenLootContainer）。
-            // 固定创建一块空面板会让界面在没开箱子时也占着半个屏幕。
-            m_LootAnchorTopLeft = new Vector2(280f, 56f + (backpack.Height * InventoryGridView.CellSize) + 20f);
+            // 弹药挂紧贴在背包下方：它是随身物品的一部分，放在一起符合「背包里的东西」这个分组。
+            var pouchTopLeft = new Vector2(280f, 56f + (backpack.Height * InventoryGridView.CellSize) + 20f);
             if (m_Registry.TryGetGrid(m_AmmoPouchContainerId, out var pouch))
             {
-                m_AmmoPouchView = CreateGridView(rootRect, pouch, m_AmmoPouchContainerId, "弹药挂", m_LootAnchorTopLeft);
-                m_LootAnchorTopLeft += new Vector2(0f, (pouch.Height * InventoryGridView.CellSize) + 22f + 24f);
+                m_AmmoPouchView = CreateGridView(rootRect, pouch, m_AmmoPouchContainerId, "弹药挂", pouchTopLeft);
             }
+
+            // 战利品与仓库放在**右侧独立一列**：它们与随身物品是两处东西，
+            // 竖着叠在背包下方既挤又容易压出面板边界（仓库是 10 列宽）。
+            //
+            // 这块面板在这里**只算位置、不创建**：战局里的容器只有搜刮读条完成后才需要出现，
+            // 准备界面的仓库由装配层显式打开（见 OpenLootContainer / OpenStash）。
+            m_LootAnchorTopLeft = new Vector2(600f, 56f);
         }
 
         /// <summary>创建设备槽一列。</summary>
@@ -256,6 +257,15 @@ namespace RaidDemo.UI
             if (m_Root != null)
             {
                 m_Root.SetActive(visible);
+            }
+
+            // 打开界面时若有仓库、且当前没有别的东西占着右侧面板，就显示仓库。
+            // 放在这里而不是等装配层每帧来推：界面一打开就该是完整的样子。
+            if (visible
+                && m_PrepStashContainerId > 0
+                && m_LootContainerId != m_PrepStashContainerId)
+            {
+                OpenStash(m_PrepStashContainerId);
             }
 
             m_SetCursorLock?.Invoke(!visible);
