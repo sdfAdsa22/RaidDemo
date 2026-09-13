@@ -47,7 +47,7 @@ namespace RaidDemo.Tests.PlayMode
         [UnityTest]
         public IEnumerator 启动后进入监听状态()
         {
-            ServerLaunchOptions.TryParse(
+            LaunchOptions.TryParse(
                 new[] { "-server", "-port", TestPort.ToString(), "-room", "测试房间" },
                 out var options,
                 out var parseError);
@@ -70,7 +70,7 @@ namespace RaidDemo.Tests.PlayMode
         [UnityTest]
         public IEnumerator 关闭后停止监听并释放会话()
         {
-            ServerLaunchOptions.TryParse(new[] { "-server", "-port", TestPort.ToString() }, out var options, out _);
+            LaunchOptions.TryParse(new[] { "-server", "-port", TestPort.ToString() }, out var options, out _);
             m_Runtime = ServerRuntime.Create(options);
             yield return null;
 
@@ -87,7 +87,7 @@ namespace RaidDemo.Tests.PlayMode
         [UnityTest]
         public IEnumerator 重复关闭不抛异常()
         {
-            ServerLaunchOptions.TryParse(new[] { "-server", "-port", TestPort.ToString() }, out var options, out _);
+            LaunchOptions.TryParse(new[] { "-server", "-port", TestPort.ToString() }, out var options, out _);
             m_Runtime = ServerRuntime.Create(options);
             yield return null;
 

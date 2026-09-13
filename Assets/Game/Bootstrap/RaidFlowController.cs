@@ -228,6 +228,25 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 直接进入战局状态，不重新加载场景。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么联机客户端需要它：</b>连接到服务器就意味着"我已经在战局里"，
+        /// 不应该再显示主菜单。而且主菜单会把 <c>Time.timeScale</c> 设为 0，
+        /// 网络栈依赖时间推进——停在菜单等于连接永远建立不起来（第一次联调就卡在这里）。</para>
+        ///
+        /// <para>与 <see cref="StartRaid"/> 的区别：本方法不加载场景、不写存档，
+        /// 只调整流程状态。场景由客户端自己按参数加载，战局内容由服务器决定。</para>
+        /// </remarks>
+        public void EnterRaidDirectly()
+        {
+            m_RaidInProgress = true;
+            State = FlowState.InRaid;
+            HideScreens();
+            Time.timeScale = 1f;
+        }
+
+        /// <summary>
         /// 单独显示或隐藏主菜单面板。
         /// </summary>
         /// <param name="visible">是否显示。</param>

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace RaidDemo.Bootstrap
 {
@@ -18,13 +19,48 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否以服务器模式启动。</summary>
         public static bool IsActive { get; private set; }
 
-        /// <summary>服务器启动参数。仅当 <see cref="IsActive"/> 为 true 时有效。</summary>
-        public static ServerLaunchOptions Options { get; private set; }
+        /// <summary>启动参数。仅当 <see cref="IsActive"/> 为 true 时有效。</summary>
+        public static LaunchOptions Options { get; private set; }
 
         /// <summary>由启动入口激活服务器模式。</summary>
-        internal static void Activate(ServerLaunchOptions options)
+        internal static void Activate(LaunchOptions options)
         {
             IsActive = true;
+            Options = options;
+        }
+    }
+
+    /// <summary>
+    /// 本进程是否以联机客户端运行，以及要连接的地址。
+    /// </summary>
+    /// <remarks>
+    /// <para>与 <see cref="ServerMode"/> 对称：客户端也要在装配之前就知道自己的角色，
+    /// 因为"要不要建立网络会话"会改变装配路径——联机客户端的移动由预测与快照驱动，
+    /// 而单机是纯本地模拟。</para>
+    ///
+    /// <para><b>它是 P1~P3 的临时入口</b>：P4 的大厅界面会让玩家在游戏里选服务器，
+    /// 那时本类退化为自动化测试与快速调试用的旁路。</para>
+    /// </remarks>
+    public static class ClientMode
+    {
+        /// <summary>是否以联机客户端启动。</summary>
+        public static bool IsActive { get; private set; }
+
+        /// <summary>要连接的服务器地址（主机[:端口]）。</summary>
+        public static string Address { get; private set; }
+
+        /// <summary>启动参数。仅当 <see cref="IsActive"/> 为 true 时有效。</summary>
+        public static LaunchOptions Options { get; private set; }
+
+        /// <summary>由启动入口激活联机客户端模式。</summary>
+        /// <remarks>
+        /// 公开给编辑器菜单使用：在编辑器里模拟一个联机客户端（<c>RaidDemo/M9/</c> 菜单），
+        /// 这样调试联机时不必每次都出包。正常运行路径仍由 <see cref="ServerEntryPoint"/> 调用。
+        /// </remarks>
+        public static void Activate(LaunchOptions options)
+        {
+            IsActive = true;
+            Address = options.ConnectAddress;
             Options = options;
         }
     }
@@ -54,9 +90,9 @@ namespace RaidDemo.Bootstrap
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void DetectServerMode()
         {
-            if (!ServerLaunchOptions.TryParse(Environment.GetCommandLineArgs(), out var options, out var error))
+            if (!LaunchOptions.TryParse(Environment.GetCommandLineArgs(), out var options, out var error))
             {
-                Debug.LogError($"[启动] 服务器参数解析失败：{error}");
+                Debug.LogError($"[启动] 命令行参数解析失败：{error}");
 
                 if (!Application.isEditor)
                 {
@@ -68,6 +104,12 @@ namespace RaidDemo.Bootstrap
 
             if (!options.IsServerRequested)
             {
+                if (options.Mode == AppLaunchMode.Client)
+                {
+                    ClientMode.Activate(options);
+                    Debug.Log($"[启动] 以联机客户端运行 ｜ 连接 {options.ConnectAddress}");
+                }
+
                 return;
             }
 
@@ -96,6 +138,34 @@ namespace RaidDemo.Bootstrap
             }
 
             ServerRuntime.Create(ServerMode.Options);
+        }
+
+        /// <summary>
+        /// 场景加载后：联机客户端按参数切到地图场景。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>P1~P3 的临时行为：</b>客户端从命令行直接进入战局地图，跳过安全屋。
+        /// P4 的大厅会让玩家在安全屋里点"出击"再进战局，届时这条路径只服务于自动化测试。</para>
+        ///
+        /// <para>之所以要在这里切场景，是因为联机客户端的装配发生在战局场景的启动类里：
+        /// 构建列表的第一个场景是安全屋，那里没有联机装配。</para>
+        /// </remarks>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void StartClientRuntime()
+        {
+            if (!ClientMode.IsActive)
+            {
+                return;
+            }
+
+            var mapScene = ClientMode.Options != null ? ClientMode.Options.MapSceneName : null;
+            if (string.IsNullOrEmpty(mapScene) || SceneManager.GetActiveScene().name == mapScene)
+            {
+                return;
+            }
+
+            Debug.Log($"[启动] 联机客户端加载地图：{mapScene}");
+            SceneManager.LoadScene(mapScene);
         }
     }
 }

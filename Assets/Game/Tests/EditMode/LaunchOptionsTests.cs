@@ -13,19 +13,19 @@ namespace RaidDemo.Tests.EditMode
     /// 因此把每种合法与非法组合都钉在测试里。</para>
     /// </remarks>
     [TestFixture]
-    public sealed class ServerLaunchOptionsTests
+    public sealed class LaunchOptionsTests
     {
         /// <summary>没有任何参数时应拿到默认值，且不认为是服务器启动。</summary>
         [Test]
         public void 无参数时使用默认值且不进入服务器模式()
         {
-            var ok = ServerLaunchOptions.TryParse(new string[0], out var options, out var error);
+            var ok = LaunchOptions.TryParse(new string[0], out var options, out var error);
 
             Assert.IsTrue(ok, error);
             Assert.IsFalse(options.IsServerRequested);
-            Assert.AreEqual(ServerLaunchOptions.DefaultPort, options.Port);
-            Assert.AreEqual(ServerLaunchOptions.DefaultRoomName, options.RoomName);
-            Assert.AreEqual(ServerLaunchOptions.DefaultSaveDirectory, options.SaveDirectory);
+            Assert.AreEqual(LaunchOptions.DefaultPort, options.Port);
+            Assert.AreEqual(LaunchOptions.DefaultRoomName, options.RoomName);
+            Assert.AreEqual(LaunchOptions.DefaultSaveDirectory, options.SaveDirectory);
             Assert.AreEqual(LogLevel.Info, options.MinimumLogLevel);
             Assert.IsFalse(options.IsHeadless);
         }
@@ -34,7 +34,7 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 参数为null时按空处理()
         {
-            var ok = ServerLaunchOptions.TryParse(null, out var options, out var error);
+            var ok = LaunchOptions.TryParse(null, out var options, out var error);
 
             Assert.IsTrue(ok, error);
             Assert.IsFalse(options.IsServerRequested);
@@ -50,7 +50,7 @@ namespace RaidDemo.Tests.EditMode
                 "-logLevel", "warning", "-batchmode", "-nographics",
             };
 
-            var ok = ServerLaunchOptions.TryParse(args, out var options, out var error);
+            var ok = LaunchOptions.TryParse(args, out var options, out var error);
 
             Assert.IsTrue(ok, error);
             Assert.IsTrue(options.IsServerRequested);
@@ -67,18 +67,18 @@ namespace RaidDemo.Tests.EditMode
         {
             var args = new[] { "-server", "-logFile", "server.log", "-screen-width", "1920", "-force-d3d11" };
 
-            var ok = ServerLaunchOptions.TryParse(args, out var options, out var error);
+            var ok = LaunchOptions.TryParse(args, out var options, out var error);
 
             Assert.IsTrue(ok, error);
             Assert.IsTrue(options.IsServerRequested);
-            Assert.AreEqual(ServerLaunchOptions.DefaultPort, options.Port);
+            Assert.AreEqual(LaunchOptions.DefaultPort, options.Port);
         }
 
         /// <summary>端口超范围必须被拒绝——静默截断会让玩家连到一个谁都没监听的端口。</summary>
         [Test]
         public void 端口超范围时解析失败()
         {
-            var ok = ServerLaunchOptions.TryParse(new[] { "-server", "-port", "70000" }, out _, out var error);
+            var ok = LaunchOptions.TryParse(new[] { "-server", "-port", "70000" }, out _, out var error);
 
             Assert.IsFalse(ok);
             Assert.IsNotNull(error);
@@ -89,7 +89,7 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 端口非数字时解析失败()
         {
-            var ok = ServerLaunchOptions.TryParse(new[] { "-server", "-port", "abc" }, out _, out var error);
+            var ok = LaunchOptions.TryParse(new[] { "-server", "-port", "abc" }, out _, out var error);
 
             Assert.IsFalse(ok);
             StringAssert.Contains("-port", error);
@@ -99,7 +99,7 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 开关缺少取值时解析失败()
         {
-            var ok = ServerLaunchOptions.TryParse(new[] { "-server", "-room" }, out _, out var error);
+            var ok = LaunchOptions.TryParse(new[] { "-server", "-room" }, out _, out var error);
 
             Assert.IsFalse(ok);
             StringAssert.Contains("缺少取值", error);
@@ -131,7 +131,7 @@ namespace RaidDemo.Tests.EditMode
 
             foreach (var saveDir in invalid)
             {
-                var ok = ServerLaunchOptions.TryParse(new[] { "-server", "-saveDir", saveDir }, out _, out var error);
+                var ok = LaunchOptions.TryParse(new[] { "-server", "-saveDir", saveDir }, out _, out var error);
 
                 Assert.IsFalse(ok, $"「{saveDir}」应被拒绝。");
                 StringAssert.Contains("相对路径", error);
@@ -142,11 +142,11 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 房间名为空或超长时解析失败()
         {
-            Assert.IsFalse(ServerLaunchOptions.TryParse(new[] { "-server", "-room", "   " }, out _, out var emptyError));
+            Assert.IsFalse(LaunchOptions.TryParse(new[] { "-server", "-room", "   " }, out _, out var emptyError));
             StringAssert.Contains("不能为空", emptyError);
 
-            var tooLong = new string('长', ServerLaunchOptions.MaxRoomNameLength + 1);
-            Assert.IsFalse(ServerLaunchOptions.TryParse(new[] { "-server", "-room", tooLong }, out _, out var longError));
+            var tooLong = new string('长', LaunchOptions.MaxRoomNameLength + 1);
+            Assert.IsFalse(LaunchOptions.TryParse(new[] { "-server", "-room", tooLong }, out _, out var longError));
             StringAssert.Contains("最长", longError);
         }
 
@@ -154,7 +154,7 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 日志等级非法时解析失败()
         {
-            var ok = ServerLaunchOptions.TryParse(new[] { "-server", "-logLevel", "trace" }, out _, out var error);
+            var ok = LaunchOptions.TryParse(new[] { "-server", "-logLevel", "trace" }, out _, out var error);
 
             Assert.IsFalse(ok);
             StringAssert.Contains("verbose", error);
@@ -170,7 +170,7 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 无头参数缺少server时给出警告但仍可继续()
         {
-            var ok = ServerLaunchOptions.TryParse(new[] { "-batchmode" }, out var options, out var error);
+            var ok = LaunchOptions.TryParse(new[] { "-batchmode" }, out var options, out var error);
 
             Assert.IsTrue(ok, error);
             Assert.IsFalse(options.IsServerRequested);
@@ -182,7 +182,7 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 启动摘要包含关键信息()
         {
-            ServerLaunchOptions.TryParse(
+            LaunchOptions.TryParse(
                 new[] { "-server", "-port", "9000", "-room", "测试房" },
                 out var options,
                 out _);

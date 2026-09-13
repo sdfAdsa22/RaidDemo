@@ -18,7 +18,8 @@
         "RaidDemo.Diagnostics",
         "RaidDemo.UI",
         "Unity.AI.Navigation",
-        "Unity.Netcode.Runtime"
+        "Unity.Netcode.Runtime",
+        "Unity.Networking.Transport"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -22,7 +22,7 @@ namespace RaidDemo.Bootstrap
     /// 不需要引擎帮我们同步场景；关掉它能少一整类「加载时序不一致」的故障。</para>
     /// </remarks>
     [DisallowMultipleComponent]
-    public sealed class ServerRuntime : MonoBehaviour
+    public sealed partial class ServerRuntime : MonoBehaviour
     {
         /// <summary>
         /// 服务器仿真频率（Hz）。
@@ -42,7 +42,7 @@ namespace RaidDemo.Bootstrap
         private SessionScope m_Session;
         private NetworkManager m_Network;
         private UnityTransport m_Transport;
-        private ServerLaunchOptions m_Options;
+        private LaunchOptions m_Options;
         private float m_NextHeartbeatTime;
         private bool m_ShutdownRequested;
 
@@ -53,10 +53,19 @@ namespace RaidDemo.Bootstrap
         public NetworkManager Network => m_Network;
 
         /// <summary>启动参数。</summary>
-        public ServerLaunchOptions Options => m_Options;
+        public LaunchOptions Options => m_Options;
 
         /// <summary>是否正在监听。</summary>
         public bool IsListening => m_Network != null && m_Network.IsListening;
+
+        /// <summary>
+        /// 当前进程内的服务器运行时（单例）。
+        /// </summary>
+        /// <remarks>
+        /// 网络回调由框架触发，拿不到构造参数，因此只能通过静态引用转交给权威世界。
+        /// 一个进程只会有一个服务器实例，这个假设是成立的。
+        /// </remarks>
+        public static ServerRuntime Active { get; private set; }
 
         /// <summary>
         /// 创建并启动一个服务器运行时。
@@ -64,7 +73,7 @@ namespace RaidDemo.Bootstrap
         /// <remarks>
         /// 返回的宿主对象标记为跨场景存活：服务器是常驻进程，不该因为场景切换而消失。
         /// </remarks>
-        public static ServerRuntime Create(ServerLaunchOptions options)
+        public static ServerRuntime Create(LaunchOptions options)
         {
             var host = new GameObject("DedicatedServer");
 
@@ -81,9 +90,10 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>初始化会话与网络监听。</summary>
-        private void Initialize(ServerLaunchOptions options)
+        private void Initialize(LaunchOptions options)
         {
             m_Options = options;
+            Active = this;
             m_Session = SessionScope.CreateDedicatedServer(options.MinimumLogLevel);
 
             var log = m_Session.Log;
@@ -96,6 +106,12 @@ namespace RaidDemo.Bootstrap
 
             m_Network = gameObject.AddComponent<NetworkManager>();
             m_Transport = gameObject.AddComponent<UnityTransport>();
+
+            // 以 -logLevel verbose 启动时打开 NGO 的开发者日志：
+            // 连接建立失败时，只有框架自己的日志能说明卡在哪一步（握手、审批还是传输层）。
+            m_Network.LogLevel = options.MinimumLogLevel == RaidDemo.Kernel.LogLevel.Verbose
+                ? Unity.Netcode.LogLevel.Developer
+                : Unity.Netcode.LogLevel.Normal;
 
             // SetConnectionData(远端地址, 端口, 监听地址)：
             // 服务器只用得到「监听地址」这一侧；远端地址填回环即可，它只对客户端连接有意义。
@@ -123,6 +139,8 @@ namespace RaidDemo.Bootstrap
             log.Info(ServerAddressReporter.BuildReport(options.Port));
             log.Info($"[服务器] 存档目录：{options.SaveDirectory}（P5 起用于按账号隔离的进度落库）");
 
+            InitializeMovement();
+
             m_NextHeartbeatTime = Time.unscaledTime + HeartbeatSeconds;
         }
 
@@ -135,6 +153,9 @@ namespace RaidDemo.Bootstrap
             {
                 return;
             }
+
+            // 权威世界的推进独立于心跳：每帧都要走，心跳只是周期性日志。
+            TickMovement(Time.deltaTime);
 
             if (Time.unscaledTime < m_NextHeartbeatTime)
             {
@@ -168,10 +189,17 @@ namespace RaidDemo.Bootstrap
                 m_Network.Shutdown();
             }
 
+            ShutdownMovement();
+
             m_Session?.Dispose();
             m_Session = null;
             m_Network = null;
             m_Transport = null;
+
+            if (ReferenceEquals(Active, this))
+            {
+                Active = null;
+            }
         }
 
         private void OnApplicationQuit()

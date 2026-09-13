@@ -166,30 +166,6 @@ namespace RaidDemo.Bootstrap
             m_Session = null;
         }
 
-        /// <summary>
-        /// 绑定遮挡透视孔：角色被土墙、集装箱挡住时，在遮挡物上以角色为中心开一个圆形透明孔。
-        /// </summary>
-        /// <remarks>
-        /// 组件挂在相机上、目标指向玩家。每次初始化都确保组件存在并重新绑定——
-        /// 场景重载会重建相机，只做一次绑定的话会出现「第一局有透视孔、第二局没有」。
-        /// </remarks>
-        private void BindOcclusionPeephole()
-        {
-            var camera = m_CameraController != null ? m_CameraController.GetComponent<Camera>() : null;
-            if (camera == null || m_PlayerMotor == null)
-            {
-                return;
-            }
-
-            var peephole = camera.GetComponent<OcclusionPeepholeController>();
-            if (peephole == null)
-            {
-                peephole = camera.gameObject.AddComponent<OcclusionPeepholeController>();
-            }
-
-            peephole.Bind(m_PlayerMotor.transform, camera);
-        }
-
         private void Update()
         {
             var flow = RaidFlowController.Ensure();
@@ -259,7 +235,17 @@ namespace RaidDemo.Bootstrap
 
             // 命令只更新意图，模拟推进由 Tick 完成：
             // 这样即使某帧没有输入，角色也会按上一次意图继续移动。
-            m_MoveHandler.Tick(Time.deltaTime);
+            //
+            // 联机客户端的推进方式不同：它必须按 60 Hz 固定步长跑（与服务器一致），
+            // 每个固定步产生一条输入并记录一条预测，因此这里只做分流。
+            if (IsMultiplayerClient)
+            {
+                TickMultiplayerClient(Time.deltaTime);
+            }
+            else
+            {
+                m_MoveHandler.Tick(Time.deltaTime);
+            }
 
             // 把最新位置回写给输入层，使下一帧的瞄准方向基于最新位置计算。
             if (m_InputCollector != null && m_PlayerMotor != null)
@@ -343,6 +329,14 @@ namespace RaidDemo.Bootstrap
             // 但地图与背包仍然装配完成——这样菜单背景就是真实的战局场景，
             // 玩家点「出击」之后看到的画面与菜单里看到的是同一个地方。
             var flow = RaidFlowController.Ensure();
+
+            // 联机客户端：连上服务器就等于已经在战局里。停在主菜单不仅语义不对，
+            // 还会把 timeScale 压成 0——网络栈依赖时间推进，那样连接永远建不起来。
+            if (ClientMode.IsActive && flow.State != RaidFlowController.FlowState.InRaid)
+            {
+                flow.EnterRaidDirectly();
+            }
+
             if (flow.State == RaidFlowController.FlowState.InRaid)
             {
                 InitializeAi();
@@ -381,6 +375,8 @@ namespace RaidDemo.Bootstrap
             }
 
             EnsureCrosshair();
+
+            InitializeMultiplayerClientIfNeeded();
 
             if (m_InputCollector == null)
             {
