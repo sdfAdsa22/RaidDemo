@@ -29,6 +29,14 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>坡道与谷口两侧要为通道让出的半宽（米），比通道本身略宽以留出视觉余量。</summary>
         private const float CorridorDecorationGap = 4.4f;
 
+        /// <summary>撤离点周围不留悬崖装饰的半径（米，只算水平距离）。</summary>
+        /// <remarks>
+        /// U-68（负责人反馈）：南谷口正上方的悬崖瓦片悬在撤离通道顶上，看起来像把路堵了。
+        /// 半径取 6.5 米——南谷口最近的瓦片在 5.6 米处（会被清掉），
+        /// 而其余撤离点最近的合法瓦片在 7.4 米开外（保留），刚好只清掉贴着撤离点的那一块。
+        /// </remarks>
+        private const float ExtractionDecorationGap = 6.5f;
+
         /// <summary>远景山石数量。环向均匀铺开，保证任何方向看出去都有山体。</summary>
         private const int FarRidgeCount = 36;
 
@@ -121,7 +129,7 @@ namespace RaidDemo.Bootstrap.Editor
             return tiles;
         }
 
-        /// <summary>沿一条墙线铺瓦片，自动跳过坡道与谷口占用的位置。</summary>
+        /// <summary>沿一条墙线铺瓦片，自动跳过坡道 / 谷口占用的位置与撤离点正上方。</summary>
         private static void PlaceCliffRow(
             Transform parent,
             List<CliffTile> tiles,
@@ -155,12 +163,37 @@ namespace RaidDemo.Bootstrap.Editor
                     ? new Vector3(cursor, 0f, offset)
                     : new Vector3(offset, 0f, cursor);
 
+                // U-68：撤离点正上方不留瓦片——石头悬在撤离通道顶上会被误读成「路被堵了」。
+                if (IsNearExtractionPoint(position))
+                {
+                    continue;
+                }
+
                 var instance = InstantiateDecoration(tile.Model, position, yaw, parent, scale, material);
                 if (instance != null)
                 {
                     instance.name = $"Cliff_{index:D2}";
                 }
             }
+        }
+
+        /// <summary>判断某个布局坐标是否落在任一撤离点的装饰禁放半径内。</summary>
+        /// <param name="layoutPosition">瓦片位置（布局坐标，谷底为 0）。</param>
+        private static bool IsNearExtractionPoint(Vector3 layoutPosition)
+        {
+            for (var i = 0; i < s_ExtractionZones.Length; i++)
+            {
+                // 撤离点表里的 Center 是水平坐标（x, z），与瓦片位置同处布局坐标系。
+                var center = s_ExtractionZones[i].Center;
+                var dx = layoutPosition.x - center.x;
+                var dz = layoutPosition.z - center.y;
+                if ((dx * dx) + (dz * dz) <= ExtractionDecorationGap * ExtractionDecorationGap)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
 

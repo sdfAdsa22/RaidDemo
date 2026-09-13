@@ -14,6 +14,11 @@ namespace RaidDemo.Bootstrap.Editor
     /// 因此必须避开三类东西——巡逻路线的拐点与连线、战利品容器的摆放点、撤离通道与坡道口。
     /// 位置全部使用布局坐标（谷底为 0），与其余分区表保持一致；
     /// 每条坐标都注明它为什么落在这里，方便以后改地图时不会被无声地挪进通道。</para>
+    ///
+    /// <para><b>U-68（2026-09-13 负责人反馈，已移除三件）：</b>厂房南厅的传送带、
+    /// 装卸平台西坡道上的厢式车、东北角的拖拉机铲车都挡在玩家必经路线上（前两件压着通行路径），
+    /// 按反馈直接删除。删除后车辆编号会自动顺延——这是程序化生成的正常结果，
+    /// 不要在场景里手工改名字。</para>
     /// </remarks>
     public static partial class GreyboxSceneBuilder
     {
@@ -27,8 +32,6 @@ namespace RaidDemo.Bootstrap.Editor
             // 北厅：料斗与机床组成一条横向掩体，避开 (-12.5, 11.5) 的武器架与 (-23, 10.5) 的旧机床。
             ("Prop_Hopper", new Vector3(-20.8f, 0f, 12.3f), 0f),
             ("Prop_Machine", new Vector3(-16.2f, 0f, 11.0f), 0f),
-            // 南厅：传送带贴南墙摆放，避开 (-11.5, -12) 的弹药箱。
-            ("Prop_Conveyor", new Vector3(-16.5f, 0f, -11.5f), 0f),
             // 东厅：货箱堆，避开 x=-15 的南隔断与 (-12, 5.5) 的巡逻终点。
             ("Prop_BoxLarge", new Vector3(-13.5f, 0f, -1.5f), 0f),
             // 西墙管线：纯装饰、无碰撞，贴着墙面走。
@@ -48,11 +51,6 @@ namespace RaidDemo.Bootstrap.Editor
             ("Prop_Truck", new Vector3(26.0f, 0f, -7.0f), 0f),
             // 堆场北侧：平板卡车横在空地上，给北入口提供一段掩体。
             ("Prop_TruckFlat", new Vector3(0.8f, 0f, 12.0f), 0f),
-            // 出生点北侧：厢式车停在谷底中部的开阔地，形成第一段可用的掩体。
-            ("Prop_DeliveryVan", new Vector3(-5.0f, 0f, -15.5f), 90f),
-            // 东北角：挖掘装载机作为工业地标，与 7.5 米水塔形成高低错落的天际线；
-            // 向南退 1 米，避免铲斗越过北侧土墙。
-            ("Prop_TractorShovel", new Vector3(18.5f, 0f, 25.0f), 210f),
             // 堆场东南角：一辆轿车与卡车错开停放，避免看起来像整齐的停车场。
             ("Prop_Sedan", new Vector3(25.5f, 0f, -13.5f), 20f),
             // 厂房北墙外：厢式车补给点，位于厂房与北坡道之间但不挡坡道走廊。
