@@ -185,7 +185,11 @@ namespace RaidDemo.Bootstrap.Editor
             controller.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
 
             var machine = controller.layers[0].stateMachine;
-            var idle = AddState(machine, characterName, "Idle", "Idle_Shoot");
+            // 待机用普通 Idle，而不是 Idle_Shoot。
+            // Idle_Shoot 是 0.367 秒的"站立射击"剪辑：它一旦循环，敌人看起来就是在原地反复举枪、抖枪
+            // （U-63）；不循环则播完僵在最后一帧、待机完全没有动作。待机交给真正的 Idle 循环剪辑，
+            // Idle_Shoot 只留给射击状态，播一遍就由 exitTime 切走。
+            var idle = AddState(machine, characterName, "Idle", "Idle");
             var walk = AddState(machine, characterName, "Walk", WalkClipKeys);
             var run = AddState(machine, characterName, "Run", RunClipKeys);
             var shoot = AddState(machine, characterName, "Idle_Shoot", "Idle_Shoot");
