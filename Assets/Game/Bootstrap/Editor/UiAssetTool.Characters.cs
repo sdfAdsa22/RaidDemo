@@ -31,6 +31,7 @@ namespace RaidDemo.Bootstrap.Editor
         {
             "Assets/Game/Bootstrap/Editor/ItemContentBuilder.cs",
             "Assets/Game/Bootstrap/Editor/PlayerCharacterBuilder.Characters.cs",
+            "Assets/Game/Bootstrap/Editor/SafeHouseSceneBuilder.Facilities.cs",
         };
 
         /// <summary>顶层 Bootstrap 文件里有少量玩家可见提示（例如强退惩罚）。</summary>
@@ -177,15 +178,6 @@ namespace RaidDemo.Bootstrap.Editor
             if (File.Exists(path))
             {
                 CollectAllUiCharacters(File.ReadAllText(path), characters);
-            }
-        }
-
-        /// <summary>把文本里所有“可能显示”的字符加入集合。</summary>
-        private static void CollectAllUiCharacters(string text, HashSet<char> characters)
-        {
-            for (var i = 0; i < text.Length; i++)
-            {
-                AddIfUiCharacter(characters, text[i]);
             }
         }
 

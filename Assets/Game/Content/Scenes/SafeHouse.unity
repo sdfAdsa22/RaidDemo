@@ -3110,7 +3110,7 @@ MonoBehaviour:
   m_text: "\u5B89\u5168\u5C4B \xB7 \u51FA\u51FB\u51C6\u5907\n\nWASD \u79FB\u52A8    \u9F20\u6807 \u7784\u51C6    \u5DE6\u952E \u5C04\u51FB\nR \u88C5\u5F39    \u6EDA\u8F6E / 1 2 \u6362\u6B66\u5668    Tab \u80CC\u5305    E \u4EA4\u4E92\nH \u4F7F\u7528\u533B\u7597\u54C1    \u53F3\u952E\u83DC\u5355\n\n\u8D70\u5230\u4ED3\u5E93\u524D\u6309 E \u6574\u7406\u88C5\u5907\uFF0C\u8D70\u5230\u51FA\u53E3\u524D\u6309 E \u9009\u62E9\u5730\u56FE\u51FA\u51FB\u3002\n\u9635\u4EA1\u4F1A\u4E22\u6389\u968F\u8EAB\u643A\u5E26\u7684\u4E00\u5207\uFF0C\u4ED3\u5E93\u91CC\u7684\u4E1C\u897F\u6C38\u8FDC\u5B89\u5168\u3002\n\n\u3010\u6309 E \u653E\u5927\u8FD9\u9875\u8BF4\u660E\u3011"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: baba8568afb2ccd40b643edaac49072e, type: 2}
-  m_sharedMaterial: {fileID: 4785293805476622995, guid: baba8568afb2ccd40b643edaac49072e, type: 2}
+  m_sharedMaterial: {fileID: -8363762261616971442, guid: baba8568afb2ccd40b643edaac49072e, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

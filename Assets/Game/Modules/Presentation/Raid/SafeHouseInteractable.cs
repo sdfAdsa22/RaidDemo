@@ -56,7 +56,9 @@ namespace RaidDemo.Presentation
         /// <summary>显示名。</summary>
         public string DisplayName
         {
-            get { return m_DisplayName; }
+            // 兜底不是为了让配置错误隐身，而是为了避免交互提示出现「与「」交互」这种空名字；
+            // 真正的名字仍然由场景生成器写入。
+            get { return string.IsNullOrEmpty(m_DisplayName) ? "设施" : m_DisplayName; }
         }
 
         /// <summary>可交互距离（米）。</summary>

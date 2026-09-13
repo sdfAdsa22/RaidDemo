@@ -146,7 +146,9 @@ namespace RaidDemo.Bootstrap
                     PlayFlatCue(catalog.UiClick, 0.5f);
                     break;
                 case UiCue.PanelOpen:
-                    PlayFlatCue(catalog.UiPanelOpen, 0.5f);
+                    // 面板打开统一复用“角色卡点击”的确认音：
+                    // 负责人明确喜欢选择角色界面的那一声，仓库/物品交互不应再另起一套提示音。
+                    PlayFlatCue(catalog.UiConfirm, 0.5f);
                     break;
                 case UiCue.PanelClose:
                     PlayFlatCue(catalog.UiPanelClose, 0.45f);
@@ -258,7 +260,8 @@ namespace RaidDemo.Bootstrap
         /// <summary>搜刮完成：容器开启。</summary>
         private void OnLootSearchCompleted(LootSearchCompletedEvent evt)
         {
-            PlayFlatCue(m_Audio?.Catalog?.LootOpen, 0.6f);
+            // 容器开启与面板打开保持同一套交互音，避免“仓库一声、箱子又一声”。
+            PlayFlatCue(m_Audio?.Catalog?.UiConfirm, 0.6f);
         }
 
         /// <summary>物品入包：一声轻响。</summary>
