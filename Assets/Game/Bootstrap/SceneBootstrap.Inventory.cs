@@ -41,11 +41,16 @@ namespace RaidDemo.Bootstrap
             m_MetaProgress = flow.Progress;
             var progress = m_MetaProgress;
             m_Loadout = progress.Loadout;
-            m_BackpackContainerId = m_ContainerRegistry.Register(m_Loadout.Backpack, ContainerKind.PlayerBackpack);
-            m_AmmoPouchContainerId = m_ContainerRegistry.Register(m_Loadout.AmmoPouch, ContainerKind.AmmoPouch);
+            // 玩家侧容器用**固定编号**（见 ContainerIds）：联机时两端必须对同一个编号
+            // 给出同一个容器，否则背包命令会执行到别人的箱子上。
+            m_BackpackContainerId = m_ContainerRegistry.Register(
+                m_Loadout.Backpack, ContainerKind.PlayerBackpack, ContainerIds.PlayerBackpack);
+            m_AmmoPouchContainerId = m_ContainerRegistry.Register(
+                m_Loadout.AmmoPouch, ContainerKind.AmmoPouch, ContainerIds.AmmoPouch);
 
             // 仓库：同一份网格会被每一局反复登记，物品因此跨局保留。
-            m_StashContainerId = m_ContainerRegistry.Register(progress.Stash, ContainerKind.Stash);
+            m_StashContainerId = m_ContainerRegistry.Register(
+                progress.Stash, ContainerKind.Stash, ContainerIds.Stash);
 
             // 战利品容器不再在这里创建：M5 的容器散布在地图上，
             // 由 InitializeRaid 按场景标记逐个生成（见 SceneBootstrap.Raid.cs）。

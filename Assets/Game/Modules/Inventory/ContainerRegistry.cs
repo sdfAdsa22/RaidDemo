@@ -92,6 +92,40 @@ namespace RaidDemo.Inventory
         }
 
         /// <summary>
+        /// 用一个**指定的** ID 登记顶层容器。
+        /// </summary>
+        /// <param name="grid">容器网格。</param>
+        /// <param name="kind">容器种类。</param>
+        /// <param name="containerId">指定的容器 ID，必须为正且尚未被占用。</param>
+        /// <returns>成功返回该 ID；参数非法或 ID 已被占用时返回 0。</returns>
+        /// <remarks>
+        /// <para><b>为什么需要它：</b>联机里所有背包命令都只带一个整数容器 ID
+        /// （见 <see cref="ContainerIds"/> 的说明）。若 ID 由各自的装配顺序决定，
+        /// 两个进程的同号容器可能指向不同的箱子——命令会"成功执行"，只是执行到了别的箱子上。</para>
+        ///
+        /// <para>自动分配仍然保留：单机与测试里用不到稳定编号，而且显式 ID 与自动 ID
+        /// 混用时要保证不会撞号，因此这里会把内部计数器推到已用 ID 之后。</para>
+        /// </remarks>
+        public int Register(InventoryGrid grid, ContainerKind kind, int containerId)
+        {
+            if (grid == null || containerId <= 0 || m_Grids.ContainsKey(containerId))
+            {
+                return 0;
+            }
+
+            m_Grids[containerId] = grid;
+            m_Kinds[containerId] = kind;
+
+            // 保证后续的自动分配不会撞上刚登记的显式 ID。
+            if (containerId >= m_NextId)
+            {
+                m_NextId = containerId + 1;
+            }
+
+            return containerId;
+        }
+
+        /// <summary>
         /// 替换某个已登记容器的网格。
         /// </summary>
         /// <param name="containerId">容器 ID。</param>

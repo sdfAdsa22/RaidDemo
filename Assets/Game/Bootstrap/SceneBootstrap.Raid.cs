@@ -249,7 +249,10 @@ namespace RaidDemo.Bootstrap
                     definition.GridSize.Width,
                     definition.GridSize.Height,
                     definition.DisplayName);
-                var containerId = m_ContainerRegistry.Register(grid, ContainerKind.Loot);
+                // 场景容器也用固定编号（起始值 + 生成顺序）：生成顺序来自场景里的生成点数组，
+                // 两端读的是同一张地图，因此编号天然一致——这是联机里"同一个箱子"的前提。
+                var containerId = m_ContainerRegistry.Register(
+                    grid, ContainerKind.Loot, ContainerIds.SceneContainer(i));
 
                 // 掉落在这里一次抽完：搜刮读条只是「打开箱子的成本」，
                 // 而不是「逐件抽取」——逐件抽取会让玩家在读条时就猜出箱子里有什么。
