@@ -22,7 +22,7 @@ namespace RaidDemo.Bootstrap.Editor
     /// 采用 Noto Sans SC（SIL OFL 1.1，允许随软件分发），放在
     /// <c>Content/External/Noto/NotoSansSC</c>。</para>
     /// </remarks>
-    public static class UiAssetTool
+    public static partial class UiAssetTool
     {
         /// <summary>中文字体文件（SIL OFL 1.1）。</summary>
         public const string SourceFontPath =
@@ -37,13 +37,13 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>字体图集边长（像素）。</summary>
         /// <remarks>动态字体资产会在运行时按需光栅化字形，图集不够时可以自动开新图集
         /// （见 <c>enableMultiAtlasSupport</c>），因此这里取 1024 起步即可。</remarks>
-        private const int AtlasSize = 1024;
+        private const int AtlasSize = 2048;
 
-        /// <summary>字形采样尺寸。中文笔画多，取 90 能保证小字号下不糊。</summary>
-        private const int SamplingPointSize = 90;
+        /// <summary>字形采样尺寸。界面最大字号 46，取 64 已能保证标题与小字都清晰，同时容纳更多汉字。</summary>
+        private const int SamplingPointSize = 64;
 
         /// <summary>字形内边距，避免相邻字形在图集里互相渗色。</summary>
-        private const int AtlasPadding = 9;
+        private const int AtlasPadding = 6;
 
         /// <summary>菜单入口：导入 TMP 基础资源。</summary>
         /// <remarks>官方入口是 <c>Window &gt; TextMeshPro &gt; Import TMP Essential Resources</c>，
@@ -94,10 +94,29 @@ namespace RaidDemo.Bootstrap.Editor
             }
 
             fontAsset.name = "NotoSansSC SDF";
+
+            // 先扫描项目内所有界面文案，把用到的汉字一次性写进图集。
+            // 不在运行时等 TMP“图集满了再开新页”：本工程已经踩过一次图集扩展失败，
+            // 结果是字符表有记录、字形表没有对应 glyph，界面出现缺字/乱码。
+            var characters = CollectUiCharacters();
+            var added = fontAsset.TryAddCharacters(characters, out var missing, true);
+            if (!added)
+            {
+                Debug.LogWarning(
+                    $"[RaidDemo] 字体预烘焙未完全成功，缺少 {missing.Length} 个字符：" +
+                    $"{DescribeCharacters(missing)}。请检查这些字符是否在当前字体文件中。");
+            }
+
+            // 预烘焙完成后切换为静态字体资产：
+            // 运行时不再写图集，也就不会再出现“动态扩页失败 → 字符有记录、glyph 不存在”的状态。
+            // 后续改界面文案时，字体覆盖测试会失败，提醒重新执行本菜单。
+            fontAsset.atlasPopulationMode = AtlasPopulationMode.Static;
+
             AssetDatabase.DeleteAsset(FontAssetPath);
             AssetDatabase.CreateAsset(fontAsset, FontAssetPath);
 
             // 图集与材质是字体资产的子资源，必须显式挂进去，否则重新打开工程后会丢。
+            // 这一步要放在 TryAddCharacters 之后：多图集支持可能在预烘焙时新建图集页。
             foreach (var texture in fontAsset.atlasTextures)
             {
                 if (texture != null && !AssetDatabase.IsSubAsset(texture))
@@ -111,9 +130,20 @@ namespace RaidDemo.Bootstrap.Editor
                 AssetDatabase.AddObjectToAsset(fontAsset.material, fontAsset);
             }
 
+            // 预烘焙过的字体资产不需要在构建时清空动态数据：
+            // 清空后若运行时扩页失败，构建版会出现与编辑器同样的缺字问题。
+            var serialized = new SerializedObject(fontAsset);
+            var clearOnBuild = serialized.FindProperty("m_ClearDynamicDataOnBuild");
+            if (clearOnBuild != null)
+            {
+                clearOnBuild.boolValue = false;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
             AssetDatabase.SaveAssets();
             var applied = ApplyAsProjectDefault(fontAsset);
-            return $"[RaidDemo] 中文字体资产已生成：{FontAssetPath}（{Directory.GetParent(FontAssetPath)?.Name}）" +
+            return $"[RaidDemo] 中文字体资产已生成：{FontAssetPath}（{Directory.GetParent(FontAssetPath)?.Name}）"
+                   + $"，预烘焙 {characters.Length} 个字符 / {fontAsset.atlasTextures.Length} 张图集" +
                    (applied ? "，并已设为项目默认字体。" : "，但设置默认字体失败（TMP Settings 缺失？）。");
         }
 

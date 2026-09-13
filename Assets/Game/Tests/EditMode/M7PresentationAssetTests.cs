@@ -4,6 +4,7 @@ using NUnit.Framework;
 using RaidDemo.Bootstrap.Editor;
 using RaidDemo.Data;
 using RaidDemo.Presentation;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 
@@ -67,6 +68,20 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsNotNull(catalog.UiCancel, "缺少取消音。" + RebuildHint);
             Assert.IsNotNull(catalog.UiLocked, "缺少未开放提示音。" + RebuildHint);
             Assert.IsNotNull(catalog.UiBuy, "缺少购买成功音。" + RebuildHint);
+        }
+
+        [Test]
+        public void 中文字体资产覆盖全部界面文案()
+        {
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(UiAssetTool.FontAssetPath);
+            Assert.IsNotNull(font,
+                $"中文字体资产缺失：{UiAssetTool.FontAssetPath}。" +
+                "请执行菜单 RaidDemo/UI/重建中文字体资产。");
+
+            var characters = UiAssetTool.CollectUiCharacters();
+            Assert.IsTrue(font.HasCharacters(characters, out var missing),
+                "中文字体资产缺少界面字符：" + new string(missing.ToArray()) +
+                "。请执行菜单 RaidDemo/UI/重建中文字体资产。");
         }
 
         [Test]

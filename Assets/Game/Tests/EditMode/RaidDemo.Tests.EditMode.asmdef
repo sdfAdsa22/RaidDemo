@@ -19,6 +19,7 @@
         "RaidDemo.Meta",
         "RaidDemo.UI",
         "RaidDemo.Bootstrap.Editor",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
