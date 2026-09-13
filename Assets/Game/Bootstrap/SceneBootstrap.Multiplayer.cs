@@ -90,13 +90,8 @@ namespace RaidDemo.Bootstrap
             var (address, port) = SplitAddress(ClientMode.Address);
             m_NetworkTransport.SetConnectionData(address, port);
 
-            m_NetworkClient.NetworkConfig = new NetworkConfig
-            {
-                NetworkTransport = m_NetworkTransport,
-
-                // 与服务器一致：场景由两端各自加载，不通过网络同步场景事件。
-                EnableSceneManagement = false,
-            };
+            // 与服务器共用同一份配置工厂：任何一处差异都会让 NGO 在握手阶段断开连接。
+            m_NetworkClient.NetworkConfig = NetworkConfigFactory.Create(m_NetworkTransport);
 
             m_NetworkClient.OnClientConnectedCallback += OnNetworkConnected;
             m_NetworkClient.OnClientDisconnectCallback += OnNetworkDisconnected;

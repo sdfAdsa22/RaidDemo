@@ -24,15 +24,6 @@ namespace RaidDemo.Bootstrap
     [DisallowMultipleComponent]
     public sealed partial class ServerRuntime : MonoBehaviour
     {
-        /// <summary>
-        /// 服务器仿真频率（Hz）。
-        /// </summary>
-        /// <remarks>
-        /// 取 60 与设计文档第 7.9 节的固定 Tick 一致：移动模拟在 60 Hz 下步进，
-        /// 客户端预测才能用同样的步长复现服务器结果。
-        /// </remarks>
-        private const uint ServerTickRate = 60;
-
         /// <summary>心跳日志间隔（秒）。长时间没有输出会让人怀疑服务器是不是死了。</summary>
         private const float HeartbeatSeconds = 30f;
 
@@ -117,17 +108,9 @@ namespace RaidDemo.Bootstrap
             // 服务器只用得到「监听地址」这一侧；远端地址填回环即可，它只对客户端连接有意义。
             m_Transport.SetConnectionData(ListenAddress, (ushort)options.Port, ListenAddress);
 
-            m_Network.NetworkConfig = new NetworkConfig
-            {
-                NetworkTransport = m_Transport,
-                TickRate = ServerTickRate,
-
-                // P0 不做入房审批：密码校验与账号登录排在 P4。
-                // 人数上限（2~4 人）届时由审批回调拒绝超额连接——NGO 2.13 的 NetworkConfig 没有独立的人数字段。
-                ConnectionApproval = false,
-
-                EnableSceneManagement = false,
-            };
+            // 网络配置与客户端共用同一份工厂：两端不一致时 NGO 会在握手阶段直接断开，
+            // 且只在开发者日志里留一条极难发现的警告（M9-P-11）。
+            m_Network.NetworkConfig = NetworkConfigFactory.Create(m_Transport);
 
             if (!m_Network.StartServer())
             {
