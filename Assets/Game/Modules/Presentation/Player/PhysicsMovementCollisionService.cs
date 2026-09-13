@@ -16,6 +16,11 @@ namespace RaidDemo.Presentation
     /// 不是由物理引擎推出来的。加刚体会让两套权威打架——物理把角色推向一边，
     /// 模拟下一秒又把它拉回来。扫掠只回答「这段位移能不能走、能走多少」，
     /// 权威仍然只有一个。</para>
+    ///
+    /// <para><b>为什么不把单位当墙（U-50）：</b>玩家与 AI 的碰撞胶囊挂在独立单位层上
+    /// （见 <see cref="PhysicsLayers"/>），这里统一改用排除单位层的遮罩。
+    /// 修复前的症状是敌人贴身时把玩家完全挡住、两个模型卡在一起；
+    /// 子弹射线不受影响——战斗查询用的是全层遮罩，照常命中单位。</para>
     /// </remarks>
     public sealed class PhysicsMovementCollisionService : IMovementCollisionWorld
     {
@@ -216,7 +221,7 @@ namespace RaidDemo.Presentation
                 castDirection,
                 m_Hits,
                 distance,
-                ~0,
+                PhysicsLayers.MovementBlockingMask,
                 QueryTriggerInteraction.Ignore);
 
             hit = default;

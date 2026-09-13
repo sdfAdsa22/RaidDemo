@@ -79,6 +79,10 @@ namespace RaidDemo.Presentation
 
         private void Awake()
         {
+            // U-50：玩家也属于「单位」，必须先于任何移动与射线查询完成分层。
+            // 放在 Awake 而不是场景构建器里，是为了让已经提交的场景（不重新生成）同样生效。
+            PhysicsLayers.ApplyUnitLayer(gameObject);
+
             m_LastGroundHeight = transform.position.y - m_GroundOffset;
         }
 
@@ -175,8 +179,9 @@ namespace RaidDemo.Presentation
         /// <para>地面高度由射线探测得出，而不是由移动模拟层提供：模拟层要能在无头服务端运行，
         /// 那里不存在碰撞体。高度属于场景信息，只能由表现层补上。</para>
         ///
-        /// <para>射线要排除两类「假地面」：角色自己的胶囊，以及站在同一位置的敌人。
-        /// 若不排除，玩家贴着一个敌人时会突然被抬高到对方头顶——
+        /// <para>射线要排除两类「假地面」：角色自己的胶囊，以及任何其他单位
+        /// （敌人，以及联机阶段将来的队友）——它们都在 <see cref="PhysicsLayers"/> 登记的单位层上，
+        /// 由遮罩整体排除。若不排除，玩家贴着一个敌人时会突然被抬高到对方头顶，
         /// 在俯视角下看起来像是被弹飞了。取最高命中点而不是最近命中点，
         /// 是为了在坡道与台面衔接处站在较高的那个面上，避免角色半个身子陷进台体。</para>
         /// </remarks>
@@ -206,7 +211,7 @@ namespace RaidDemo.Presentation
                 Vector3.down,
                 m_GroundHits,
                 m_GroundProbeHeight * 2f,
-                ~0,
+                PhysicsLayers.GroundProbeMask,
                 QueryTriggerInteraction.Ignore);
 
             var best = float.NegativeInfinity;
@@ -220,11 +225,6 @@ namespace RaidDemo.Presentation
 
                 if (hit.collider.transform == transform
                     || hit.collider.transform.IsChildOf(transform))
-                {
-                    continue;
-                }
-
-                if (hit.collider.GetComponentInParent<EnemyAgentView>() != null)
                 {
                     continue;
                 }

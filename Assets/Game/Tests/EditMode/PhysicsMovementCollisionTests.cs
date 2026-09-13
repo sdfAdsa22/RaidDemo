@@ -90,6 +90,53 @@ namespace RaidDemo.Tests.EditMode
             Assert.Greater(resolved.Y, 0.9f, "16 度坡道不应阻塞水平移动。");
         }
 
+        [Test]
+        public void 单位层已登记()
+        {
+            Assert.GreaterOrEqual(
+                LayerMask.NameToLayer(PhysicsLayers.UnitsLayerName),
+                0,
+                "TagManager 里必须登记 Units 层：移动遮罩与命中判定的分工依赖它（U-50）。");
+        }
+
+        [Test]
+        public void 单位层上的胶囊不再阻挡移动()
+        {
+            var owner = CreateOwner(Vector3.zero);
+            CreateUnitCapsule(new Vector3(0f, 0.9f, 1f));
+            Physics.SyncTransforms();
+
+            var service = new PhysicsMovementCollisionService(owner.transform, 1.8f, 0.02f);
+
+            service.TryResolveMove(
+                new Vector2F(0f, 0f),
+                new Vector2F(0f, 1f),
+                0.4f,
+                out var resolved);
+
+            Assert.Greater(resolved.Y, 0.9f, "单位层上的胶囊不应阻挡移动（U-50：贴身卡死）。");
+        }
+
+        [Test]
+        public void 默认层上的胶囊仍然阻挡移动()
+        {
+            var owner = CreateOwner(Vector3.zero);
+            var unit = CreateUnitCapsule(new Vector3(0f, 0.9f, 1f));
+            // 对照用例：同样的胶囊留在默认层时仍然是墙，防止"排除层"写错成"排除一切"。
+            unit.layer = 0;
+            Physics.SyncTransforms();
+
+            var service = new PhysicsMovementCollisionService(owner.transform, 1.8f, 0.02f);
+
+            service.TryResolveMove(
+                new Vector2F(0f, 0f),
+                new Vector2F(0f, 1f),
+                0.4f,
+                out var resolved);
+
+            Assert.Less(resolved.Y, 0.5f, "非单位层的实体碰撞体仍然必须挡住移动。");
+        }
+
         private GameObject CreateOwner(Vector3 position)
         {
             var owner = new GameObject("TestOwner");
@@ -100,6 +147,19 @@ namespace RaidDemo.Tests.EditMode
             collider.center = new Vector3(0f, 0.9f, 0f);
             m_Created.Add(owner);
             return owner;
+        }
+
+        private GameObject CreateUnitCapsule(Vector3 position)
+        {
+            var unit = new GameObject("TestUnit");
+            unit.transform.position = position;
+            PhysicsLayers.ApplyUnitLayer(unit);
+            var collider = unit.AddComponent<CapsuleCollider>();
+            collider.height = 1.8f;
+            collider.radius = 0.4f;
+            collider.center = new Vector3(0f, 0.9f, 0f);
+            m_Created.Add(unit);
+            return unit;
         }
 
         private void CreateBox(Vector3 center, Vector3 size)

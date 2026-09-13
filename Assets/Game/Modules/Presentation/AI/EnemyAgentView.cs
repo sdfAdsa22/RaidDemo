@@ -330,6 +330,10 @@ namespace RaidDemo.Presentation
         /// </remarks>
         private void BuildVisual()
         {
+            // U-50：单位独立分层——子弹射线照常命中，移动扫掠不再把单位当墙。
+            // 玩家侧的对应调用在 PlayerMotor.Awake。
+            PhysicsLayers.ApplyUnitLayer(gameObject);
+
             var collider = gameObject.AddComponent<CapsuleCollider>();
             collider.height = BodyHeight;
             collider.radius = BodyRadius;
