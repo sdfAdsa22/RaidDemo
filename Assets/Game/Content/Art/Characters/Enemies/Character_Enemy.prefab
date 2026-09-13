@@ -2043,6 +2043,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1524267582602158981}
   - component: {fileID: 2940052412874255980}
+  - component: {fileID: 6181232270001192589}
   m_Layer: 0
   m_Name: Model
   m_TagString: Untagged
@@ -2090,6 +2091,21 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &6181232270001192589
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8111090128793708698}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 846b2aad3206c784e91930718392c567, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RaidDemo.Presentation::RaidDemo.Presentation.LocomotionAnimationBinding
+  m_WalkDesignSpeed: 1.9
+  m_RunDesignSpeed: 4.2272725
+  m_RunSwitchSpeed: 3.6
 --- !u!1 &8242831835861222727
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -64,6 +65,7 @@ namespace RaidDemo.Tests.EditMode
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+                var loopingClips = CollectLoopingClips(controller);
 
                 foreach (var layer in controller.layers)
                 {
@@ -77,12 +79,76 @@ namespace RaidDemo.Tests.EditMode
 
                         var clip = state.state.motion as AnimationClip;
                         Assert.IsNotNull(clip, $"{path} 的 {name} 状态没有绑定动画剪辑。");
+
+                        // 共享剪辑的例外：循环状态与一次性状态可能用同一段剪辑
+                        // （敌人待机播的就是持枪瞄准的 Idle_Shoot）。一个剪辑只有一份 Loop Time，
+                        // 必须以循环状态的需求为准，否则待机播放 0.367 秒后会僵在最后一帧；
+                        // 一次性状态只有满足"有 exitTime=1 的过渡、播完必定切走"时才允许共享，
+                        // 否则死亡这类会停在原地重播的状态仍然必须被拦住。
+                        if (Contains(loopingClips, clip) && HasExitTimeTransition(state.state))
+                        {
+                            continue;
+                        }
+
                         Assert.IsFalse(
                             AnimationUtility.GetAnimationClipSettings(clip).loopTime,
                             $"{path} 的 {name} 是一次性动作，不应打开 Loop Time（当前剪辑：{clip.name}）。");
                     }
                 }
             }
+        }
+
+        /// <summary>收集所有循环状态引用的剪辑。</summary>
+        private static List<AnimationClip> CollectLoopingClips(AnimatorController controller)
+        {
+            var clips = new List<AnimationClip>();
+            foreach (var layer in controller.layers)
+            {
+                foreach (var state in layer.stateMachine.states)
+                {
+                    if (!IsLoopingState(state.state.name))
+                    {
+                        continue;
+                    }
+
+                    if (state.state.motion is AnimationClip clip && !Contains(clips, clip))
+                    {
+                        clips.Add(clip);
+                    }
+                }
+            }
+
+            return clips;
+        }
+
+        /// <summary>该状态是否存在"播完（exitTime=1）就切走"的过渡。</summary>
+        private static bool HasExitTimeTransition(AnimatorState state)
+        {
+            foreach (var transition in state.transitions)
+            {
+                if (transition.hasExitTime
+                    && transition.exitTime >= 1f
+                    && transition.destinationState != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>剪辑列表里是否已包含同一个对象。</summary>
+        private static bool Contains(List<AnimationClip> clips, AnimationClip clip)
+        {
+            for (var i = 0; i < clips.Count; i++)
+            {
+                if (clips[i] == clip)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>该状态是否属于"会长期停留、必须循环"的类型。</summary>

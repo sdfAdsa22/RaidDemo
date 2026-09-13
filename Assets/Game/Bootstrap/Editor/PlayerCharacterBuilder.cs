@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using RaidDemo.Presentation;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -106,6 +107,12 @@ namespace RaidDemo.Bootstrap.Editor
             var controller = AnimatorController.CreateAnimatorControllerAtPath(path);
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
             controller.AddParameter("Sprinting", AnimatorControllerParameterType.Bool);
+            controller.AddParameter(new AnimatorControllerParameter
+            {
+                name = LocomotionAnimationBinding.RateParameterName,
+                type = AnimatorControllerParameterType.Float,
+                defaultFloat = 1f
+            });
             controller.AddParameter("Armed", AnimatorControllerParameterType.Bool);
             controller.AddParameter("Shoot", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Die", AnimatorControllerParameterType.Trigger);
@@ -117,6 +124,12 @@ namespace RaidDemo.Bootstrap.Editor
             var sprint = AddState(machine, modelPath, "Sprint", "sprint");
             var shoot = AddState(machine, modelPath, "Shoot", "holding-right-shoot");
             var die = AddState(machine, modelPath, "Die", "die");
+
+            // A-02：走路与冲刺的播放倍率随实际速度变化。参数只在移动状态上绑定，
+            // 待机 / 开火 / 倒地仍按剪辑原始速度播放，否则开枪动作会跟着跑速一起被加速。
+            // 默认值必须是 1：视图第一次写参数之前若为 0，走路状态会定格在第一帧。
+            CharacterAnimatorWiring.BindLocomotionRate(walk);
+            CharacterAnimatorWiring.BindLocomotionRate(sprint);
 
             machine.defaultState = idle;
 
@@ -244,12 +257,31 @@ namespace RaidDemo.Bootstrap.Editor
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
+            ApplyLocomotionAnimationBinding(instance, modelPath);
             ApplyProjectMaterial(instance);
 
             PrefabUtility.SaveAsPrefabAsset(container, prefabPath);
             Object.DestroyImmediate(container);
             AssetDatabase.SaveAssets();
             return $"{prefabPath} (scale={scale:F3})";
+        }
+
+        /// <summary>
+        /// 把走 / 冲刺剪辑的设计速度写进模型预制体（A-02）。
+        /// </summary>
+        /// <remarks>
+        /// 玩家不用阈值判断跑步：奔跑与否由模拟层的 <c>IsSprinting</c> 决定，
+        /// 因此 <see cref="LocomotionAnimationBinding.RunSwitchSpeed"/> 写 0。
+        /// </remarks>
+        private static void ApplyLocomotionAnimationBinding(GameObject instance, string modelPath)
+        {
+            var walkClip = LoadClip(modelPath, "walk");
+            var sprintClip = LoadClip(modelPath, "sprint");
+            var binding = instance.AddComponent<LocomotionAnimationBinding>();
+            binding.Configure(
+                LocomotionAnimationRate.DesignSpeed(walkClip, FootstepCadence.WalkStrideMeters),
+                LocomotionAnimationRate.DesignSpeed(sprintClip, FootstepCadence.SprintStrideMeters),
+                0f);
         }
 
         /// <summary>把模型缩放到目标身高，并让脚底落在容器原点。</summary>

@@ -109,11 +109,17 @@ namespace RaidDemo.Presentation
     /// </remarks>
     public struct FootstepCadence
     {
-        /// <summary>步行步幅（米）。成年人步幅约 0.75 米，卡通角色腿短，取 0.75 会显得碎步。</summary>
-        private const float WalkStrideMeters = 0.95f;
+        /// <summary>
+        /// 步行步幅（米）。成年人步幅约 0.75 米，卡通角色腿短，取 0.75 会显得碎步。
+        /// </summary>
+        /// <remarks>
+        /// 公开给移动动画的播放速率换算使用：步幅同时决定"脚步多久响一次"与"动画该走多快"，
+        /// 两边必须是同一个数字，否则会出现脚步与画面各走各的。
+        /// </remarks>
+        public const float WalkStrideMeters = 0.95f;
 
-        /// <summary>奔跑步幅（米）。</summary>
-        private const float SprintStrideMeters = 1.55f;
+        /// <summary>奔跑步幅（米）。公开原因同 <see cref="WalkStrideMeters"/>。</summary>
+        public const float SprintStrideMeters = 1.55f;
 
         /// <summary>两次脚步之间的最小间隔（秒）。</summary>
         private const float MinStepIntervalSeconds = 0.2f;

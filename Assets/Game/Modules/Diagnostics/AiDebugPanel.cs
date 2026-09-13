@@ -138,6 +138,10 @@ namespace RaidDemo.Diagnostics
                 m_Builder.Append($"（可听半径 {snapshot.PlayerNoiseRadiusMeters:F0} 米）");
             }
 
+            // A-02：把速度与播放倍率摆在一起，滑步问题可以当场判断是倍率没跟速度走、
+            // 还是剪辑本身的设计速度估错了。
+            m_Builder.Append($"　速度 {snapshot.PlayerSpeedMetersPerSecond:F1} m/s");
+            m_Builder.Append($"　动画倍率 {snapshot.PlayerPlaybackRate:F2}×");
             m_Builder.Append(snapshot.PlayerSpotted ? "　⚠ 已被发现" : "　未被发现");
             return m_Builder.ToString();
         }

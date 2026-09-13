@@ -41,6 +41,7 @@ namespace RaidDemo.Presentation
         private Transform m_FacingIndicator;
         private GameObject m_CharacterPrefab;
         private Animator m_Animator;
+        private LocomotionAnimationBinding m_AnimationBinding;
         private Vector3 m_LastPosition;
 
         /// <summary>是否已经采过一次位置。第一次采样只用来对齐基准，不参与速度计算。</summary>
@@ -64,6 +65,8 @@ namespace RaidDemo.Presentation
         private static readonly int ShootId = Animator.StringToHash("Shoot");
         private static readonly int DieId = Animator.StringToHash("Die");
         private static readonly int HitId = Animator.StringToHash("Hit");
+        private static readonly int LocomotionRateId =
+            Animator.StringToHash(LocomotionAnimationBinding.RateParameterName);
 
         /// <summary>绑定的 AI 单位。供装配与调试读取。</summary>
         public AiAgent Agent
@@ -140,6 +143,34 @@ namespace RaidDemo.Presentation
             var speed = Time.deltaTime > 0.0001f ? delta.magnitude / Time.deltaTime : 0f;
             m_SmoothedSpeed = Mathf.Lerp(m_SmoothedSpeed, speed, 0.35f);
             m_Animator.SetFloat(SpeedId, m_SmoothedSpeed);
+
+            // A-02：把位置差分得到的速度换算成播放倍率。倍率参数只绑在 Walk / Run 状态上，
+            // 开火、受击、死亡动画不受影响。AI 的速度档位会从巡逻 2 一路升到撤退 4.2，
+            // 没有这层换算时，同一个走路剪辑在五个档位下会以五种不同的打滑程度播放。
+            var designSpeed = ResolveDesignSpeed(m_SmoothedSpeed);
+            m_Animator.SetFloat(
+                LocomotionRateId,
+                LocomotionAnimationRate.Calculate(m_SmoothedSpeed, designSpeed));
+        }
+
+        /// <summary>
+        /// 按当前速度选择该用哪一档设计速度。
+        /// </summary>
+        /// <remarks>
+        /// 阈值不在这里写死：它由角色构建器写进 <see cref="LocomotionAnimationBinding"/>，
+        /// 与动画控制器里 Walk→Run 的过渡条件是同一个值，避免表现层再复制一份常量。
+        /// 绑定缺失时返回 0，倍率退回 1（不缩放），不会因为漏接数据而改变现有表现。
+        /// </remarks>
+        private float ResolveDesignSpeed(float speed)
+        {
+            if (m_AnimationBinding == null)
+            {
+                return 0f;
+            }
+
+            var useRun = m_AnimationBinding.RunSwitchSpeed > 0f
+                         && speed > m_AnimationBinding.RunSwitchSpeed;
+            return useRun ? m_AnimationBinding.RunDesignSpeed : m_AnimationBinding.WalkDesignSpeed;
         }
 
         /// <summary>
@@ -307,6 +338,9 @@ namespace RaidDemo.Presentation
                 visual.transform.localPosition = Vector3.zero;
                 visual.transform.localRotation = Quaternion.identity;
                 m_Animator = visual.GetComponentInChildren<Animator>();
+                m_AnimationBinding = m_Animator != null
+                    ? m_Animator.GetComponent<LocomotionAnimationBinding>()
+                    : null;
                 return;
             }
 

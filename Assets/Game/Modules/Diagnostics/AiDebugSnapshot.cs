@@ -67,6 +67,12 @@ namespace RaidDemo.Diagnostics
         /// <summary>玩家当前档位对应的可听半径（米）。</summary>
         public float PlayerNoiseRadiusMeters { get; private set; }
 
+        /// <summary>玩家当前水平移动速度（米/秒）。用于核对移动动画的播放倍率。</summary>
+        public float PlayerSpeedMetersPerSecond { get; private set; }
+
+        /// <summary>玩家当前移动动画的播放倍率。</summary>
+        public float PlayerPlaybackRate { get; private set; } = 1f;
+
         /// <summary>调度器的战局时钟（秒）。</summary>
         public float ElapsedSeconds { get; private set; }
 
@@ -118,6 +124,8 @@ namespace RaidDemo.Diagnostics
             Target = context.Target;
             PlayerNoiseTier = context.PlayerNoiseTier;
             PlayerNoiseRadiusMeters = Profile != null ? Profile.HearingRadiusFor(PlayerNoiseTier) : 0f;
+            PlayerSpeedMetersPerSecond = context.PlayerSpeedMetersPerSecond;
+            PlayerPlaybackRate = context.PlayerPlaybackRate;
             ElapsedSeconds = director.ElapsedSeconds;
 
             var agents = director.Agents;

@@ -1,3 +1,4 @@
+using RaidDemo.Presentation;
 using UnityEditor.Animations;
 
 namespace RaidDemo.Bootstrap.Editor
@@ -47,6 +48,22 @@ namespace RaidDemo.Bootstrap.Editor
             transition.exitTime = 1f;
             transition.duration = duration;
             AddConditions(transition, conditions);
+        }
+
+        /// <summary>
+        /// 把一个移动状态的速度倍率交给共用浮点参数控制（A-02）。
+        /// </summary>
+        /// <param name="state">走路 / 跑步这类会持续播放的移动状态。</param>
+        /// <remarks>
+        /// <para>只在移动状态上绑定，待机与开火、受击、死亡保持原本的播放速度——
+        /// 全局改 <c>Animator.speed</c> 会把这些一次性动作一起加速，是这一版刻意避开的做法。</para>
+        /// <para>参数名来自 <see cref="LocomotionAnimationBinding.RateParameterName"/>，
+        /// 构建器、运行时视图与测试共用同一个来源，改名时不会漏掉某一处。</para>
+        /// </remarks>
+        public static void BindLocomotionRate(AnimatorState state)
+        {
+            state.speedParameterActive = true;
+            state.speedParameter = LocomotionAnimationBinding.RateParameterName;
         }
 
         private static void AddConditions(

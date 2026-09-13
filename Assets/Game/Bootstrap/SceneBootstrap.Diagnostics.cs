@@ -21,6 +21,7 @@ namespace RaidDemo.Bootstrap
     {
         private AiDebugOverlay m_DebugOverlay;
         private Camera m_DebugViewCamera;
+        private PlayerCharacterView m_DebugPlayerView;
 
         /// <summary>开发者模式总控。未启用时该组件仍然存在，但关闭状态下零开销。</summary>
         public AiDebugOverlay DebugOverlay
@@ -76,6 +77,43 @@ namespace RaidDemo.Bootstrap
         public NoiseTier PlayerNoiseTier
         {
             get { return m_CurrentNoiseTier; }
+        }
+
+        /// <inheritdoc />
+        public float PlayerSpeedMetersPerSecond
+        {
+            get
+            {
+                var view = ResolveDebugPlayerView();
+                return view != null ? view.CurrentSpeedMetersPerSecond : 0f;
+            }
+        }
+
+        /// <inheritdoc />
+        public float PlayerPlaybackRate
+        {
+            get
+            {
+                var view = ResolveDebugPlayerView();
+                return view != null ? view.CurrentPlaybackRate : 1f;
+            }
+        }
+
+        /// <summary>
+        /// 取玩家角色视图，供面板读取移动速度与动画倍率。
+        /// </summary>
+        /// <remarks>
+        /// 与相机引用同样缓存：F2 面板每帧刷新，每帧 <c>GetComponent</c> 是没有必要的开销。
+        /// 视图挂在玩家根节点上，战局开始时就已经存在；找不到时返回 null，面板显示 0 / 1。
+        /// </remarks>
+        private PlayerCharacterView ResolveDebugPlayerView()
+        {
+            if (m_DebugPlayerView == null && m_PlayerMotor != null)
+            {
+                m_DebugPlayerView = m_PlayerMotor.GetComponent<PlayerCharacterView>();
+            }
+
+            return m_DebugPlayerView;
         }
 
         /// <summary>

@@ -27,8 +27,11 @@ namespace RaidDemo.Presentation
         private static readonly int ArmedId = Animator.StringToHash("Armed");
         private static readonly int ShootId = Animator.StringToHash("Shoot");
         private static readonly int DieId = Animator.StringToHash("Die");
+        private static readonly int LocomotionRateId =
+            Animator.StringToHash(LocomotionAnimationBinding.RateParameterName);
 
         private Animator m_Animator;
+        private LocomotionAnimationBinding m_AnimationBinding;
         private GameObject m_VisualRoot;
         private CombatTargetView m_TargetView;
         private PlayerWeaponView m_WeaponView;
@@ -37,6 +40,20 @@ namespace RaidDemo.Presentation
         private IDisposable m_FireSubscription;
         private IDisposable m_DamageSubscription;
         private bool m_IsDead;
+        private float m_CurrentSpeed;
+        private float m_PlaybackRate = 1f;
+
+        /// <summary>最近一次移动事件里的速度（米/秒）。仅供开发者面板读取，不参与玩法。</summary>
+        public float CurrentSpeedMetersPerSecond
+        {
+            get { return m_CurrentSpeed; }
+        }
+
+        /// <summary>当前写入 Animator 的移动动画播放倍率。仅供开发者面板读取。</summary>
+        public float CurrentPlaybackRate
+        {
+            get { return m_PlaybackRate; }
+        }
 
         private void Awake()
         {
@@ -74,6 +91,9 @@ namespace RaidDemo.Presentation
 
             m_VisualRoot = instance;
             m_Animator = instance.GetComponentInChildren<Animator>(true);
+            m_AnimationBinding = m_Animator != null
+                ? m_Animator.GetComponent<LocomotionAnimationBinding>()
+                : null;
         }
 
         /// <summary>
@@ -87,6 +107,9 @@ namespace RaidDemo.Presentation
         private void CacheVisualRoot()
         {
             m_Animator = GetComponentInChildren<Animator>(true);
+            m_AnimationBinding = m_Animator != null
+                ? m_Animator.GetComponent<LocomotionAnimationBinding>()
+                : null;
             if (m_Animator == null)
             {
                 m_VisualRoot = null;
@@ -146,12 +169,23 @@ namespace RaidDemo.Presentation
                 return;
             }
 
+            m_CurrentSpeed = evt.Speed;
             m_Animator.SetFloat(SpeedId, evt.Speed);
 
             // "是否在奔跑"直接用模拟层的结论，而不是再拿速度和一个阈值比一次：
             // 阈值会随负重变化（超载时冲刺门槛会降低），在表现层复制一份必然对不上，
             // 表现为"系统认为你在跑（掉体力、噪音按奔跑算），画面上还在走"。
             m_Animator.SetBool(SprintingId, evt.IsSprinting);
+
+            // A-02：把实际速度换算成播放倍率，写进控制器里只绑在 Walk / Sprint 状态上的参数。
+            // 待机、开火、倒地都有自己的原始速度，不会被这里影响。
+            // 绑定缺失（例如场景里放的是未重建的旧预制体）时 design 传 0，Calculate 返回 1，
+            // 表现与修复前完全一致，不会因为漏接数据而出现定格或快进。
+            var designSpeed = m_AnimationBinding != null
+                ? (evt.IsSprinting ? m_AnimationBinding.RunDesignSpeed : m_AnimationBinding.WalkDesignSpeed)
+                : 0f;
+            m_PlaybackRate = LocomotionAnimationRate.Calculate(evt.Speed, designSpeed);
+            m_Animator.SetFloat(LocomotionRateId, m_PlaybackRate);
         }
 
         /// <summary>只有玩家自己的枪声才触发开火动画（敌人的射击由各自的视图处理）。</summary>

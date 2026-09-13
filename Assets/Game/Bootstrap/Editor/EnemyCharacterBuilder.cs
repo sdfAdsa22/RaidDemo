@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using RaidDemo.Presentation;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -15,7 +16,7 @@ namespace RaidDemo.Bootstrap.Editor
     /// <para>三个角色共用同一套状态：Idle / Walk / Run / Shoot / Death / Hit，
     /// 差别只在模型与贴图，因此控制器逐个生成、预制体逐个保存。</para>
     /// </remarks>
-    public static class EnemyCharacterBuilder
+    public static partial class EnemyCharacterBuilder
     {
         /// <summary>源模型目录（Quaternius Toon Shooter，CC0）。</summary>
         private const string SourceFolder =
@@ -57,6 +58,19 @@ namespace RaidDemo.Bootstrap.Editor
         {
             "Idle", "Walk", "Run", "Duck", "Walk_Shoot", "Run_Gun", "Run_Shoot"
         };
+
+        /// <summary>
+        /// 走路状态的剪辑兜底链。第一个是武装走路（举枪姿态），所以优先于空手走路。
+        /// </summary>
+        /// <remarks>
+        /// 三个角色的剪辑集不一致：士兵模型没有 Walk / Walk_Shoot，按固定名字取会拿到 null，
+        /// 表现就是"这个敌人走路没有动画"。构建控制器与推算设计速度共用这一份链，
+        /// 保证"绑的剪辑"与"算的剪辑长度"不会各说各话。
+        /// </remarks>
+        private static readonly string[] WalkClipKeys = { "Walk_Shoot", "Run_Gun", "Run" };
+
+        /// <summary>跑步状态的剪辑兜底链。构建控制器与推算设计速度共用。</summary>
+        private static readonly string[] RunClipKeys = { "Run_Gun", "Run_Shoot", "Walk" };
 
         /// <summary>
         /// 模型自带的整套武器（全部挂在右手节点下，且会同时显示）。
@@ -160,17 +174,28 @@ namespace RaidDemo.Bootstrap.Editor
 
             var controller = AnimatorController.CreateAnimatorControllerAtPath(path);
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
+            controller.AddParameter(new AnimatorControllerParameter
+            {
+                name = LocomotionAnimationBinding.RateParameterName,
+                type = AnimatorControllerParameterType.Float,
+                defaultFloat = 1f
+            });
             controller.AddParameter("Shoot", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Die", AnimatorControllerParameterType.Trigger);
             controller.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
 
             var machine = controller.layers[0].stateMachine;
             var idle = AddState(machine, characterName, "Idle", "Idle_Shoot");
-            var walk = AddState(machine, characterName, "Walk", "Walk_Shoot", "Run_Gun", "Run");
-            var run = AddState(machine, characterName, "Run", "Run_Gun", "Run_Shoot", "Walk");
-            var shoot = AddState(machine, characterName, "Idle_Shoot");
-            var death = AddState(machine, characterName, "Death");
-            var hit = AddState(machine, characterName, "HitReact");
+            var walk = AddState(machine, characterName, "Walk", WalkClipKeys);
+            var run = AddState(machine, characterName, "Run", RunClipKeys);
+            var shoot = AddState(machine, characterName, "Idle_Shoot", "Idle_Shoot");
+            var death = AddState(machine, characterName, "Death", "Death");
+            var hit = AddState(machine, characterName, "HitReact", "HitReact");
+
+            // A-02：走路与跑步的播放倍率随实际速度变化；开火 / 受击 / 死亡保持原始速度。
+            // 参数默认值为 1：视图第一次写参数前若为 0，移动状态会定格在第一帧。
+            CharacterAnimatorWiring.BindLocomotionRate(walk);
+            CharacterAnimatorWiring.BindLocomotionRate(run);
             machine.defaultState = idle;
 
             // 冒烟确认：Idle / Walk / Run 是"会一直循环下去"的状态，
@@ -248,135 +273,16 @@ namespace RaidDemo.Bootstrap.Editor
                 $"{reloaded.name}，已在构建期自动打开 Loop Time。");
         }
 
+        /// <summary>添加一个状态并绑定剪辑兜底链；状态名与候选剪辑分开传。</summary>
         private static AnimatorState AddState(
             AnimatorStateMachine machine,
             string characterName,
+            string stateName,
             params string[] clipKeys)
         {
-            var state = machine.AddState(clipKeys[0]);
+            var state = machine.AddState(stateName);
             state.motion = ResolveClip(characterName, clipKeys);
             return state;
         }
-
-        /// <summary>生成敌人预制体：解包、缩放、落地、挂 Animator、重赋材质。</summary>
-        private static string BuildPrefab(string characterName, string controllerPath)
-        {
-            var path = $"{ArtFolder}/{characterName}.prefab";
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath(characterName));
-            var container = new GameObject(characterName);
-            var instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
-            instance.name = "Model";
-            instance.transform.SetParent(container.transform, worldPositionStays: false);
-
-            // 解包后再改缩放：嵌套预制体实例上的覆盖在保存新预制体时可能被回退（M7-P-01）。
-            PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
-
-            RemoveExtraWeapons(instance);
-            var scale = FitToHeight(instance, TargetHeight);
-            var animator = instance.AddComponent<Animator>();
-            animator.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
-            animator.applyRootMotion = false;
-            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-
-            ApplyProjectMaterial(characterName, instance);
-
-            PrefabUtility.SaveAsPrefabAsset(container, path);
-            Object.DestroyImmediate(container);
-            AssetDatabase.SaveAssets();
-            return $"{path} (scale={scale:F2})";
-        }
-
-        /// <summary>只保留一把主武器，其余武器节点删除。</summary>
-        private static void RemoveExtraWeapons(GameObject instance)
-        {
-            var toRemove = new List<GameObject>();
-            foreach (var child in instance.GetComponentsInChildren<Transform>(true))
-            {
-                if (child == instance.transform || !WeaponNodes.Contains(child.name))
-                {
-                    continue;
-                }
-
-                if (child.name != PreferredWeapon)
-                {
-                    toRemove.Add(child.gameObject);
-                }
-            }
-
-            foreach (var target in toRemove)
-            {
-                Object.DestroyImmediate(target);
-            }
-        }
-
-        private static float FitToHeight(GameObject instance, float targetHeight)
-        {
-            var renderers = instance.GetComponentsInChildren<Renderer>();
-            if (renderers.Length == 0)
-            {
-                return 1f;
-            }
-
-            var bounds = renderers[0].bounds;
-            for (var i = 1; i < renderers.Length; i++)
-            {
-                bounds.Encapsulate(renderers[i].bounds);
-            }
-
-            var scale = bounds.size.y > 0.0001f ? targetHeight / bounds.size.y : 1f;
-            instance.transform.localScale = Vector3.one * scale;
-
-            renderers = instance.GetComponentsInChildren<Renderer>();
-            var scaled = renderers[0].bounds;
-            for (var i = 1; i < renderers.Length; i++)
-            {
-                scaled.Encapsulate(renderers[i].bounds);
-            }
-
-            instance.transform.localPosition = new Vector3(0f, -scaled.min.y, 0f);
-            return scale;
-        }
-
-        /// <summary>把资源包材质换成项目 URP Lit 材质，保留原贴图。</summary>
-        private static void ApplyProjectMaterial(string characterName, GameObject instance)
-        {
-            var materialPath = $"{ArtFolder}/M_{characterName}.mat";
-            var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
-            if (material == null)
-            {
-                material = new Material(Shader.Find("Universal Render Pipeline/Lit"))
-                {
-                    name = "M_" + characterName
-                };
-                material.SetFloat("_Smoothness", 0.05f);
-                material.SetFloat("_Metallic", 0f);
-                AssetDatabase.CreateAsset(material, materialPath);
-            }
-
-            foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
-            {
-                var source = renderer.sharedMaterial;
-                var texture = source != null ? source.mainTexture : null;
-                if (texture != null)
-                {
-                    material.SetTexture("_BaseMap", texture);
-                }
-                else if (source != null)
-                {
-                    M7MaterialLibrary.SetColorIfDifferent(material, "_BaseColor", source.color);
-
-                    // `_Color` 是内置渲染管线时代的遗留别名。本项目的材质都基于 URP，
-                    // 渲染只读 `_BaseColor`，但 Unity 保存材质时会把这个属性一起写进文件；
-                    // 不同步的话两个属性会长期不一致（实测出现过 `_BaseColor` 灰蓝、`_Color` 深灰），
-                    // 将来排查配色问题的人会先被这个假象带偏。
-                    M7MaterialLibrary.SetColorIfDifferent(material, "_Color", source.color);
-                }
-
-                renderer.sharedMaterial = material;
-            }
-
-            EditorUtility.SetDirty(material);
-        }
-
     }
 }

@@ -39,5 +39,11 @@ namespace RaidDemo.Diagnostics
 
         /// <summary>玩家当前的噪音档位。</summary>
         NoiseTier PlayerNoiseTier { get; }
+
+        /// <summary>玩家当前的水平移动速度（米/秒）。仅供开发者面板显示移动动画的调试信息。</summary>
+        float PlayerSpeedMetersPerSecond { get; }
+
+        /// <summary>玩家当前移动动画的播放倍率。仅供开发者面板显示。</summary>
+        float PlayerPlaybackRate { get; }
     }
 }
