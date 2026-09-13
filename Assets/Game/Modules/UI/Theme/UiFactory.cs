@@ -231,6 +231,84 @@ namespace RaidDemo.UI
             return track;
         }
 
+        /// <summary>
+        /// 按任意锚点创建一个九宫格贴图（面板 / 底板 / 徽标）。
+        /// </summary>
+        /// <param name="parent">父节点。</param>
+        /// <param name="name">节点名。</param>
+        /// <param name="sprite">九宫格贴图。</param>
+        /// <param name="anchor">锚点，例如 (0,0) 左下、(0.5,1) 顶中。</param>
+        /// <param name="pivot">轴心，通常与锚点一致。</param>
+        /// <param name="offset">相对锚点的偏移（屏幕坐标方向，Y 向上为正）。</param>
+        /// <param name="size">尺寸。</param>
+        /// <remarks>HUD 元素要贴屏幕的四个角与顶边，而 <see cref="CreatePanel"/> 只支持左上角布局；
+        /// 与其在每块 HUD 里重复写锚点代码，不如在这里给一个通用的。</remarks>
+        public static RectTransform CreateAnchored(
+            RectTransform parent,
+            string name,
+            Sprite sprite,
+            Vector2 anchor,
+            Vector2 pivot,
+            Vector2 offset,
+            Vector2 size)
+        {
+            var rect = CreateRect(parent, name);
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = pivot;
+            rect.anchoredPosition = offset;
+            rect.sizeDelta = size;
+
+            var image = rect.gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = 1f;
+            image.raycastTarget = false;
+            return rect;
+        }
+
+        /// <summary>按任意锚点创建文本（HUD 用）。</summary>
+        /// <param name="parent">父节点。</param>
+        /// <param name="content">文字内容。</param>
+        /// <param name="anchor">锚点。</param>
+        /// <param name="pivot">轴心。</param>
+        /// <param name="offset">相对锚点的偏移。</param>
+        /// <param name="size">文本框尺寸。</param>
+        /// <param name="fontSize">字号。</param>
+        /// <param name="alignment">对齐方式。</param>
+        /// <param name="color">颜色。</param>
+        /// <param name="wrap">是否允许换行。</param>
+        public static TextMeshProUGUI CreateAnchoredLabel(
+            RectTransform parent,
+            string content,
+            Vector2 anchor,
+            Vector2 pivot,
+            Vector2 offset,
+            Vector2 size,
+            float fontSize,
+            TextAlignmentOptions alignment,
+            Color color,
+            bool wrap = false)
+        {
+            var rect = CreateRect(parent, "Label");
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = pivot;
+            rect.anchoredPosition = offset;
+            rect.sizeDelta = size;
+
+            var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            ApplyDefaultFont(text);
+            text.text = content;
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.color = color;
+            text.raycastTarget = false;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+            return text;
+        }
+
         /// <summary>创建一个空节点（供摆放子元素）。</summary>
         public static RectTransform CreateRect(RectTransform parent, string name)
         {

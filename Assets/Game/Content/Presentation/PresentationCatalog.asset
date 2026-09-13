@@ -19,3 +19,5 @@ MonoBehaviour:
   m_ImpactSparkPrefab: {fileID: 8922675939398521961, guid: cc32a1a056dd003458b2d2a4394f81ca, type: 3}
   m_ImpactDustPrefab: {fileID: 2725729683819602947, guid: f6725b0498d7ff34e8d0d7b995e44eaa, type: 3}
   m_ImpactFleshPrefab: {fileID: 4093384041635255389, guid: 33bd2d1024c005c49b51bcfba2c0e0b2, type: 3}
+  m_CrosshairSprite: {fileID: 1338022970059654511, guid: 330c1e26bdaba53468ec6196d4a89299, type: 3}
+  m_CrosshairReloadSprite: {fileID: -15259688750184389, guid: e7616934742f6d542a6599aca753e82a, type: 3}

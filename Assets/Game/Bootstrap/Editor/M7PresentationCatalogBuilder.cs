@@ -23,6 +23,9 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>目录资产所在文件夹。</summary>
         public const string CatalogFolder = "Assets/Game/Content/Presentation";
 
+        /// <summary>准星素材目录（Kenney Crosshair Pack，CC0）。</summary>
+        private const string CrosshairFolder = "Assets/Game/Content/External/Kenney/CrosshairPack";
+
         /// <summary>菜单入口。</summary>
         [MenuItem("RaidDemo/M7/重建表现层资产（音效 / 武器 / 特效）")]
         public static void BuildFromMenu()
@@ -55,6 +58,7 @@ namespace RaidDemo.Bootstrap.Editor
         private static string BuildCatalog()
         {
             M7MaterialLibrary.EnsureFolder(CatalogFolder);
+            EnsureCrosshairSprites();
 
             var catalog = AssetDatabase.LoadAssetAtPath<PresentationCatalog>(CatalogPath);
             if (catalog == null)
@@ -78,11 +82,48 @@ namespace RaidDemo.Bootstrap.Editor
                 AssetDatabase.LoadAssetAtPath<GameObject>(M7VfxPrefabBuilder.VfxFolder + "/Vfx_ImpactDust.prefab"));
             SetReference(serialized, "m_ImpactFleshPrefab",
                 AssetDatabase.LoadAssetAtPath<GameObject>(M7VfxPrefabBuilder.VfxFolder + "/Vfx_ImpactFlesh.prefab"));
+            SetReference(serialized, "m_CrosshairSprite",
+                AssetDatabase.LoadAssetAtPath<Sprite>(CrosshairFolder + "/Crosshair_Normal.png"));
+            SetReference(serialized, "m_CrosshairReloadSprite",
+                AssetDatabase.LoadAssetAtPath<Sprite>(CrosshairFolder + "/Crosshair_Reload.png"));
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(catalog);
 
             AssetDatabase.SaveAssets();
             return $"[RaidDemo] M7 表现层目录：{CatalogPath}";
+        }
+
+        /// <summary>
+        /// 把准星 PNG 的导入类型设为 Sprite。
+        /// </summary>
+        /// <remarks>Unity 对普通 PNG 的默认导入类型是 Texture，而界面需要的是 Sprite；
+        /// 不设这一步的话 <c>LoadAssetAtPath&lt;Sprite&gt;</c> 会返回 null，
+        /// 表现为"准星又变回程序化的十字"——功能没坏，但素材等于没用上。</remarks>
+        private static void EnsureCrosshairSprites()
+        {
+            if (!AssetDatabase.IsValidFolder(CrosshairFolder))
+            {
+                return;
+            }
+
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { CrosshairFolder }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
+                {
+                    continue;
+                }
+
+                if (importer.textureType == TextureImporterType.Sprite && !importer.mipmapEnabled)
+                {
+                    continue;
+                }
+
+                importer.textureType = TextureImporterType.Sprite;
+                importer.alphaIsTransparency = true;
+                importer.mipmapEnabled = false;
+                importer.SaveAndReimport();
+            }
         }
 
         /// <summary>写入一个对象引用槽位。</summary>

@@ -31,6 +31,10 @@ namespace RaidDemo.Presentation
         [SerializeField] private GameObject m_ImpactDustPrefab;
         [SerializeField] private GameObject m_ImpactFleshPrefab;
 
+        [Header("准星")]
+        [SerializeField] private Sprite m_CrosshairSprite;
+        [SerializeField] private Sprite m_CrosshairReloadSprite;
+
         /// <summary>音效目录。</summary>
         public AudioCatalog Audio => m_Audio;
 
@@ -51,5 +55,11 @@ namespace RaidDemo.Presentation
 
         /// <summary>命中活体预制体。</summary>
         public GameObject ImpactFleshPrefab => m_ImpactFleshPrefab;
+
+        /// <summary>常规准星贴图。</summary>
+        public Sprite CrosshairSprite => m_CrosshairSprite;
+
+        /// <summary>换弹中的准星贴图（换一个造型，让"正在换弹"不靠颜色也能看出来）。</summary>
+        public Sprite CrosshairReloadSprite => m_CrosshairReloadSprite;
     }
 }

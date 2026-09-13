@@ -32,6 +32,11 @@ namespace RaidDemo.Bootstrap
             var host = new GameObject("AimCrosshair");
             host.transform.SetParent(transform, worldPositionStays: false);
             m_Crosshair = host.AddComponent<AimCrosshair>();
+
+            // 准星贴图来自表现层资产目录；目录为空时组件自动退回程序化十字。
+            m_Crosshair.Initialize(
+                m_PresentationCatalog != null ? m_PresentationCatalog.CrosshairSprite : null,
+                m_PresentationCatalog != null ? m_PresentationCatalog.CrosshairReloadSprite : null);
         }
 
         /// <summary>
@@ -49,6 +54,13 @@ namespace RaidDemo.Bootstrap
             }
 
             var worldAim = m_InputCollector.AimWorldPosition;
+
+            // 换弹时换一张准星造型：这是"现在打不出去"最直接的提示。
+            m_Crosshair.SetReloading(
+                m_WeaponController != null
+                && m_WeaponController.Runtime != null
+                && m_WeaponController.Runtime.IsReloading);
+
             if (worldAim.IsNearlyZero)
             {
                 m_Crosshair.Hide();

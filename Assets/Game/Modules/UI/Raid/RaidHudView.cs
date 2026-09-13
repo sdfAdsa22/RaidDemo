@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -35,7 +36,7 @@ namespace RaidDemo.UI
         private const float HealLabelSeconds = 1.6f;
 
         /// <summary>回血提示的颜色（与撤离成功的绿色同一族，表示「变好」）。</summary>
-        private static readonly Color HealColor = new Color(0.40f, 0.90f, 0.55f);
+        private static readonly Color HealColor = UiPalette.Ok;
 
         /// <summary>撤离读条宽度（像素）。</summary>
         private const float ExtractionBarWidth = 360f;
@@ -43,63 +44,79 @@ namespace RaidDemo.UI
         /// <summary>剩余时间低于该值时倒计时转为警示色（秒）。</summary>
         private const float UrgentThresholdSeconds = 60f;
 
-        private static readonly Color TextColor = new Color(0.94f, 0.94f, 0.96f);
-        private static readonly Color DimColor = new Color(0.72f, 0.72f, 0.78f);
-        private static readonly Color UrgentColor = new Color(1f, 0.42f, 0.35f);
-        private static readonly Color BarBackColor = new Color(0.15f, 0.15f, 0.17f, 0.85f);
-        private static readonly Color SearchFillColor = new Color(0.95f, 0.78f, 0.30f);
-        private static readonly Color ExtractionFillColor = new Color(0.30f, 0.85f, 0.50f);
+        /// <summary>
+        /// 战局 HUD 压在世界上，用小样里的"白色胶囊 + 深墨文字"。
+        /// </summary>
+        /// <remarks>顶部倒计时与底部读条都要在任何背景（亮草地、暗厂房）上读清，
+        /// 因此每一项都自带一块有描边的底板，而不是靠文字描边硬撑。</remarks>
+        private static readonly Color TextColor = UiPalette.Ink;
+        private static readonly Color DimColor = UiPalette.InkSoft;
+        private static readonly Color UrgentColor = UiPalette.Bad;
+        private static readonly Color SearchFillColor = UiPalette.Warn;
+        private static readonly Color ExtractionFillColor = UiPalette.Ok;
 
-        private Text m_TimerLabel;
-        private Text m_KillsLabel;
-        private Text m_QuestLabel;
-        private Text m_PromptLabel;
+        private TextMeshProUGUI m_TimerLabel;
+        private TextMeshProUGUI m_KillsLabel;
+        private TextMeshProUGUI m_QuestLabel;
+        private GameObject m_QuestPlate;
+        private TextMeshProUGUI m_PromptLabel;
+        private GameObject m_PromptPlate;
         private GameObject m_SearchRoot;
-        private Text m_SearchLabel;
+        private TextMeshProUGUI m_SearchLabel;
         private Image m_SearchFill;
         private GameObject m_ExtractionRoot;
-        private Text m_ExtractionLabel;
+        private TextMeshProUGUI m_ExtractionLabel;
         private Image m_ExtractionFill;
         private GameObject m_UseRoot;
-        private Text m_UseLabel;
+        private TextMeshProUGUI m_UseLabel;
         private Image m_UseFill;
-        private Text m_HealLabel;
+        private TextMeshProUGUI m_HealLabel;
+        private GameObject m_HealPlate;
         private float m_HealRemaining;
 
         /// <summary>构建界面。由装配层在战局开始时调用一次。</summary>
         public void Initialize()
         {
-            var canvasHost = new GameObject("RaidHudCanvas", typeof(Canvas), typeof(CanvasScaler));
-            canvasHost.transform.SetParent(transform, worldPositionStays: false);
-
-            var canvas = canvasHost.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-
             // 位于准星（100）之上、背包界面（200）之下：搜刮读条要盖住准星，
             // 但背包一旦打开就必须压住战局信息，否则拖拽物品时会被倒计时挡住视线。
             // 取 140 而不是与战斗界面相同的 150：两者相同时渲染顺序取决于对象创建顺序，
             // 而创建顺序会随装配流程变化，那种不稳定迟早会表现为「某次运行后弹药被倒计时挡住」。
-            canvas.sortingOrder = 140;
+            var canvas = UiFactory.CreateCanvas(transform, "RaidHudCanvas", 140);
+            var rootRect = canvas;
 
-            var scaler = canvasHost.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
+            // 倒计时：顶中一块底板 + 大号等宽数字。等宽数字让秒数变化时整行不左右跳动。
+            var timerPlate = UiFactory.CreateAnchored(
+                rootRect, "TimerPlate", UiSprites.Chip,
+                anchor: new Vector2(0.5f, 1f), pivot: new Vector2(0.5f, 1f),
+                offset: new Vector2(0f, -20f), size: new Vector2(200f, 58f));
+            m_TimerLabel = UiFactory.CreateAnchoredLabel(
+                timerPlate, "00:00",
+                anchor: new Vector2(0.5f, 0.5f), pivot: new Vector2(0.5f, 0.5f),
+                offset: Vector2.zero, size: new Vector2(180f, 48f),
+                fontSize: 34f, alignment: TextAlignmentOptions.Center, color: TextColor);
 
-            var rootRect = (RectTransform)canvasHost.transform;
-            m_TimerLabel = CreateLabel(
-                rootRect, "00:00", new Vector2(0.5f, 1f),
-                new Vector2(0f, -28f), new Vector2(320f, 52f), 34, TextAnchor.MiddleCenter);
-
-            m_KillsLabel = CreateLabel(
-                rootRect, "击杀 0", new Vector2(1f, 1f),
-                new Vector2(-48f, -32f), new Vector2(240f, 28f), 18, TextAnchor.MiddleRight);
+            var killsPlate = UiFactory.CreateAnchored(
+                rootRect, "KillsPlate", UiSprites.Chip,
+                anchor: new Vector2(1f, 1f), pivot: new Vector2(1f, 1f),
+                offset: new Vector2(-28f, -20f), size: new Vector2(170f, 44f));
+            m_KillsLabel = UiFactory.CreateAnchoredLabel(
+                killsPlate, "击杀 0",
+                anchor: new Vector2(0.5f, 0.5f), pivot: new Vector2(0.5f, 0.5f),
+                offset: Vector2.zero, size: new Vector2(150f, 34f),
+                fontSize: 20f, alignment: TextAlignmentOptions.Center, color: TextColor);
 
             // 任务追踪放在左上角：不与顶部倒计时、右侧击杀数争夺视线焦点。
-            m_QuestLabel = CreateLabel(
-                rootRect, string.Empty, new Vector2(0f, 1f),
-                new Vector2(32f, -32f), new Vector2(520f, 28f), 16, TextAnchor.MiddleLeft);
-            m_QuestLabel.color = new Color(0.85f, 0.88f, 0.60f);
-            m_QuestLabel.gameObject.SetActive(false);
+            var questPlate = UiFactory.CreateAnchored(
+                rootRect, "QuestPlate", UiSprites.Chip,
+                anchor: new Vector2(0f, 1f), pivot: new Vector2(0f, 1f),
+                offset: new Vector2(28f, -20f), size: new Vector2(560f, 44f));
+            m_QuestLabel = UiFactory.CreateAnchoredLabel(
+                questPlate, string.Empty,
+                anchor: new Vector2(0.5f, 0.5f), pivot: new Vector2(0.5f, 0.5f),
+                offset: Vector2.zero, size: new Vector2(536f, 34f),
+                fontSize: 16f, alignment: TextAlignmentOptions.Left, color: new Color(0.88f, 0.92f, 0.62f));
+            m_QuestPlate = questPlate.gameObject;
+            questPlate.gameObject.SetActive(false);
 
             BuildExtraction(rootRect);
             BuildPrompt(rootRect);
@@ -117,7 +134,11 @@ namespace RaidDemo.UI
             }
 
             var has = !string.IsNullOrEmpty(text);
-            m_QuestLabel.gameObject.SetActive(has);
+            if (m_QuestPlate != null)
+            {
+                m_QuestPlate.SetActive(has);
+            }
+
             if (has)
             {
                 m_QuestLabel.text = text;
@@ -139,9 +160,9 @@ namespace RaidDemo.UI
             }
 
             m_HealRemaining = 0f;
-            if (m_HealLabel != null)
+            if (m_HealPlate != null)
             {
-                m_HealLabel.gameObject.SetActive(false);
+                m_HealPlate.SetActive(false);
             }
         }
 
@@ -174,7 +195,11 @@ namespace RaidDemo.UI
 
             m_HealLabel.text = $"生命 +{amount}";
             m_HealLabel.color = HealColor;
-            m_HealLabel.gameObject.SetActive(true);
+            if (m_HealPlate != null)
+            {
+                m_HealPlate.SetActive(true);
+            }
+
             m_HealRemaining = HealLabelSeconds;
         }
 
@@ -215,7 +240,11 @@ namespace RaidDemo.UI
             }
 
             var hasPrompt = !string.IsNullOrEmpty(prompt);
-            m_PromptLabel.gameObject.SetActive(hasPrompt);
+            if (m_PromptPlate != null)
+            {
+                m_PromptPlate.SetActive(hasPrompt);
+            }
+
             if (hasPrompt)
             {
                 m_PromptLabel.text = prompt;
@@ -263,135 +292,107 @@ namespace RaidDemo.UI
         /// <summary>创建撤离读秒面板（标题 + 进度条）。</summary>
         private void BuildExtraction(RectTransform parent)
         {
-            m_ExtractionRoot = new GameObject("ExtractionPanel", typeof(RectTransform));
-            var rect = (RectTransform)m_ExtractionRoot.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -88f);
-            rect.sizeDelta = new Vector2(ExtractionBarWidth, 52f);
+            var plate = UiFactory.CreateAnchored(
+                parent, "ExtractionPanel", UiSprites.Chip,
+                anchor: new Vector2(0.5f, 1f), pivot: new Vector2(0.5f, 1f),
+                offset: new Vector2(0f, -88f), size: new Vector2(ExtractionBarWidth + 40f, 74f));
+            m_ExtractionRoot = plate.gameObject;
 
-            m_ExtractionLabel = CreateLabel(
-                rect, "正在撤离", new Vector2(0.5f, 1f),
-                Vector2.zero, new Vector2(ExtractionBarWidth, 26f), 18, TextAnchor.MiddleCenter);
+            m_ExtractionLabel = UiFactory.CreateAnchoredLabel(
+                plate, "正在撤离",
+                anchor: new Vector2(0.5f, 1f), pivot: new Vector2(0.5f, 1f),
+                offset: new Vector2(0f, -8f), size: new Vector2(ExtractionBarWidth, 28f),
+                fontSize: 19f, alignment: TextAlignmentOptions.Center, color: TextColor);
 
-            m_ExtractionFill = CreateBar(rect, ExtractionBarWidth, 14f, ExtractionFillColor);
+            m_ExtractionFill = CreateBar(plate, ExtractionBarWidth, 14f, ExtractionFillColor);
             m_ExtractionRoot.SetActive(false);
         }
 
         /// <summary>创建底部的交互提示。</summary>
         private void BuildPrompt(RectTransform parent)
         {
-            m_PromptLabel = CreateLabel(
-                parent, string.Empty, new Vector2(0.5f, 0f),
-                new Vector2(0f, 176f), new Vector2(560f, 32f), 20, TextAnchor.MiddleCenter);
-            m_PromptLabel.gameObject.SetActive(false);
+            var plate = UiFactory.CreateAnchored(
+                parent, "PromptPanel", UiSprites.Chip,
+                anchor: new Vector2(0.5f, 0f), pivot: new Vector2(0.5f, 0f),
+                offset: new Vector2(0f, 236f), size: new Vector2(620f, 44f));
+
+            m_PromptLabel = UiFactory.CreateAnchoredLabel(
+                plate, string.Empty,
+                anchor: new Vector2(0.5f, 0.5f), pivot: new Vector2(0.5f, 0.5f),
+                offset: Vector2.zero, size: new Vector2(596f, 36f),
+                fontSize: 20f, alignment: TextAlignmentOptions.Center, color: TextColor);
+            plate.gameObject.SetActive(false);
+            m_PromptPlate = plate.gameObject;
         }
 
         /// <summary>创建医疗品使用读条（在搜刮读条上方一排，避免两者同时出现时重叠）。</summary>
         private void BuildUse(RectTransform parent)
         {
-            m_UseRoot = new GameObject("UsePanel", typeof(RectTransform));
-            var rect = (RectTransform)m_UseRoot.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = new Vector2(0.5f, 0f);
-            rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.anchoredPosition = new Vector2(0f, 166f);
-            rect.sizeDelta = new Vector2(UseBarWidth, 46f);
+            var plate = UiFactory.CreateAnchored(
+                parent, "UsePanel", UiSprites.Chip,
+                anchor: new Vector2(0.5f, 0f), pivot: new Vector2(0.5f, 0f),
+                offset: new Vector2(0f, 164f), size: new Vector2(UseBarWidth + 40f, 68f));
+            m_UseRoot = plate.gameObject;
 
-            m_UseLabel = CreateLabel(
-                rect, "使用中…", new Vector2(0.5f, 1f),
-                Vector2.zero, new Vector2(UseBarWidth, 24f), 17, TextAnchor.MiddleCenter);
+            m_UseLabel = UiFactory.CreateAnchoredLabel(
+                plate, "使用中…",
+                anchor: new Vector2(0.5f, 1f), pivot: new Vector2(0.5f, 1f),
+                offset: new Vector2(0f, -8f), size: new Vector2(UseBarWidth, 26f),
+                fontSize: 18f, alignment: TextAlignmentOptions.Center, color: TextColor);
 
-            m_UseFill = CreateBar(rect, UseBarWidth, 12f, HealColor);
+            m_UseFill = CreateBar(plate, UseBarWidth, 12f, HealColor);
             m_UseRoot.SetActive(false);
         }
 
         /// <summary>创建回血提示（显示在生命条上方，右侧留白处）。</summary>
         private void BuildHeal(RectTransform parent)
         {
-            m_HealLabel = CreateLabel(
-                parent, string.Empty, new Vector2(0f, 0f),
-                new Vector2(200f, 250f), new Vector2(220f, 28f), 18, TextAnchor.MiddleLeft);
-            m_HealLabel.color = HealColor;
-            m_HealLabel.gameObject.SetActive(false);
+            var plate = UiFactory.CreateAnchored(
+                parent, "HealPlate", UiSprites.Chip,
+                anchor: new Vector2(0f, 0f), pivot: new Vector2(0f, 0f),
+                offset: new Vector2(56f, 244f), size: new Vector2(200f, 40f));
+
+            m_HealLabel = UiFactory.CreateAnchoredLabel(
+                plate, string.Empty,
+                anchor: new Vector2(0.5f, 0.5f), pivot: new Vector2(0.5f, 0.5f),
+                offset: Vector2.zero, size: new Vector2(180f, 32f),
+                fontSize: 19f, alignment: TextAlignmentOptions.Center, color: HealColor);
+            m_HealPlate = plate.gameObject;
+            plate.gameObject.SetActive(false);
         }
 
         /// <summary>创建搜刮读条。</summary>
         private void BuildSearch(RectTransform parent)
         {
-            m_SearchRoot = new GameObject("SearchPanel", typeof(RectTransform));
-            var rect = (RectTransform)m_SearchRoot.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = new Vector2(0.5f, 0f);
-            rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.anchoredPosition = new Vector2(0f, 108f);
-            rect.sizeDelta = new Vector2(SearchBarWidth, 46f);
+            var plate = UiFactory.CreateAnchored(
+                parent, "SearchPanel", UiSprites.Chip,
+                anchor: new Vector2(0.5f, 0f), pivot: new Vector2(0.5f, 0f),
+                offset: new Vector2(0f, 92f), size: new Vector2(SearchBarWidth + 40f, 68f));
+            m_SearchRoot = plate.gameObject;
 
-            m_SearchLabel = CreateLabel(
-                rect, "搜刮中…", new Vector2(0.5f, 1f),
-                Vector2.zero, new Vector2(SearchBarWidth, 24f), 17, TextAnchor.MiddleCenter);
+            m_SearchLabel = UiFactory.CreateAnchoredLabel(
+                plate, "搜刮中…",
+                anchor: new Vector2(0.5f, 1f), pivot: new Vector2(0.5f, 1f),
+                offset: new Vector2(0f, -8f), size: new Vector2(SearchBarWidth, 26f),
+                fontSize: 18f, alignment: TextAlignmentOptions.Center, color: TextColor);
 
-            m_SearchFill = CreateBar(rect, SearchBarWidth, 12f, SearchFillColor);
+            m_SearchFill = CreateBar(plate, SearchBarWidth, 12f, SearchFillColor);
             m_SearchRoot.SetActive(false);
         }
 
-        /// <summary>在父节点底部创建一个进度条，返回填充图像。</summary>
+        /// <summary>
+        /// 在底板内部创建一个进度条，返回填充图像。
+        /// </summary>
+        /// <param name="parent">底板（已按内容高度排好版）。</param>
+        /// <param name="width">进度条宽度。</param>
+        /// <param name="height">进度条高度。</param>
+        /// <param name="fillColor">填充颜色。</param>
+        /// <remarks>位置固定为"距底板顶部 44 像素、左右各留 20"：
+        /// 三个读条的底板布局一致（上方一行标题、下方一条进度），因此不必逐个传坐标。</remarks>
         private static Image CreateBar(RectTransform parent, float width, float height, Color fillColor)
         {
-            var back = new GameObject("Back", typeof(RectTransform), typeof(Image));
-            var backRect = (RectTransform)back.transform;
-            backRect.SetParent(parent, worldPositionStays: false);
-            backRect.anchorMin = new Vector2(0.5f, 0f);
-            backRect.anchorMax = new Vector2(0.5f, 0f);
-            backRect.pivot = new Vector2(0.5f, 0f);
-            backRect.anchoredPosition = Vector2.zero;
-            backRect.sizeDelta = new Vector2(width, height);
-            back.GetComponent<Image>().color = BarBackColor;
-
-            var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-            var fillRect = (RectTransform)fill.transform;
-            fillRect.SetParent(backRect, worldPositionStays: false);
-            fillRect.anchorMin = new Vector2(0f, 0f);
-            fillRect.anchorMax = new Vector2(0f, 1f);
-            fillRect.pivot = new Vector2(0f, 0.5f);
-            fillRect.anchoredPosition = Vector2.zero;
-            fillRect.sizeDelta = Vector2.zero;
-            var image = fill.GetComponent<Image>();
-            image.color = fillColor;
-            return image;
-        }
-
-        /// <summary>创建一个文本标签。</summary>
-        private static Text CreateLabel(
-            RectTransform parent,
-            string content,
-            Vector2 anchor,
-            Vector2 anchoredPosition,
-            Vector2 size,
-            int fontSize,
-            TextAnchor alignment)
-        {
-            var host = new GameObject("Label", typeof(RectTransform), typeof(Text));
-            var rect = (RectTransform)host.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = anchor;
-            rect.anchorMax = anchor;
-            rect.pivot = anchor;
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
-
-            var text = host.GetComponent<Text>();
-            text.font = UiFontProvider.Get(fontSize);
-            text.fontSize = fontSize;
-            text.text = content;
-            text.alignment = alignment;
-            text.color = TextColor;
-            text.raycastTarget = false;
-            return text;
+            UiFactory.CreateBar(parent, new Vector2(20f, 44f), new Vector2(width, height), fillColor, out var fill);
+            return fill;
         }
     }
 }

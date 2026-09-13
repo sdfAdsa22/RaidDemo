@@ -1,5 +1,6 @@
 using RaidDemo.Combat;
 using RaidDemo.Inventory;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -35,30 +36,36 @@ namespace RaidDemo.UI
         /// </remarks>
         private const float Margin = 56f;
 
-        /// <summary>面板宽度（像素）。</summary>
-        private const float PanelWidth = 260f;
+        /// <summary>底板宽度与高度（像素）。</summary>
+        private const float PanelWidth = 340f;
+
+        private const float PanelHeight = 176f;
 
         /// <summary>换弹进度条高度（像素）。</summary>
         private const float BarHeight = 10f;
 
-        private static readonly Color TextColor = new Color(0.94f, 0.94f, 0.96f);
-        private static readonly Color DimTextColor = new Color(0.72f, 0.72f, 0.78f);
-        private static readonly Color LowAmmoColor = new Color(1f, 0.55f, 0.35f);
-        private static readonly Color LowHealthColor = new Color(1f, 0.4f, 0.35f);
-        private static readonly Color DeadColor = new Color(0.6f, 0.6f, 0.65f);
-        private static readonly Color BarBackColor = new Color(0.18f, 0.18f, 0.20f, 0.8f);
-        private static readonly Color BarFillColor = new Color(0.95f, 0.75f, 0.25f);
+        /// <summary>
+        /// HUD 压在世界上，因此用"纸面底板 + 深墨文字"。
+        /// </summary>
+        /// <remarks>与小样一致：白色圆角底板 + 深墨文字，描边保证它在亮绿草地与暗色厂房上都看得清。
+        /// 相比"深底浅字"，这套更贴近卡通扁平的观感，也和背包、商人是同一套纸面语言。</remarks>
+        private static readonly Color TextColor = UiPalette.Ink;
+        private static readonly Color DimTextColor = UiPalette.InkSoft;
+        private static readonly Color LowAmmoColor = UiPalette.Yellow;
+        private static readonly Color LowHealthColor = UiPalette.Bad;
+        private static readonly Color DeadColor = UiPalette.InkDisabled;
+        private static readonly Color BarFillColor = UiPalette.Warn;
 
         private PlayerWeaponController m_Controller;
         private PlayerLoadout m_Loadout;
 
-        private Text m_WeaponLabel;
-        private Text m_AmmoLabel;
-        private Text m_ReserveLabel;
-        private Text m_HealthLabel;
+        private TextMeshProUGUI m_WeaponLabel;
+        private TextMeshProUGUI m_AmmoLabel;
+        private TextMeshProUGUI m_ReserveLabel;
+        private TextMeshProUGUI m_HealthLabel;
 
         /// <summary>护甲显示（身体护甲与头盔的等级和耐久）。</summary>
-        private Text m_ArmorLabel;
+        private TextMeshProUGUI m_ArmorLabel;
         private Image m_ReloadBarFill;
         private RectTransform m_ReloadBarRoot;
         private string m_WeaponName = "无武器";
@@ -223,7 +230,7 @@ namespace RaidDemo.UI
             }
 
             m_ReloadBarFill.rectTransform.sizeDelta = new Vector2(
-                PanelWidth * Mathf.Clamp01(runtime.ReloadProgress01),
+                m_ReloadBarRoot.sizeDelta.x * Mathf.Clamp01(runtime.ReloadProgress01),
                 0f);
         }
 
@@ -239,105 +246,69 @@ namespace RaidDemo.UI
         /// <summary>构建整套界面。</summary>
         private void BuildLayout()
         {
-            var canvasHost = new GameObject("CombatHudCanvas", typeof(Canvas), typeof(CanvasScaler));
-            canvasHost.transform.SetParent(transform, worldPositionStays: false);
-            m_CanvasHost = canvasHost;
-
-            var canvas = canvasHost.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-
             // 高于准星（100），低于背包面板（200）：
-            // 背包打开时面板会盖住屏幕中央，而弹药信息在右下角，两者不冲突。
-            canvas.sortingOrder = 150;
+            // 背包打开时面板会盖住屏幕中央，而弹药信息在左下角，两者不冲突。
+            var canvas = UiFactory.CreateCanvas(transform, "CombatHudCanvas", 150);
+            m_CanvasHost = canvas.gameObject;
 
-            var scaler = canvasHost.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
+            // 一块深色半透明底板托住全部信息：HUD 直接压在草地上时，
+            // 浅色文字会与亮绿背景糊在一起；底板让它在任何背景上都读得清。
+            var plateRect = UiFactory.CreateAnchored(
+                canvas,
+                "Plate",
+                UiSprites.Card,
+                anchor: new Vector2(0f, 0f),
+                pivot: new Vector2(0f, 0f),
+                offset: new Vector2(Margin, Margin),
+                size: new Vector2(PanelWidth, PanelHeight));
 
-            // 每个元素直接锚到画布右下角，不再套一层中间面板。
-            // 少一层嵌套就少一处可能出错的地方：只要画布正确覆盖屏幕，
-            // 这些元素就一定在屏幕内，且与画布缩放无关。
-            m_WeaponLabel = CreateLabel(canvasHost.transform, "无武器", Margin + 96f, 28f, 15, DimTextColor);
-            m_AmmoLabel = CreateLabel(canvasHost.transform, "-- / --", Margin + 58f, 40f, 30, TextColor);
-            m_ReserveLabel = CreateLabel(canvasHost.transform, "备弹 0", Margin + 32f, 22f, 14, DimTextColor);
-
-            // 生命值放在武器信息上方：它是玩家最先要看的数字，
+            // 生命值放在最上方：它是玩家最先要看的数字，
             // 而弹匣数量在交火中反而是次要信息。
-            m_HealthLabel = CreateLabel(canvasHost.transform, "生命 -- / --", Margin + 132f, 24f, 18, TextColor);
-            m_ArmorLabel = CreateLabel(canvasHost.transform, "甲 无  ｜  盔 无", Margin + 158f, 22f, 15, DimTextColor);
-            BuildReloadBar(canvasHost.transform);
+            m_HealthLabel = CreateLabel(plateRect, "生命 -- / --", 12f, 19f, TextColor);
+            m_ArmorLabel = CreateLabel(plateRect, "甲 无  ｜  盔 无", 38f, 15f, DimTextColor);
+            m_WeaponLabel = CreateLabel(plateRect, "无武器", 72f, 15f, DimTextColor);
+            m_AmmoLabel = CreateLabel(plateRect, "-- / --", 92f, 34f, TextColor);
+            m_ReserveLabel = CreateLabel(plateRect, "弹挂 0   背包 0", 132f, 14f, DimTextColor);
+
+            BuildReloadBar(plateRect);
         }
 
         /// <summary>创建换弹进度条。</summary>
-        private void BuildReloadBar(Transform parent)
+        private void BuildReloadBar(RectTransform parent)
         {
-            var backHost = new GameObject("ReloadBarBack", typeof(RectTransform), typeof(Image));
-            var backRect = (RectTransform)backHost.transform;
-            backRect.SetParent(parent, worldPositionStays: false);
-            backRect.anchorMin = new Vector2(0f, 0f);
-            backRect.anchorMax = new Vector2(0f, 0f);
-            backRect.pivot = new Vector2(0f, 0f);
-            backRect.anchoredPosition = new Vector2(Margin, Margin + 14f);
-            backRect.sizeDelta = new Vector2(PanelWidth, BarHeight);
+            // 进度条贴在底板内部的最下沿：换弹时它出现，不换弹时整条隐藏，
+            // 因此不会长期占着屏幕空间。
+            m_ReloadBarRoot = UiFactory.CreateBar(
+                parent,
+                new Vector2(16f, PanelHeight - 22f),
+                new Vector2(PanelWidth - 32f, BarHeight),
+                BarFillColor,
+                out m_ReloadBarFill);
 
-            var backImage = backHost.GetComponent<Image>();
-            backImage.color = BarBackColor;
-            backImage.raycastTarget = false;
-            m_ReloadBarRoot = backRect;
-
-            var fillHost = new GameObject("ReloadBarFill", typeof(RectTransform), typeof(Image));
-            var fillRect = (RectTransform)fillHost.transform;
-            fillRect.SetParent(backRect, worldPositionStays: false);
-            fillRect.anchorMin = new Vector2(0f, 0f);
-            fillRect.anchorMax = new Vector2(0f, 1f);
-            fillRect.pivot = new Vector2(0f, 0.5f);
-            fillRect.anchoredPosition = Vector2.zero;
-            fillRect.sizeDelta = Vector2.zero;
-
-            m_ReloadBarFill = fillHost.GetComponent<Image>();
-            m_ReloadBarFill.color = BarFillColor;
-            m_ReloadBarFill.raycastTarget = false;
-
-            backHost.SetActive(false);
+            m_ReloadBarRoot.gameObject.SetActive(false);
         }
 
-        /// <summary>创建一个右对齐的文本标签。</summary>
-        private static Text CreateLabel(
-            Transform parent,
+        /// <summary>在底板内创建一个左对齐的文本标签。</summary>
+        /// <param name="parent">底板。</param>
+        /// <param name="content">初始文字。</param>
+        /// <param name="top">距底板顶部的像素。</param>
+        /// <param name="fontSize">字号。</param>
+        /// <param name="color">颜色。</param>
+        private static TextMeshProUGUI CreateLabel(
+            RectTransform parent,
             string content,
-            float bottom,
-            float height,
-            int fontSize,
+            float top,
+            float fontSize,
             Color color)
         {
-            var host = new GameObject("Label", typeof(RectTransform), typeof(Text));
-            var rect = (RectTransform)host.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-
-            // 固定尺寸 + 左对齐锚点：左边缘钉在距屏幕左缘 Margin 处，文字向右展开。
-            // 宽度取足够大，避免任何情况下发生换行。
-            rect.anchorMin = new Vector2(0f, 0f);
-            rect.anchorMax = new Vector2(0f, 0f);
-            rect.pivot = new Vector2(0f, 0f);
-            rect.anchoredPosition = new Vector2(Margin, bottom);
-            rect.sizeDelta = new Vector2(PanelWidth, height);
-
-            var text = host.GetComponent<Text>();
-            text.font = UiFontProvider.Get(fontSize);
-            text.fontSize = fontSize;
-            text.text = content;
-            text.alignment = TextAnchor.LowerLeft;
-            text.color = color;
-
-            // 溢出显示而不是换行：文字一旦略宽于矩形，默认的自动换行会把后半段
-            // 折到第二行，而矩形高度只有几十像素，第二行随即被垂直裁掉——
-            // 表现就是"界面上只显示了一部分文字"。
-            // 这里宁可让文字略微超出矩形，也不要它被无声地裁掉。
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-
-            text.raycastTarget = false;
-            return text;
+            return UiFactory.CreateLabel(
+                parent,
+                content,
+                new Vector2(16f, top),
+                new Vector2(PanelWidth - 32f, fontSize + 8f),
+                fontSize,
+                TextAlignmentOptions.Left,
+                color);
         }
     }
 }
