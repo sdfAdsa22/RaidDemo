@@ -75,6 +75,13 @@ namespace RaidDemo.UI
         private UiButton m_ConfirmButton;
         private UiButton m_CancelButton;
 
+        /// <summary>
+        /// 屏幕根：遮罩 + 面板的统一显隐开关。
+        /// </summary>
+        /// <remarks>与 <c>m_Root</c>（面板）分开：面板同时还是出售菜单定位的参照物，
+        /// 而遮罩必须与面板一起显隐，两者不能是同一个节点。</remarks>
+        private GameObject m_ScreenRoot;
+
         /// <summary>内容区左边距。</summary>
         private const float Margin = 28f;
 
@@ -94,10 +101,16 @@ namespace RaidDemo.UI
         private void BuildLayout()
         {
             var canvas = UiFactory.CreateCanvas(transform, "MerchantCanvas", 210);
-            UiFactory.CreateVeil(canvas, "Veil");
+
+            // 与背包界面同一条规则：遮罩与面板挂在同一个屏幕根下，一起显隐。
+            // 遮罩单独挂在画布上会一直留在屏幕上，把游戏画面永久压暗。
+            var screen = UiFactory.CreateRect(canvas, "Screen");
+            UiFactory.Stretch(screen);
+            m_ScreenRoot = screen.gameObject;
+            UiFactory.CreateVeil(screen, "Veil");
 
             var panel = UiFactory.CreateCenteredPanel(
-                canvas, "Panel", new Vector2(PanelWidth, PanelHeight), UiSprites.Card);
+                screen, "Panel", new Vector2(PanelWidth, PanelHeight), UiSprites.Card);
             m_Root = panel.gameObject;
 
             BuildTitleBar(panel);

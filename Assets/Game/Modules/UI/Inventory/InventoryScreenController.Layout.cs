@@ -70,6 +70,13 @@ namespace RaidDemo.UI
         private float m_ContentTopY = MinContentTop;
 
         /// <summary>
+        /// 屏幕根：遮罩 + 面板的统一显隐开关。
+        /// </summary>
+        /// <remarks>它必须与 <c>m_Root</c>（面板）分开：面板同时还是各网格视图的父节点，
+        /// 那些视图的坐标是相对面板算的，不能改挂到整屏节点下。</remarks>
+        private GameObject m_ScreenRoot;
+
+        /// <summary>
         /// 换背包后重建整套界面布局。
         /// </summary>
         /// <param name="backpack">新的背包网格。</param>
@@ -93,6 +100,7 @@ namespace RaidDemo.UI
             }
 
             m_CanvasHost = null;
+            m_ScreenRoot = null;
             m_Root = null;
             m_MenuRoot = null;
             m_BackpackView = null;
@@ -125,11 +133,18 @@ namespace RaidDemo.UI
             var canvas = UiFactory.CreateCanvas(transform, "InventoryCanvas", 200);
             m_CanvasHost = canvas.gameObject;
 
+            // 遮罩与面板必须挂在同一个"屏幕根"下，由它统一显隐。
+            // 曾经把遮罩直接挂在画布上，而显隐开关只作用于面板——结果关掉背包之后
+            // 遮罩还留在屏幕上，整个游戏画面被永久压暗（负责人 2026-09-13 反馈）。
+            var screen = UiFactory.CreateRect(canvas, "Screen");
+            UiFactory.Stretch(screen);
+            m_ScreenRoot = screen.gameObject;
+
             // 面板打开时压暗背后的世界：奶油面板本身够亮，遮罩只压一半，
             // 让玩家知道自己还站在地图里。
-            UiFactory.CreateVeil(canvas, "Veil");
+            UiFactory.CreateVeil(screen, "Veil");
 
-            var root = UiFactory.CreateCenteredPanel(canvas, "Root", new Vector2(PanelWidth, PanelHeight), UiSprites.Card);
+            var root = UiFactory.CreateCenteredPanel(screen, "Root", new Vector2(PanelWidth, PanelHeight), UiSprites.Card);
             m_Root = root.gameObject;
 
             var backpack = m_Loadout.Backpack;
@@ -259,9 +274,13 @@ namespace RaidDemo.UI
         private void SetVisible(bool visible)
         {
             m_IsOpen = visible;
-            if (m_Root != null)
+
+            // 开关作用在屏幕根上：遮罩与面板一起显隐。
+            // 只切面板会让遮罩留在屏幕上，把关掉界面之后的游戏画面持续压暗。
+            var target = m_ScreenRoot != null ? m_ScreenRoot : m_Root;
+            if (target != null)
             {
-                m_Root.SetActive(visible);
+                target.SetActive(visible);
             }
 
             // 打开界面时**如果什么容器都没指定**，就默认显示仓库（出击准备）。

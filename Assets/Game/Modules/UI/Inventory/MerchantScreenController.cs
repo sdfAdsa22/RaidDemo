@@ -78,7 +78,7 @@ namespace RaidDemo.UI
         /// <summary>界面是否打开。装配层据此冻结角色输入。</summary>
         public bool IsOpen
         {
-            get { return m_Root != null && m_Root.activeSelf; }
+            get { return m_ScreenRoot != null && m_ScreenRoot.activeSelf; }
         }
 
         /// <summary>
@@ -229,9 +229,11 @@ namespace RaidDemo.UI
 
         private void SetVisible(bool visible)
         {
-            if (m_Root != null)
+            // 与背包界面同一条规则：开关作用在屏幕根上，遮罩与面板一起显隐。
+            var target = m_ScreenRoot != null ? m_ScreenRoot : m_Root;
+            if (target != null)
             {
-                m_Root.SetActive(visible);
+                target.SetActive(visible);
             }
 
             m_SetCursorLock?.Invoke(!visible);
