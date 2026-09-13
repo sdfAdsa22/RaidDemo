@@ -137,6 +137,68 @@ namespace RaidDemo.Tests.EditMode
             Assert.Less(resolved.Y, 0.5f, "非单位层的实体碰撞体仍然必须挡住移动。");
         }
 
+        [Test]
+        public void 贴着高台侧面时能走出去而不是被钉死()
+        {
+            // U-69 复刻：走下高台侧面后，脚底已经落到下层地面，但胶囊半径还压在侧棱里。
+            // 修复前 PhysX 对"起点已重叠"的碰撞体在每个方向都返回 0 距离命中，
+            // 位移被压成 0——实测四个方向都无法移动。
+            var owner = CreateOwner(new Vector3(0f, 0f, 0.1f));
+            CreateBox(new Vector3(0f, 0.6f, -1f), new Vector3(4f, 1.2f, 2f));
+            Physics.SyncTransforms();
+
+            var service = new PhysicsMovementCollisionService(owner.transform, 1.8f, 0.02f);
+
+            service.TryResolveMove(
+                new Vector2F(0f, 0.1f),
+                new Vector2F(0f, 1f),
+                0.4f,
+                out var resolved);
+
+            Assert.Greater(resolved.Y, 0.9f, "贴着侧面时应该能走出去（去穿透），而不是被钉死。");
+        }
+
+        [Test]
+        public void 球心正好压在棱面上时也能脱困()
+        {
+            // 平台边缘实测到的退化情形：角色落到下层后，胶囊球心正好压在台体侧面平面上，
+            // 最近点计算退化。这里锁定兜底方向（包围盒中心 → 球心）生效。
+            var owner = CreateOwner(new Vector3(0f, 0f, 0f));
+            CreateBox(new Vector3(0f, 0.6f, -1f), new Vector3(4f, 1.2f, 2f));
+            Physics.SyncTransforms();
+
+            var service = new PhysicsMovementCollisionService(owner.transform, 1.8f, 0.02f);
+
+            service.TryResolveMove(
+                new Vector2F(0f, 0f),
+                new Vector2F(0f, 1f),
+                0.4f,
+                out var resolved);
+
+            Assert.Greater(resolved.Y, 0.9f, "球心压在棱面上时也应该被推出来并继续移动。");
+        }
+
+        [Test]
+        public void 去穿透只把人推离棱边不会让人钻进高台()
+        {
+            var owner = CreateOwner(new Vector3(0f, 0f, 0.1f));
+            CreateBox(new Vector3(0f, 0.6f, -1f), new Vector3(4f, 1.2f, 2f));
+            Physics.SyncTransforms();
+
+            var service = new PhysicsMovementCollisionService(owner.transform, 1.8f, 0.02f);
+
+            // 连续三帧朝高台方向推：去穿透应该先把人推出来，再被侧棱正常挡住，
+            // 最终胶囊后沿不能进到台体里面。
+            var position = new Vector2F(0f, 0.1f);
+            for (var frame = 0; frame < 3; frame++)
+            {
+                service.TryResolveMove(position, new Vector2F(0f, -1f), 0.4f, out var resolved);
+                position = new Vector2F(position.X + resolved.X, position.Y + resolved.Y);
+            }
+
+            Assert.GreaterOrEqual(position.Y - 0.4f, -0.05f, "去穿透之后仍然不能钻进高台侧面。");
+        }
+
         private GameObject CreateOwner(Vector3 position)
         {
             var owner = new GameObject("TestOwner");
