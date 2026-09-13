@@ -3,7 +3,6 @@ using RaidDemo.Data;
 using RaidDemo.Meta;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace RaidDemo.UI
 {
@@ -57,15 +56,10 @@ namespace RaidDemo.UI
                     m_ShopRows.Count * ShopRowPitch,
                     ShopRowHeight);
 
-                if (definition.Icon != null)
-                {
-                    CreateRowIcon(row, definition.Icon);
-                }
-
                 var label = UiFactory.CreateLabel(
                     row,
                     string.Empty,
-                    new Vector2(definition.Icon != null ? 50f : 14f, 0f),
+                    new Vector2(14f, 0f),
                     new Vector2(LeftWidth - 140f, ShopRowHeight),
                     UiPalette.BodySize,
                     TextAlignmentOptions.Left,
@@ -86,26 +80,6 @@ namespace RaidDemo.UI
                     Buy = buy,
                 });
             }
-        }
-
-        /// <summary>在货架行左侧放一个分类图标。</summary>
-        /// <remarks>图标只是辅助识别，不参与点击；宽度固定为 28，避免不同 PNG 尺寸把文字挤开。</remarks>
-        private static void CreateRowIcon(RectTransform parent, Sprite sprite)
-        {
-            var host = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-            var rect = (RectTransform)host.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = new Vector2(0f, 0.5f);
-            rect.anchorMax = new Vector2(0f, 0.5f);
-            rect.pivot = new Vector2(0f, 0.5f);
-            rect.anchoredPosition = new Vector2(12f, 0f);
-            rect.sizeDelta = new Vector2(28f, 28f);
-
-            var image = host.GetComponent<Image>();
-            image.sprite = sprite;
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            image.color = UiPalette.InkSoft;
         }
 
         /// <summary>任务页：固定任务卡片。</summary>

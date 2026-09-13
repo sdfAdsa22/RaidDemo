@@ -30,7 +30,6 @@ namespace RaidDemo.UI
         private RectTransform m_Rect;
         private Image m_Outline;
         private Image m_Fill;
-        private Image m_Icon;
         private TextMeshProUGUI m_Label;
         private Image m_Badge;
         private Color m_RarityOutline;
@@ -84,8 +83,6 @@ namespace RaidDemo.UI
             m_Outline = EnsureImage("Outline", m_Rect, UiSprites.RingWhite, m_RarityOutline);
             UiFactory.Stretch(m_Outline.rectTransform);
 
-            m_Icon = EnsureIcon(m_Rect);
-            ApplyIcon(item);
             m_Label = EnsureLabel(m_Rect);
             m_Badge = EnsureBadge(m_Rect);
             RefreshVisualState();
@@ -138,29 +135,10 @@ namespace RaidDemo.UI
             m_Outline.color = outlineColor;
             m_Fill.color = fillColor;
             m_Label.color = labelColor;
-            if (m_Icon != null)
-            {
-                m_Icon.color = m_Selected ? UiPalette.Teal : outlineColor;
-            }
-
             if (m_Badge != null)
             {
                 m_Badge.gameObject.SetActive(m_Selected);
             }
-        }
-
-        /// <summary>按物品定义切换图标；没有图标时隐藏图标层。</summary>
-        private void ApplyIcon(ItemInstance item)
-        {
-            if (m_Icon == null)
-            {
-                return;
-            }
-
-            var definition = item != null ? item.Definition as ItemDefinition : null;
-            var sprite = definition != null ? definition.Icon : null;
-            m_Icon.sprite = sprite;
-            m_Icon.gameObject.SetActive(sprite != null);
         }
 
         /// <summary>按比例压暗颜色，保留原来的透明度。</summary>
@@ -193,34 +171,6 @@ namespace RaidDemo.UI
             image.pixelsPerUnitMultiplier = 1f;
             image.color = color;
             image.raycastTarget = false;
-            return image;
-        }
-
-        /// <summary>
-        /// 创建物品图标层。
-        /// </summary>
-        /// <remarks>
-        /// 图标锚在格子顶部中央、按短边缩放，名称仍然压在最底部：
-        /// 1×1 的弹药不会出现“图标盖住文字”，3×1 的步枪也能在长条里保持居中。
-        /// </remarks>
-        private static Image EnsureIcon(RectTransform parent)
-        {
-            var host = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-            var rect = (RectTransform)host.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -6f);
-
-            var shortSide = Mathf.Min(parent.sizeDelta.x, parent.sizeDelta.y);
-            var iconSize = Mathf.Clamp(shortSide * 0.55f, 20f, 64f);
-            rect.sizeDelta = new Vector2(iconSize, iconSize);
-
-            var image = host.GetComponent<Image>();
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            host.SetActive(false);
             return image;
         }
 

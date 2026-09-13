@@ -130,21 +130,10 @@ namespace RaidDemo.UI
                 row.Unit.text = $"单价 {entry.UnitValue:N0}";
                 row.Total.text = $"合计 {entry.TotalValue:N0}";
 
-                // 有图标就画图标，没有就退回「稀有度色小方块」。
-                // 图标按类别共用（武器 / 弹药 / 医疗 / 贵重 / 任务），
-                // 因此这里只保证"一眼能分辨类别"，具体是不是某一把枪仍然靠名字。
-                var icon = entry.Icon;
-                var hasIcon = icon != null;
-                row.Icon.gameObject.SetActive(hasIcon);
-                row.Chip.gameObject.SetActive(!hasIcon);
-                if (hasIcon)
-                {
-                    row.Icon.sprite = icon;
-                }
-                else
-                {
-                    row.Chip.color = UiPalette.ItemOutline(entry.Rarity);
-                }
+                // 物品行只用稀有度色小方块，不再画分类图标：
+                // 分类图标在背包/商人/结算里都容易与物品名争夺视线，
+                // 而稀有度本身就是结算清单里更需要一眼看出的信息。
+                row.Chip.color = UiPalette.ItemOutline(entry.Rarity);
             }
 
             m_ListFooterLabel.text = count > MaxItemRows

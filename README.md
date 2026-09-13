@@ -390,7 +390,7 @@
 | [Kenney Particle Pack](https://kenney.nl/assets/particle-pack) | 枪口火焰、命中火花、血雾的贴图 | CC0 | kenney.nl |
 | [Noto Sans SC](https://github.com/notofonts/noto-cjk) | 界面中文字体（TMP 静态子集字体资产） | **SIL OFL 1.1** | notofonts/noto-cjk |
 | [Kenney UI Pack](https://kenney.nl/assets/ui-pack) | 界面音效（点击 / 切换 / 确认） | CC0 | kenney.nl |
-| [Kenney Game Icons](https://kenney.nl/assets/game-icons) + [Crosshair Pack](https://kenney.nl/assets/crosshair-pack) | 五类物品图标与准星（已接入背包 / 战利品 / 商人 / 结算） | CC0 | kenney.nl |
+| [Kenney Game Icons](https://kenney.nl/assets/game-icons) + [Crosshair Pack](https://kenney.nl/assets/crosshair-pack) | 五类物品图标素材与准星（图标素材已归档；当前物品格 / 商人 / 结算按反馈只显示稀有度色块，分类图标暂不显示） | CC0 | kenney.nl |
 
 > **关于 Broken Vector**：该包的原始文件里**没有任何 license / readme**，早期按 itch 资源页与惯例推断的
 > "未授权再分发"已经不成立——**作者在官方交流群中说明允许分发，项目负责人于 2026-09-12 确认**。

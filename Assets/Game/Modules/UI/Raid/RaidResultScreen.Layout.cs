@@ -38,12 +38,11 @@ namespace RaidDemo.UI
         /// <summary>
         /// 物品清单的一行。
         /// </summary>
-        /// <remarks>图标与稀有度小方块是**同一位置的两个控件**：有图标时显示图标、
-        /// 没有时显示色块。这样"没有图标"不会表现为一行缺一块，而是退回一个同样大小的占位。</remarks>
+        /// <remarks>行首只保留稀有度色小方块：结算清单要回答“值不值”，
+        /// 稀有度比分类图标更直接。</remarks>
         private sealed class ResultRow
         {
             public GameObject Root;
-            public Image Icon;
             public Image Chip;
             public TextMeshProUGUI Name;
             public TextMeshProUGUI Count;
@@ -154,17 +153,6 @@ namespace RaidDemo.UI
             root.sizeDelta = new Vector2(width, RowHeight);
 
             var iconTop = (RowHeight - RowIconSize) * 0.5f;
-            var icon = UiFactory.CreateAnchored(
-                root, "Icon", UiSprites.Block,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -iconTop),
-                new Vector2(RowIconSize, RowIconSize));
-            var iconImage = icon.GetComponent<Image>();
-            // 22px 的小图比九宫格边界还小，继续用 Sliced 只会把四角挤在一起，
-            // 因此小图标与小色块一律走 Simple。
-            iconImage.type = Image.Type.Simple;
-            iconImage.preserveAspect = true;
-            iconImage.raycastTarget = false;
-
             var chip = UiFactory.CreateAnchored(
                 root, "Chip", UiSprites.Block,
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -iconTop),
@@ -176,7 +164,6 @@ namespace RaidDemo.UI
             var row = new ResultRow
             {
                 Root = root.gameObject,
-                Icon = iconImage,
                 Chip = chipImage,
                 Name = UiFactory.CreateLabel(
                     root, string.Empty, new Vector2(34f, 4f), new Vector2(380f, RowHeight - 6f),
