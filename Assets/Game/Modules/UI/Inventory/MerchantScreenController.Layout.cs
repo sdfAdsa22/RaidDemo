@@ -122,8 +122,25 @@ namespace RaidDemo.UI
         /// 一屏约能看到 12 行，其余用滚轮查看。</remarks>
         private const float ShopViewportHeight = 580f;
 
-        /// <summary>滚轮每单位输入对应的滚动像素。Windows 一格滚轮为 ±120，折算约 48 像素一行。</summary>
-        private const float ShopScrollPixelsPerUnit = 0.4f;
+        /// <summary>滚轮一格对应的滚动像素：一格一行（行距 48）。</summary>
+        private const float ShopScrollPixelsPerNotch = 48f;
+
+        /// <summary>
+        /// 判定"原始滚轮值是不是 120 制"的阈值。
+        /// </summary>
+        /// <remarks>
+        /// <para>滚轮值的量纲取决于平台后端：老式平台给 WHEEL_DELTA 的 <b>120/格</b>，
+        /// 而新版 Input System 在 Windows 上会按 <c>scrollWheelDeltaPerTick</c> 归一成 <b>1/格</b>。</para>
+        /// <para>一格永远不可能超过 10：凡是绝对值大于 10 的输入都按 120 制换算，其余按"已经是格数"处理。
+        /// 这样两种量纲都对，且不依赖任何平台宏。</para>
+        /// </remarks>
+        private const float ShopScrollRawUnitsPerNotchThreshold = 10f;
+
+        /// <summary>120 制滚轮的一格数值。</summary>
+        private const float ShopScrollRawUnitsPerNotch = 120f;
+
+        /// <summary>键盘上下键每帧滚动的格数（约 12 像素/帧，与滚轮手感接近）。</summary>
+        private const float ShopArrowNotchesPerFrame = 0.25f;
 
         /// <summary>构建整套界面。</summary>
         private void BuildLayout()

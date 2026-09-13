@@ -187,8 +187,11 @@ namespace RaidDemo.UI
         /// <summary>
         /// 按滚轮输入滚动货架。也支持键盘上下键（滚轮坏掉或笔记本触控板不好用时仍可操作）。
         /// </summary>
-        /// <param name="wheelDelta">本帧滚轮输入（Windows 一格约 ±120）。</param>
+        /// <param name="wheelDelta">本帧滚轮原始值（120 制或归一制都可以）。</param>
         /// <remarks>
+        /// <para><b>输入先归一成"格数"再换算像素</b>：滚轮原始值的量纲随平台后端变化
+        /// （120/格 或 1/格），直接拿"像素 / 原始单位"当系数会差 120 倍——
+        /// 症状就是"滚了十几圈只动一点点"。归一之后，一格永远等于一行（48 像素）。</para>
         /// <para>偏移量的方向：内容原点在左上、Y 轴向上为正，因此"向下滚动"是让内容的
         /// <c>anchoredPosition.y</c> 增大。</para>
         /// <para>边界必须夹住：不夹的话可以一路把内容推出视口，界面会变成一片空白，
@@ -204,15 +207,14 @@ namespace RaidDemo.UI
             var keyboard = Keyboard.current;
             if (keyboard != null)
             {
-                // 方向键按帧推进：±30 单位 ≈ 每帧 12 像素（60 帧下约 720 像素/秒），
-                // 与滚轮一格 48 像素的手感接近；给 240 会一帧滚过一整屏。
+                // 方向键按帧推进：0.25 格/帧 ≈ 12 像素，与滚轮走同一条"格数"通道。
                 if (keyboard.downArrowKey.isPressed)
                 {
-                    wheelDelta -= 30f;
+                    wheelDelta -= ShopArrowNotchesPerFrame * ShopScrollRawUnitsPerNotch;
                 }
                 else if (keyboard.upArrowKey.isPressed)
                 {
-                    wheelDelta += 30f;
+                    wheelDelta += ShopArrowNotchesPerFrame * ShopScrollRawUnitsPerNotch;
                 }
             }
 
@@ -222,8 +224,12 @@ namespace RaidDemo.UI
             }
 
             var maxScroll = Mathf.Max(0f, m_ShopContentHeight - ShopViewportHeight + 8f);
+            // 先归一成"格数"，再换算成像素：见方法注释里的量纲说明。
+            var notches = Mathf.Abs(wheelDelta) > ShopScrollRawUnitsPerNotchThreshold
+                ? wheelDelta / ShopScrollRawUnitsPerNotch
+                : wheelDelta;
             var target = Mathf.Clamp(
-                m_ShopScroll - (wheelDelta * ShopScrollPixelsPerUnit), 0f, maxScroll);
+                m_ShopScroll - (notches * ShopScrollPixelsPerNotch), 0f, maxScroll);
             if (Mathf.Approximately(target, m_ShopScroll))
             {
                 return;
