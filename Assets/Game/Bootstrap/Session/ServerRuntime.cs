@@ -124,6 +124,11 @@ namespace RaidDemo.Bootstrap
 
             InitializeMovement();
 
+            // 导航装配必须排在移动装配之后：地图场景是在移动装配里加载的，
+            // 而导航网格只能从场景里的碰撞体烘焙出来（顺序反了会烘出一张空网格）。
+            // 注意这里只是"登记待办"：场景加载要到本帧稍后才生效，真正的烘焙在 TickNavigation 里。
+            BeginNavigation();
+
             m_NextHeartbeatTime = Time.unscaledTime + HeartbeatSeconds;
         }
 
@@ -138,6 +143,7 @@ namespace RaidDemo.Bootstrap
             }
 
             // 权威世界的推进独立于心跳：每帧都要走，心跳只是周期性日志。
+            TickNavigation();
             TickMovement(Time.deltaTime);
 
             if (Time.unscaledTime < m_NextHeartbeatTime)

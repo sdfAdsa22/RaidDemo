@@ -43,6 +43,15 @@ namespace RaidDemo.Bootstrap
         private readonly Dictionary<int, GameObject> m_PlayerColliders = new Dictionary<int, GameObject>();
         private readonly HashSet<int> m_InputLogged = new HashSet<int>();
 
+        /// <summary>
+        /// 每名玩家上一次采样到的地面高度。
+        /// </summary>
+        /// <remarks>
+        /// 地面探测是无状态的，但"没命中时沿用上次结果"需要有人记住上次结果：
+        /// 否则玩家走过没有碰撞体的缝隙时会被判成站在 0 米，碰撞胶囊瞬间悬空。
+        /// </remarks>
+        private readonly Dictionary<int, float> m_PlayerGroundHeights = new Dictionary<int, float>();
+
         /// <summary>服务器侧的移动权威世界。供测试与调试读取。</summary>
         public MovementServerWorld World => m_World;
 
@@ -80,6 +89,7 @@ namespace RaidDemo.Bootstrap
 
             m_PlayerBodies.Clear();
             m_PlayerColliders.Clear();
+            m_PlayerGroundHeights.Clear();
             m_SnapshotBuffer.Clear();
             ShutdownCombat();
             m_World = null;
@@ -140,6 +150,7 @@ namespace RaidDemo.Bootstrap
         {
             var playerId = (int)clientId;
             m_PlayerBodies.Remove(playerId);
+            m_PlayerGroundHeights.Remove(playerId);
             RemovePlayerFromCombat(playerId);
 
             if (m_World != null && m_World.RemovePlayer(playerId))
@@ -212,8 +223,12 @@ namespace RaidDemo.Bootstrap
         /// 把权威位置写回玩家对象的 Transform。
         /// </summary>
         /// <remarks>
-        /// 碰撞扫掠从 Transform 出发，因此它必须与模拟位置一致；
-        /// 高度保持不变（俯视角下移动只发生在水平面）。
+        /// <para>碰撞扫掠从 Transform 出发，因此它必须与模拟位置一致。</para>
+        ///
+        /// <para><b>高度每帧重采：</b>模拟层只有平面坐标，而"这个位置的地面有多高"属于场景信息。
+        /// 地图是下沉盆地（谷底 -6、平台 -4.8、塬面 0），写死高度会让胶囊浮在地面上方 6 米——
+        /// 于是服务器认为玩家可以穿过集装箱，子弹也会从掩体上方飞过。
+        /// 这里用与玩家表现层同一套规则的地面探测，把胶囊始终贴在真实地面上。</para>
         /// </remarks>
         private void SyncPlayerTransforms()
         {
@@ -226,7 +241,15 @@ namespace RaidDemo.Bootstrap
                 }
 
                 var position = snapshot.State.Position;
-                body.position = new Vector3(position.X, body.position.y, position.Y);
+                var plane = new Vector2F(position.X, position.Y);
+                var ground = GroundProbe.SampleGroundHeight(
+                    plane,
+                    body.position.y,
+                    m_PlayerGroundHeights.TryGetValue(pair.Key, out var previous) ? previous : body.position.y,
+                    body);
+
+                m_PlayerGroundHeights[pair.Key] = ground;
+                body.position = new Vector3(position.X, ground, position.Y);
             }
         }
 
@@ -277,7 +300,19 @@ namespace RaidDemo.Bootstrap
         {
             var instance = new GameObject($"ServerPlayerBody_{playerId}");
             var position = SpawnPositionFor(playerId);
-            instance.transform.position = new Vector3(position.X, 0f, position.Y);
+
+            // 出生高度取导航网格采样：此时服务器已经烘焙过导航数据，它是"地面在哪"最省事的权威答案。
+            // 找不到导航数据时退回 0 米；随后的每帧地面探测会把胶囊修正到真实地面。
+            var ground = NavMeshGroundSampler.TrySample(position, out var sampled) ? sampled : 0f;
+            instance.transform.position = new Vector3(position.X, ground, position.Y);
+            m_PlayerGroundHeights[playerId] = ground;
+
+            // 高度对齐是"静默出错"的重灾区：胶囊浮在地面上方时，服务器照常接受输入、
+            // 照常广播快照，只有"子弹穿掩体""玩家穿集装箱"这类间接症状。
+            // 因此每次有人加入都留一条 Info 痕迹，让这个数字在任何构建里都查得到。
+            m_Session?.Log.Info(
+                $"[服务器] 玩家 {playerId} 的碰撞载体就位：平面 ({position.X:F1}, {position.Y:F1})，"
+                + $"地面高度 {ground:F2} 米。");
 
             // 形状与客户端角色一致：命中判定用的是同一套胶囊尺寸，
             // 否则"客户端觉得打中了、服务器觉得没中"会变成常态。

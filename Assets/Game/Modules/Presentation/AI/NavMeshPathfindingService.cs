@@ -20,24 +20,19 @@ namespace RaidDemo.Presentation
     /// 否则一旦某处写反，症状是"AI 往垂直于目标的方向走"——看起来像状态机出了问题。</para>
     ///
     /// <para><b>高度采样：</b>M5 的装卸平台让地图第一次出现高低差，而逻辑层给出的
-    /// 始终是二维坐标。若直接把 y 固定为 0 去算路径，平台上的点在导航网格之外，
-    /// 寻路会整体失败——表现为「AI 站在台下一动不动」。因此这里先对起点与终点
-    /// 各自做一次 <c>NavMesh.SamplePosition</c>，把平面点吸附到最近的导航网格表面
-    /// （含高度），再计算路径。采样半径取 2.5 米，刚好覆盖 1.2 米高的台面。</para>
+    /// 始终是二维坐标。若直接把 y 固定为 0 去算路径，地面上的点就会落在导航网格之外，
+    /// 寻路整体失败——而失败被降级成"直线推进"，于是症状只是"AI 走得有点傻"，
+    /// 没有任何报错。因此这里先对起点与终点各自采样出脚下的地面高度，再计算路径。</para>
+    ///
+    /// <para><b>为什么用 <see cref="NavMeshGroundSampler"/> 而不是一次大半径采样：</b>
+    /// M7 起地图是下沉盆地（谷底 -6、装卸平台 -4.8、塬面 0），同一平面位置上可能有多层导航面。
+    /// "离采样点最近的面"会被平台或坡道抢走，把点吸附到错误的高度上；
+    /// 分层采样取的是最低的那层，也就是单位真正站着的那层。</para>
     /// </remarks>
     public sealed class NavMeshPathfindingService : IPathfindingService
     {
         /// <summary>所有导航区域都能走。</summary>
         private const int AreaMask = NavMesh.AllAreas;
-
-        /// <summary>
-        /// 平面点吸附到导航网格的最大搜索半径（米）。
-        /// </summary>
-        /// <remarks>
-        /// 该值必须大于地图上的最大高差，否则站在高台上的目标点会吸附失败。
-        /// 当前地图最大高差是装卸平台的 1.2 米，取 2.5 留出一倍余量。
-        /// </remarks>
-        private const float SampleRadiusMeters = 2.5f;
 
         /// <summary>
         /// 复用的路径对象。
@@ -65,10 +60,10 @@ namespace RaidDemo.Presentation
 
             waypoints.Clear();
 
-            // 吸附失败时退回原始平面点：宁可让 CalculatePath 去报失败，
+            // 采样失败时退回名义高度：宁可让 CalculatePath 去报失败，
             // 也不要把起点悄悄挪到别处——那会让 AI 突然出现在玩家看不见的位置。
-            var start = SampleOntoNavMesh(ToWorld(from));
-            var end = SampleOntoNavMesh(ToWorld(to));
+            var start = ToWorld(from);
+            var end = ToWorld(to);
 
             if (!NavMesh.CalculatePath(start, end, AreaMask, m_Path))
             {
@@ -97,22 +92,22 @@ namespace RaidDemo.Presentation
             return true;
         }
 
-        /// <summary>平面坐标 → 世界坐标（y 固定为地面高度 0）。</summary>
+        /// <summary>
+        /// 平面坐标 → 世界坐标（y 取该位置脚下的地面高度）。
+        /// </summary>
+        /// <remarks>
+        /// <para>高度不能写死：M7 起地图是下沉盆地，谷底在 -6 米、塬面在 0 米、
+        /// 装卸平台在 -4.8 米。写死任何一个高度，另一侧的点就会落到导航网格之外，
+        /// 于是寻路整体失败并静默退化成直线推进——画面上的症状只是"AI 走得有点傻"。</para>
+        ///
+        /// <para>用分层采样而不是一次大半径采样：同一平面位置上可能有多层导航面，
+        /// 分层采样取最低的那层，正是单位站着的这层（详见 <see cref="NavMeshGroundSampler"/>）。</para>
+        /// </remarks>
         private static Vector3 ToWorld(Vector2F point)
         {
-            return new Vector3(point.X, 0f, point.Y);
-        }
-
-        /// <summary>
-        /// 把一个世界坐标点吸附到最近的导航网格表面。
-        /// </summary>
-        /// <param name="point">原始点。</param>
-        /// <returns>吸附后的点；附近没有导航网格时返回原点。</returns>
-        private static Vector3 SampleOntoNavMesh(Vector3 point)
-        {
-            return NavMesh.SamplePosition(point, out var hit, SampleRadiusMeters, AreaMask)
-                ? hit.position
-                : point;
+            return NavMeshGroundSampler.TrySample(point, out var height)
+                ? new Vector3(point.X, height, point.Y)
+                : new Vector3(point.X, 0f, point.Y);
         }
 
         /// <summary>世界坐标 → 平面坐标。</summary>
