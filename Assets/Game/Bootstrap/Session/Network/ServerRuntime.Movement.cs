@@ -217,6 +217,10 @@ namespace RaidDemo.Bootstrap
             if (m_World.CaptureSnapshots(m_SnapshotBuffer) > 0)
             {
                 BroadcastSnapshots();
+
+                // 敌人快照与玩家快照同一节拍：两者在客户端是同一帧被插值的，
+                // 节拍不同会让"敌人打中了队友"这类事件在两边的画面上错开半拍。
+                BroadcastEnemySnapshots();
             }
         }
 

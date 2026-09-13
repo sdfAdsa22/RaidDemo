@@ -124,6 +124,7 @@ namespace RaidDemo.Bootstrap
             m_NetworkSnapshotHandlerRegistered = true;
 
             RegisterCombatChannel();
+            RegisterEnemyChannel();
         }
 
         /// <summary>连接断开：清理远端视图，避免留下不会动的假队友。</summary>
@@ -132,6 +133,7 @@ namespace RaidDemo.Bootstrap
             Debug.LogWarning($"[联机] 与服务器断开（clientId={clientId}）。");
 
             ClearRemoteViews();
+            ClearRemoteEnemyViews();
         }
 
         /// <summary>
@@ -162,6 +164,7 @@ namespace RaidDemo.Bootstrap
             }
 
             UpdateRemoteViews(deltaTime);
+            UpdateRemoteEnemyViews(deltaTime);
         }
 
         /// <summary>
