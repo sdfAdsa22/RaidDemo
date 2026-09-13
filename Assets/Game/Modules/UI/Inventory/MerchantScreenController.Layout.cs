@@ -64,6 +64,24 @@ namespace RaidDemo.UI
         private MerchantTab m_ActiveTab = MerchantTab.Buy;
         private RectTransform m_BuyTabRoot;
         private RectTransform m_QuestTabRoot;
+
+        /// <summary>
+        /// 货架列表的滚动视口与内容。
+        /// </summary>
+        /// <remarks>M8 批次 2 把货架扩到 15 项之后，列表高度超过了面板；
+        /// 视口负责裁剪（RectMask2D），内容负责整体上移——滚轮改的就是内容的 Y 偏移。</remarks>
+        private RectTransform m_ShopViewport;
+        private RectTransform m_ShopContent;
+
+        /// <summary>货架当前滚动偏移（像素，向下为正）。</summary>
+        private float m_ShopScroll;
+
+        /// <summary>货架内容高度，用于计算最大滚动量。</summary>
+        private float m_ShopContentHeight;
+
+        /// <summary>滚动提示：仅在内容超出视口时显示。</summary>
+        private TextMeshProUGUI m_ShopScrollHint;
+
         private TextMeshProUGUI m_SellInfoLabel;
         private UiButton m_SellToggleButton;
         private UiButton m_SellCancelButton;
@@ -96,6 +114,16 @@ namespace RaidDemo.UI
 
         /// <summary>创建页签内容根节点时用的尺寸（够放下最长的列表）。</summary>
         private static readonly Vector2 TabRootSize = new Vector2(LeftWidth, 640f);
+
+        /// <summary>
+        /// 货架视口高度（像素）。
+        /// </summary>
+        /// <remarks>从"列表起点 144"到"底部提示条 734"之间取 580，留出提示区的空隙；
+        /// 一屏约能看到 12 行，其余用滚轮查看。</remarks>
+        private const float ShopViewportHeight = 580f;
+
+        /// <summary>滚轮每单位输入对应的滚动像素。Windows 一格滚轮为 ±120，折算约 48 像素一行。</summary>
+        private const float ShopScrollPixelsPerUnit = 0.4f;
 
         /// <summary>构建整套界面。</summary>
         private void BuildLayout()

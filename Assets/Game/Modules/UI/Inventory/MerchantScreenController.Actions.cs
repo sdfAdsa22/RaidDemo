@@ -159,6 +159,9 @@ namespace RaidDemo.UI
         /// <summary>购买按钮与快捷键。</summary>
         private void UpdateBuyInput(Vector2 pointer)
         {
+            // 货架先吃滚轮：鼠标停在哪一行都能滚，不需要把指针放到滚动条上。
+            UpdateShopScroll(Mouse.current.scroll.ReadValue().y);
+
             for (var i = 0; i < m_ShopRows.Count; i++)
             {
                 var row = m_ShopRows[i];
@@ -179,6 +182,55 @@ namespace RaidDemo.UI
                 UiAudio.Play(result.Success ? UiCue.Buy : UiCue.Locked);
                 return;
             }
+        }
+
+        /// <summary>
+        /// 按滚轮输入滚动货架。也支持键盘上下键（滚轮坏掉或笔记本触控板不好用时仍可操作）。
+        /// </summary>
+        /// <param name="wheelDelta">本帧滚轮输入（Windows 一格约 ±120）。</param>
+        /// <remarks>
+        /// <para>偏移量的方向：内容原点在左上、Y 轴向上为正，因此"向下滚动"是让内容的
+        /// <c>anchoredPosition.y</c> 增大。</para>
+        /// <para>边界必须夹住：不夹的话可以一路把内容推出视口，界面会变成一片空白，
+        /// 而且没有任何东西提示"滚过头了"。</para>
+        /// </remarks>
+        private void UpdateShopScroll(float wheelDelta)
+        {
+            if (m_ShopContent == null)
+            {
+                return;
+            }
+
+            var keyboard = Keyboard.current;
+            if (keyboard != null)
+            {
+                // 方向键按帧推进：±30 单位 ≈ 每帧 12 像素（60 帧下约 720 像素/秒），
+                // 与滚轮一格 48 像素的手感接近；给 240 会一帧滚过一整屏。
+                if (keyboard.downArrowKey.isPressed)
+                {
+                    wheelDelta -= 30f;
+                }
+                else if (keyboard.upArrowKey.isPressed)
+                {
+                    wheelDelta += 30f;
+                }
+            }
+
+            if (Mathf.Approximately(wheelDelta, 0f))
+            {
+                return;
+            }
+
+            var maxScroll = Mathf.Max(0f, m_ShopContentHeight - ShopViewportHeight + 8f);
+            var target = Mathf.Clamp(
+                m_ShopScroll - (wheelDelta * ShopScrollPixelsPerUnit), 0f, maxScroll);
+            if (Mathf.Approximately(target, m_ShopScroll))
+            {
+                return;
+            }
+
+            m_ShopScroll = target;
+            m_ShopContent.anchoredPosition = new Vector2(0f, m_ShopScroll);
         }
 
         /// <summary>任务按钮。</summary>

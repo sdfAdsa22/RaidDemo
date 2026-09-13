@@ -3,6 +3,7 @@ using RaidDemo.Data;
 using RaidDemo.Meta;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace RaidDemo.UI
 {
@@ -40,6 +41,31 @@ namespace RaidDemo.UI
                 return;
             }
 
+            // 视口 + 内容：视口负责裁掉超出部分，内容承载全部行、由滚轮上下移动。
+            // 行仍然摆在内容里，因此点击判定（row.Buy.Contains）不需要任何改动。
+            m_ShopViewport = UiFactory.CreateRect(host, "ShopViewport");
+            m_ShopViewport.anchorMin = new Vector2(0f, 1f);
+            m_ShopViewport.anchorMax = new Vector2(0f, 1f);
+            m_ShopViewport.pivot = new Vector2(0f, 1f);
+            m_ShopViewport.anchoredPosition = Vector2.zero;
+            m_ShopViewport.sizeDelta = new Vector2(LeftWidth, ShopViewportHeight);
+            m_ShopViewport.gameObject.AddComponent<RectMask2D>();
+
+            m_ShopContent = UiFactory.CreateRect(m_ShopViewport, "ShopContent");
+            m_ShopContent.anchorMin = new Vector2(0f, 1f);
+            m_ShopContent.anchorMax = new Vector2(0f, 1f);
+            m_ShopContent.pivot = new Vector2(0f, 1f);
+            m_ShopContent.anchoredPosition = Vector2.zero;
+
+            m_ShopScrollHint = UiFactory.CreateLabel(
+                host,
+                "滚轮 / ↑↓ 滚动查看全部商品",
+                new Vector2(0f, ShopViewportHeight + 4f),
+                new Vector2(LeftWidth, 22f),
+                UiPalette.SmallSize,
+                TextAlignmentOptions.Right,
+                UiPalette.InkSoft);
+
             var entries = m_Trader.Entries;
             for (var i = 0; i < entries.Count; i++)
             {
@@ -51,7 +77,7 @@ namespace RaidDemo.UI
                 }
 
                 var row = CreateRowBackground(
-                    host,
+                    m_ShopContent,
                     "ShopRow_" + entry.ItemId,
                     m_ShopRows.Count * ShopRowPitch,
                     ShopRowHeight);
@@ -66,12 +92,14 @@ namespace RaidDemo.UI
                     UiPalette.Ink);
 
                 // 口径徽标：让"这把枪吃什么弹"在购买前就能对上（M8 批次 2）。
+                // 位置紧贴「购买」按钮左侧、与按钮同高——注意 CreateAnchored 的 Y 轴向上为正，
+                // 因此向下偏移必须给负数（给正数会让徽标浮到行框外面，看起来像右上角的小角标）。
                 CaliberBadge.CreateAnchored(
                     row,
                     RaidDemo.Data.CaliberPalette.ResolveCaliber(definition),
                     anchor: new Vector2(0f, 1f),
                     pivot: new Vector2(0f, 1f),
-                    offset: new Vector2(LeftWidth - 168f, 12f),
+                    offset: new Vector2(LeftWidth - 166f, -13f),
                     size: new Vector2(44f, 18f));
 
                 var buy = UiFactory.CreateButton(
@@ -88,6 +116,18 @@ namespace RaidDemo.UI
                     Label = label,
                     Buy = buy,
                 });
+            }
+
+            m_ShopContentHeight = m_ShopRows.Count * ShopRowPitch;
+            m_ShopContent.sizeDelta = new Vector2(
+                LeftWidth, Mathf.Max(ShopViewportHeight, m_ShopContentHeight + 8f));
+            m_ShopScroll = 0f;
+
+            // 少于视口高度时不显示滚动提示，避免"提示滚轮却没东西可滚"。
+            if (m_ShopScrollHint != null)
+            {
+                var scrollable = m_ShopContentHeight > ShopViewportHeight;
+                m_ShopScrollHint.gameObject.SetActive(scrollable);
             }
         }
 
