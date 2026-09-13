@@ -23,45 +23,14 @@ namespace RaidDemo.UI
     /// </remarks>
     public sealed partial class InventoryScreenController : MonoBehaviour
     {
-        /// <summary>界面参考分辨率。所有布局数值都按这个尺寸写。</summary>
-        private const float ReferenceWidth = 1920f;
-
-        private const float ReferenceHeight = 1080f;
-
-        /// <summary>面板尺寸与位置（像素）。</summary>
         /// <summary>
-        /// 面板宽度（像素）。
+        /// 装备槽的常态与悬停底色。
         /// </summary>
-        /// <remarks>
-        /// 从 900 加宽到 1500：右侧要放得下仓库（10x8 = 560 像素宽），
-        /// 而 900 宽时它只能挤在背包下方、还会压出面板边界。
-        /// 1920 参考分辨率下 1500 仍留有余量。
-        /// </remarks>
-        private const float PanelWidth = 1500f;
+        /// <remarks>M7 批次 4 起，装备槽与负重条的尺寸 / 颜色都搬到了 Layout 部分与 <see cref="UiPalette"/>，
+        /// 这里只保留拖拽逻辑真正用到的两个"底色"语义：常态用白色（等于贴图原色），悬停用主题的浅青绿。</remarks>
+        private static readonly Color SlotColor = Color.white;
 
-        private const float PanelHeight = 820f;
-
-        private const float PanelTop = 120f;
-
-        /// <summary>装备槽尺寸与间距（像素）。</summary>
-        private const float SlotWidth = 200f;
-
-        private const float SlotHeight = 44f;
-
-        private const float SlotGap = 56f;
-
-        /// <summary>负重条尺寸（像素）。</summary>
-        private const float BarWidth = 200f;
-
-        private const float BarHeight = 18f;
-
-        private static readonly Color PanelColor = new Color(0.08f, 0.08f, 0.10f, 0.96f);
-        private static readonly Color SlotColor = new Color(0.22f, 0.22f, 0.25f, 1f);
-        private static readonly Color SlotHighlightColor = new Color(0.30f, 0.85f, 0.40f, 0.55f);
-        private static readonly Color BarBackColor = new Color(0.18f, 0.18f, 0.20f, 1f);
-        private static readonly Color LightColor = new Color(0.35f, 0.80f, 0.45f);
-        private static readonly Color HeavyColor = new Color(0.95f, 0.75f, 0.25f);
-        private static readonly Color OverloadedColor = new Color(0.95f, 0.30f, 0.30f);
+        private static readonly Color SlotHighlightColor = UiPalette.SlotHover;
 
         /// <summary>装备槽的界面元素。</summary>
         private sealed class SlotWidget
@@ -69,7 +38,7 @@ namespace RaidDemo.UI
             public EquipmentSlot Slot;
             public RectTransform Rect;
             public Image Background;
-            public Text Label;
+            public TMPro.TextMeshProUGUI Label;
             public ItemInstance Item;
         }
 
@@ -117,7 +86,7 @@ namespace RaidDemo.UI
         private Vector2 m_LootAnchorTopLeft;
 
         private Image m_BarFill;
-        private Text m_BarLabel;
+        private TMPro.TextMeshProUGUI m_BarLabel;
 
         private bool m_IsOpen;
         private bool m_IsDragging;

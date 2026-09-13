@@ -48,6 +48,8 @@ namespace RaidDemo.UI
         private static Sprite s_Track;
         private static Sprite s_Fill;
         private static Sprite s_Ring;
+        private static Sprite s_RingWhite;
+        private static Sprite s_Block;
 
         /// <summary>奶油色面板（不透明）。</summary>
         public static Sprite Card => s_Card ??= Build("Ui_Card", UiPalette.Paper, UiPalette.Outline, 3f, 0f);
@@ -87,6 +89,12 @@ namespace RaidDemo.UI
 
         /// <summary>选中环（中空，只画描边），叠在格子上表示"当前选中"。</summary>
         public static Sprite Ring => s_Ring ??= Build("Ui_Ring", new Color(0f, 0f, 0f, 0f), UiPalette.Teal, 3f, 0f);
+
+        /// <summary>白色描边环：使用时按稀有度染色，就是物品格的外框。</summary>
+        public static Sprite RingWhite => s_RingWhite ??= Build("Ui_RingWhite", new Color(0f, 0f, 0f, 0f), Color.white, 3f, 0f);
+
+        /// <summary>纯白实心圆角块（无描边）：使用时按语义染色，充当地块与进度条填充。</summary>
+        public static Sprite Block => s_Block ??= Build("Ui_Block", Color.white, Color.white, 0f, 0f);
 
         /// <summary>
         /// 画一张圆角矩形贴图并切成九宫格。

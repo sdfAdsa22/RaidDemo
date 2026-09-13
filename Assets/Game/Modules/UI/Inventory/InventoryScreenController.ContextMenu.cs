@@ -38,16 +38,16 @@ namespace RaidDemo.UI
         {
             public RectTransform Rect;
             public Image Background;
-            public Text Label;
+            public TMPro.TextMeshProUGUI Label;
             public Action Action;
             public bool Enabled;
         }
 
-        private static readonly Color MenuBackColor = new Color(0.10f, 0.10f, 0.12f, 0.98f);
-        private static readonly Color MenuRowColor = new Color(0.16f, 0.16f, 0.19f, 1f);
-        private static readonly Color MenuRowHoverColor = new Color(0.24f, 0.40f, 0.62f, 1f);
-        private static readonly Color MenuTextColor = new Color(0.92f, 0.92f, 0.95f);
-        private static readonly Color MenuDisabledColor = new Color(0.45f, 0.45f, 0.50f);
+        /// <summary>菜单行的常态底色：透明，让菜单底板露出来。</summary>
+        private static readonly Color MenuRowColor = new Color(1f, 1f, 1f, 0f);
+
+        /// <summary>菜单行悬停底色：主题的青绿浅色。</summary>
+        private static readonly Color MenuRowHoverColor = UiPalette.SlotHover;
 
         private readonly List<MenuRow> m_MenuRows = new List<MenuRow>(4);
         private RectTransform m_MenuRoot;
@@ -124,8 +124,16 @@ namespace RaidDemo.UI
             m_MenuRoot.anchorMin = new Vector2(0f, 1f);
             m_MenuRoot.anchorMax = new Vector2(0f, 1f);
             m_MenuRoot.pivot = new Vector2(0f, 1f);
-            m_MenuRoot.sizeDelta = new Vector2(MenuWidth, MenuRowHeight * 4f);
-            host.GetComponent<Image>().color = MenuBackColor;
+            m_MenuRoot.sizeDelta = new Vector2(MenuWidth, (MenuRowHeight * 4f) + 8f);
+
+            // 菜单是一张浮起来的纸：用比主面板略深的贴图 + 深墨描边，
+            // 与背包面板形成层次，而不是另配一套颜色。
+            var back = host.GetComponent<Image>();
+            back.sprite = UiSprites.CardDim;
+            back.type = Image.Type.Sliced;
+            back.pixelsPerUnitMultiplier = 1f;
+            back.color = Color.white;
+            back.raycastTarget = false;
 
             for (var i = 0; i < 4; i++)
             {
@@ -135,15 +143,18 @@ namespace RaidDemo.UI
                 rect.anchorMin = new Vector2(0f, 1f);
                 rect.anchorMax = new Vector2(0f, 1f);
                 rect.pivot = new Vector2(0f, 1f);
-                rect.anchoredPosition = new Vector2(2f, -2f - (i * MenuRowHeight));
-                rect.sizeDelta = new Vector2(MenuWidth - 4f, MenuRowHeight - 2f);
+                rect.anchoredPosition = new Vector2(4f, -4f - (i * MenuRowHeight));
+                rect.sizeDelta = new Vector2(MenuWidth - 8f, MenuRowHeight);
 
                 var background = rowHost.GetComponent<Image>();
+                background.sprite = UiSprites.Block;
+                background.type = Image.Type.Sliced;
+                background.pixelsPerUnitMultiplier = 1f;
                 background.color = MenuRowColor;
                 background.raycastTarget = false;
 
-                var label = CreateLabel(rect, string.Empty, new Vector2(10f, 0f),
-                    MenuWidth - 20f, MenuRowHeight - 2f, 15);
+                var label = CreateLabel(rect, string.Empty, new Vector2(12f, 0f),
+                    MenuWidth - 24f, MenuRowHeight, 15);
 
                 m_MenuRows.Add(new MenuRow
                 {
@@ -191,7 +202,7 @@ namespace RaidDemo.UI
         {
             var row = m_MenuRows[index];
             row.Label.text = caption;
-            row.Label.color = enabled ? MenuTextColor : MenuDisabledColor;
+            row.Label.color = enabled ? UiPalette.Ink : UiPalette.InkDisabled;
             row.Background.color = MenuRowColor;
             row.Enabled = enabled;
             row.Action = action;

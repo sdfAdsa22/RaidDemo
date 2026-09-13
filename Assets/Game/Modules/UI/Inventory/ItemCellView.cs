@@ -1,4 +1,5 @@
 using RaidDemo.Data;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,28 +14,26 @@ namespace RaidDemo.UI
     /// 统一处理——因为拖拽是一个跨格子的状态机，让每个物品各自处理会立刻出现
     /// "谁负责画预览"这种责任不清的问题。</para>
     ///
-    /// <para>色块颜色来自 <see cref="RarityPalette"/>，这是稀有度对玩家最直接的作用：
-    /// 一眼扫过去就知道哪件东西值钱。</para>
+    /// <para><b>配色取自稀有度，但用的是"浅底变体"</b>（M7 批次 4）：
+    /// 物品格现在是奶油纸面上的一块浅色卡片，填充色由稀有度色向白色稀释 78%，
+    /// 描边直接用稀有度色。深色文字压在浅填充上，五个档位一眼能分开，
+    /// 而深色背景上用的原色仍然留给世界里的伤害数字与标记。</para>
     /// </remarks>
     public sealed class ItemCellView : MonoBehaviour
     {
-        /// <summary>物品主体色块的透明度。压暗一点，让网格背景透出来，避免界面糊成一片。</summary>
-        private const float FillAlpha = 0.85f;
-
-        /// <summary>描边透明度。</summary>
-        private const float OutlineAlpha = 1f;
-
         /// <summary>内边距（像素）。留出缝隙，相邻物品才不会看起来连成一块。</summary>
         private const float Padding = 2f;
 
+        /// <summary>压暗系数：批量出售模式下未选中的物品用它变暗。</summary>
+        private const float DimFactor = 0.55f;
+
         private RectTransform m_Rect;
         private Image m_Outline;
-        private Image m_InnerLine;
         private Image m_Fill;
-        private Text m_Label;
-        private Text m_CheckBadge;
-        private Color m_BaseOutlineColor;
-        private Color m_BaseFillColor;
+        private TextMeshProUGUI m_Label;
+        private Image m_Badge;
+        private Color m_RarityOutline;
+        private Color m_RarityFill;
         private bool m_Selected;
         private bool m_Dimmed;
 
@@ -73,33 +72,27 @@ namespace RaidDemo.UI
                 (sizeInCells.Width * cellSize) - (Padding * 2f),
                 (sizeInCells.Height * cellSize) - (Padding * 2f));
 
-            var color = RarityPalette.GetColor(item.Definition.Rarity);
-            m_BaseOutlineColor = new Color(color.r, color.g, color.b, OutlineAlpha);
-            m_BaseFillColor = new Color(
-                color.r * 0.45f, color.g * 0.45f, color.b * 0.45f, FillAlpha);
+            m_RarityOutline = UiPalette.ItemOutline(item.Definition.Rarity);
+            m_RarityFill = UiPalette.ItemFill(item.Definition.Rarity);
 
-            m_Outline = EnsureImage("Outline", m_Rect, color);
-            // 黑色内分隔线：选中时夹在白色外描边与品质填充之间，
-            // 让白色描边在任何亮度的品质色上都能被看清。
-            m_InnerLine = EnsureImage("InnerLine", m_Outline.rectTransform, Color.clear);
-            StretchToParent(m_InnerLine.rectTransform, 1f);
-            m_Fill = EnsureImage("Fill", m_Outline.rectTransform, m_BaseFillColor);
-            StretchToParent(m_Fill.rectTransform, 2f);
-            m_Outline.color = m_BaseOutlineColor;
-            StretchToParent(m_Outline.rectTransform, 0f);
+            m_Fill = EnsureImage("Fill", m_Rect, UiSprites.Block, m_RarityFill);
+            UiFactory.Stretch(m_Fill.rectTransform);
+            m_Fill.rectTransform.offsetMin = new Vector2(UiPalette.OutlineWidth, UiPalette.OutlineWidth);
+            m_Fill.rectTransform.offsetMax = new Vector2(-UiPalette.OutlineWidth, -UiPalette.OutlineWidth);
 
-            m_Label = EnsureLabel("Label", m_Outline.rectTransform);
-            m_CheckBadge = EnsureCheckBadge(m_Outline.rectTransform);
+            m_Outline = EnsureImage("Outline", m_Rect, UiSprites.RingWhite, m_RarityOutline);
+            UiFactory.Stretch(m_Outline.rectTransform);
+
+            m_Label = EnsureLabel(m_Rect);
+            m_Badge = EnsureBadge(m_Rect);
             RefreshVisualState();
         }
 
         /// <summary>
         /// 设置选中状态。
         /// </summary>
-        /// <remarks>
-        /// 选中不替换稀有度填充色：白色外描边、黑色内分隔线与右上角勾
-        /// 提供与品质颜色无关的形状信号，避免和绿色 / 蓝色品质混淆。
-        /// </remarks>
+        /// <remarks>选中不替换稀有度填充：描边换成主题的青绿、右上角加一个角标，
+        /// 这两个信号与品质颜色无关，因此在任何稀有度上都读得出来。</remarks>
         public void SetSelected(bool selected)
         {
             m_Selected = selected;
@@ -121,32 +114,30 @@ namespace RaidDemo.UI
                 return;
             }
 
-            var outlineColor = m_BaseOutlineColor;
-            var fillColor = m_BaseFillColor;
-            var labelColor = Color.white;
+            var outlineColor = m_RarityOutline;
+            var fillColor = m_RarityFill;
+            var labelColor = UiPalette.Ink;
 
-            // 未选中且处于出售模式：整体压暗，选中项保持原亮度形成对比。
             if (m_Dimmed && !m_Selected)
             {
-                outlineColor = Dim(outlineColor, 0.55f);
-                fillColor = Dim(fillColor, 0.55f);
-                labelColor = new Color(0.62f, 0.62f, 0.66f, 0.85f);
+                outlineColor = Dim(outlineColor, DimFactor);
+                fillColor = Dim(fillColor, DimFactor);
+                labelColor = UiPalette.InkDisabled;
             }
 
             if (m_Selected)
             {
-                outlineColor = Color.white;
-                fillColor = m_BaseFillColor;
-                labelColor = Color.white;
+                outlineColor = UiPalette.Teal;
+                fillColor = m_RarityFill;
+                labelColor = UiPalette.Ink;
             }
 
             m_Outline.color = outlineColor;
             m_Fill.color = fillColor;
             m_Label.color = labelColor;
-            m_InnerLine.color = m_Selected ? Color.black : Color.clear;
-            if (m_CheckBadge != null)
+            if (m_Badge != null)
             {
-                m_CheckBadge.gameObject.SetActive(m_Selected);
+                m_Badge.gameObject.SetActive(m_Selected);
             }
         }
 
@@ -168,72 +159,87 @@ namespace RaidDemo.UI
             m_Label.text = Item.StackCount > 1 ? $"{name} x{Item.StackCount}" : name;
         }
 
-        /// <summary>确保一个矩形 Image 存在。</summary>
-        private static Image EnsureImage(string name, RectTransform parent, Color color)
+        /// <summary>确保一个九宫格 Image 存在。</summary>
+        private static Image EnsureImage(string name, RectTransform parent, Sprite sprite, Color color)
         {
             var host = new GameObject(name, typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)host.transform;
             rect.SetParent(parent, worldPositionStays: false);
             var image = host.GetComponent<Image>();
+            image.sprite = sprite;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = 1f;
             image.color = color;
             image.raycastTarget = false;
             return image;
         }
 
-        /// <summary>确保文本组件存在。</summary>
-        private static Text EnsureLabel(string name, RectTransform parent)
+        /// <summary>确保物品名文本存在（压在格子底部，最多两行）。</summary>
+        private static TextMeshProUGUI EnsureLabel(RectTransform parent)
         {
-            var host = new GameObject(name, typeof(RectTransform), typeof(Text));
+            var host = new GameObject("Label", typeof(RectTransform));
             var rect = (RectTransform)host.transform;
             rect.SetParent(parent, worldPositionStays: false);
-            var text = host.GetComponent<Text>();
-            text.font = UiFontProvider.Get(12);
-            text.fontSize = 12;
-            text.alignment = TextAnchor.LowerCenter;
-            text.color = Color.white;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
+            UiFactory.Stretch(rect);
+            rect.offsetMin = new Vector2(4f, 3f);
+            rect.offsetMax = new Vector2(-4f, -3f);
+
+            var text = host.AddComponent<TextMeshProUGUI>();
+            var font = TMP_Settings.defaultFontAsset;
+            if (font != null)
+            {
+                text.font = font;
+            }
+
+            text.fontSize = 13f;
+            text.alignment = TextAlignmentOptions.Bottom;
+            text.color = UiPalette.Ink;
             text.raycastTarget = false;
-            StretchToParent(rect, 2f);
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.textWrappingMode = TextWrappingModes.Normal;
             return text;
         }
 
-        /// <summary>创建右上角的选中勾。</summary>
-        private static Text EnsureCheckBadge(RectTransform parent)
+        /// <summary>创建右上角的选中角标（青绿圆片 + 白勾）。</summary>
+        private static Image EnsureBadge(RectTransform parent)
         {
-            var host = new GameObject("SelectedBadge", typeof(RectTransform), typeof(Text));
+            var host = new GameObject("SelectedBadge", typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)host.transform;
             rect.SetParent(parent, worldPositionStays: false);
             rect.anchorMin = new Vector2(1f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            rect.anchoredPosition = new Vector2(-1f, -1f);
-            rect.sizeDelta = new Vector2(18f, 18f);
+            rect.anchoredPosition = new Vector2(-3f, -3f);
+            rect.sizeDelta = new Vector2(22f, 22f);
 
-            var text = host.GetComponent<Text>();
-            text.font = UiFontProvider.Get(14);
-            text.fontSize = 14;
-            text.text = "✓";
-            text.alignment = TextAnchor.MiddleCenter;
-            text.color = Color.white;
-            text.raycastTarget = false;
+            var badge = host.GetComponent<Image>();
+            // 实心圆角块 + 白勾：22 像素的尺寸下，空心环里的对勾会看不清。
+            badge.sprite = UiSprites.Block;
+            badge.type = Image.Type.Sliced;
+            badge.pixelsPerUnitMultiplier = 1f;
+            badge.color = UiPalette.Teal;
+            badge.raycastTarget = false;
 
-            var outline = host.AddComponent<Outline>();
-            outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
-            outline.effectDistance = new Vector2(1f, -1f);
+            var labelHost = new GameObject("Mark", typeof(RectTransform));
+            var labelRect = (RectTransform)labelHost.transform;
+            labelRect.SetParent(rect, worldPositionStays: false);
+            UiFactory.Stretch(labelRect);
+
+            var mark = labelHost.AddComponent<TextMeshProUGUI>();
+            var font = TMP_Settings.defaultFontAsset;
+            if (font != null)
+            {
+                mark.font = font;
+            }
+
+            mark.text = "✓";
+            mark.fontSize = 15f;
+            mark.alignment = TextAlignmentOptions.Center;
+            mark.color = Color.white;
+            mark.raycastTarget = false;
 
             host.SetActive(false);
-            return text;
-        }
-
-        /// <summary>把子节点拉满父节点，四周留出指定边距。</summary>
-        private static void StretchToParent(RectTransform rect, float margin)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.offsetMin = new Vector2(margin, margin);
-            rect.offsetMax = new Vector2(-margin, -margin);
+            return badge;
         }
     }
 }

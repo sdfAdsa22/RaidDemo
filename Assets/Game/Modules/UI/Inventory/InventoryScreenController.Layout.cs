@@ -1,26 +1,47 @@
-﻿using System.Collections.Generic;
-using RaidDemo.Data;
+using System.Collections.Generic;
 using RaidDemo.Inventory;
-using RaidDemo.Kernel;
 using RaidDemo.Shared;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace RaidDemo.UI
 {
     /// <summary>
-    /// 背包界面的布局与刷新部分。
+    /// 背包界面的布局与刷新部分（M7 批次 4 的版式重排 + 换皮）。
     /// </summary>
     /// <remarks>
+    /// <para><b>版式：三栏。</b>左栏是装备（人体概念的竖列）、中栏是随身物品（主背包 + 弹药挂）、
+    /// 右栏是"另一处容器"（战利品箱或仓库）。旧版把战利品塞在背包下方，
+    /// 仓库是 10 列宽，一张面板根本放不下，而且和随身物品混在一起也说不清哪些是自己的。</para>
+    ///
     /// <para>拆成 partial 文件的原因：整个界面类已经超过项目规定的单文件 400 行上限。
-    /// 这里按职责切分，布局负责"长什么样"，拖拽部分负责"鼠标做了什么"。</para>
-    /// <para>界面在运行时用代码构建，不依赖预制体。灰盒阶段这样最省事，
-    /// 等 M7 做美术时再把布局换成预制体，届时逻辑部分不需要改动。</para>
+    /// 这里按职责切分：布局负责"长什么样"，拖拽部分负责"鼠标做了什么"。</para>
     /// </remarks>
     public sealed partial class InventoryScreenController
     {
-        /// <summary>背包价值 / 携带总值显示。由 Layout 部分创建与刷新。</summary>
-        private Text m_ValueLabel;
+        /// <summary>
+        /// 面板尺寸（参考像素）。
+        /// </summary>
+        /// <remarks>宽度按最宽的右栏（10 列仓库）反推；高度按最高的一列反推——
+        /// 中栏在 7×7 背包 + 弹药挂时最高（约 648），因此取 690 留出下边距。
+        /// 写死这两个数是因为内容尺寸本身有上界（仓库 10×8、背包最多 7×7），
+        /// 而"面板跟着内容长"会让不同背包下面板大小不一样，看起来像界面在抖。</remarks>
+        private const float PanelWidth = 1560f;
+
+        private const float PanelHeight = 690f;
+
+        /// <summary>标题条高度。</summary>
+        private const float TitleBarHeight = 64f;
+
+        /// <summary>左栏（装备）的横坐标。</summary>
+        private const float LeftColumnX = 28f;
+
+        /// <summary>中栏（随身物品）的横坐标。</summary>
+        private const float MiddleColumnX = 368f;
+
+        /// <summary>内容区起始高度（标题条之下）。</summary>
+        private const float ContentTop = 84f;
 
         /// <summary>
         /// 换背包后重建整套界面布局。
@@ -28,16 +49,15 @@ namespace RaidDemo.UI
         /// <param name="backpack">新的背包网格。</param>
         /// <param name="containerId">背包的容器 ID。</param>
         /// <remarks>
-        /// <para>换包会改变网格尺寸，而弹药挂与战利品面板的位置是按背包高度推算出来的，
+        /// <para>换包会改变网格尺寸，而弹药挂与右栏的位置是按背包尺寸推算出来的，
         /// 因此不能只替换一个视图——必须整块重建，否则面板会互相压住。</para>
-        ///
         /// <para>重建只销毁自己创建的画布，玩家数据（网格与装备）完全不动。</para>
         /// </remarks>
         public void RebuildLayout(InventoryGrid backpack, int containerId)
         {
-            // 先记住当前打开的战利品容器，并把状态清成「没有打开」。
+            // 先记住当前打开的战利品容器，并把状态清成"没有打开"。
             // 重建会销毁它的视图；若状态还留着这个 ID，OpenLootContainer 会以为
-            // 「这个容器已经展示过了」而跳过重建——表现就是面板消失、重搜同一个箱子也不回来。
+            // "这个容器已经展示过了"而跳过重建——表现就是面板消失、重搜同一个箱子也不回来。
             var openLootId = m_LootContainerId;
             m_LootContainerId = 0;
 
@@ -74,137 +94,66 @@ namespace RaidDemo.UI
         /// <summary>构建整套界面。</summary>
         private void BuildLayout()
         {
-            var canvasHost = new GameObject("InventoryCanvas", typeof(Canvas), typeof(CanvasScaler));
-            canvasHost.transform.SetParent(transform, worldPositionStays: false);
-            var canvas = canvasHost.GetComponent<Canvas>();
-            m_CanvasHost = canvasHost;
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             // 必须高于准星画布的 100：两者相同时，后创建的画布会盖在上面，
             // 而准星是启动过程中后建的，于是准星会压在背包面板上。
-            canvas.sortingOrder = 200;
+            var canvas = UiFactory.CreateCanvas(transform, "InventoryCanvas", 200);
+            m_CanvasHost = canvas.gameObject;
 
-            var scaler = canvasHost.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
+            // 面板打开时压暗背后的世界：奶油面板本身够亮，遮罩只压一半，
+            // 让玩家知道自己还站在地图里。
+            UiFactory.CreateVeil(canvas, "Veil");
 
-            var rootHost = new GameObject("Root", typeof(RectTransform), typeof(Image));
-            var rootRect = (RectTransform)rootHost.transform;
-            rootRect.SetParent(canvasHost.transform, worldPositionStays: false);
-            rootRect.anchorMin = new Vector2(0.5f, 0.5f);
-            rootRect.anchorMax = new Vector2(0.5f, 0.5f);
-            rootRect.pivot = new Vector2(0.5f, 0.5f);
-            rootRect.anchoredPosition = new Vector2(0f, 0f);
-            rootRect.sizeDelta = new Vector2(PanelWidth, PanelHeight);
-            var background = rootHost.GetComponent<Image>();
-            background.color = PanelColor;
-            background.raycastTarget = false;
-            m_Root = rootHost;
+            var root = UiFactory.CreateCenteredPanel(canvas, "Root", new Vector2(PanelWidth, PanelHeight), UiSprites.Card);
+            m_Root = root.gameObject;
 
-            CreateLabel(rootRect, "背包 (Tab 关闭  F 整理  双击快速搬运  R 拖拽中旋转  右键拆分 / 卸下)",
-                new Vector2(24f, 16f), PanelWidth - 48f, 24f, 16);
-
-            BuildEquipmentColumn(rootRect);
-            BuildWeightBar(rootRect);
+            BuildTitleBar(root);
+            BuildEquipmentColumn(root);
+            BuildWeightBar(root);
 
             var backpack = m_Loadout.Backpack;
-            m_BackpackView = CreateGridView(rootRect, backpack, m_BackpackContainerId, "主背包", new Vector2(280f, 56f));
+            m_BackpackView = CreateGridView(root, backpack, m_BackpackContainerId, "主背包", new Vector2(MiddleColumnX, ContentTop));
 
-            // 弹药挂紧贴在背包下方：它是随身物品的一部分，放在一起符合「背包里的东西」这个分组。
-            var pouchTopLeft = new Vector2(280f, 56f + (backpack.Height * InventoryGridView.CellSize) + 20f);
+            // 弹药挂紧贴在背包下方：它是随身物品的一部分，放在一起符合"背包里的东西"这个分组。
+            var backpackHeight = (backpack.Height * InventoryGridView.CellSize) + 50f;
+            var pouchTopLeft = new Vector2(MiddleColumnX, ContentTop + backpackHeight + 16f);
             if (m_Registry.TryGetGrid(m_AmmoPouchContainerId, out var pouch))
             {
-                m_AmmoPouchView = CreateGridView(rootRect, pouch, m_AmmoPouchContainerId, "弹药挂", pouchTopLeft);
+                m_AmmoPouchView = CreateGridView(root, pouch, m_AmmoPouchContainerId, "弹药挂", pouchTopLeft);
             }
 
-            // 战利品与仓库放在**右侧独立一列**：它们与随身物品是两处东西，
-            // 竖着叠在背包下方既挤又容易压出面板边界（仓库是 10 列宽）。
-            //
-            // 横坐标必须**按背包实际宽度推算**，不能写死：背包由装备决定（5x5 / 6x6 / 7x7），
-            // 写死 600 时，换成 6x6 的背包就会与这一列压在一起（宽度变成 336，超出预留的 320）。
-            var backpackColumnWidth = backpack.Width * InventoryGridView.CellSize;
-            m_LootAnchorTopLeft = new Vector2(280f + backpackColumnWidth + 40f, 56f);
+            // 右栏：战利品与仓库。横坐标必须**按背包实际宽度推算**，不能写死：
+            // 背包由装备决定（5x5 / 6x6 / 7x7），写死会让 7x7 的包与右栏压在一起。
+            var backpackWidth = (backpack.Width * InventoryGridView.CellSize) + 16f;
+            m_LootAnchorTopLeft = new Vector2(MiddleColumnX + backpackWidth + 24f, ContentTop);
         }
 
-        /// <summary>创建设备槽一列。</summary>
-        private void BuildEquipmentColumn(RectTransform parent)
+        /// <summary>标题条：界面名 + 操作提示。</summary>
+        private static void BuildTitleBar(RectTransform parent)
         {
-            var slots = new[]
-            {
-                EquipmentSlot.PrimaryWeapon,
-                EquipmentSlot.SecondaryWeapon,
-                EquipmentSlot.Head,
-                EquipmentSlot.Body,
-                EquipmentSlot.Backpack,
-            };
-
-            for (var i = 0; i < slots.Length; i++)
-            {
-                var host = new GameObject($"Slot_{slots[i]}", typeof(RectTransform), typeof(Image));
-                var rect = (RectTransform)host.transform;
-                rect.SetParent(parent, worldPositionStays: false);
-                rect.anchorMin = new Vector2(0f, 1f);
-                rect.anchorMax = new Vector2(0f, 1f);
-                rect.pivot = new Vector2(0f, 1f);
-                rect.anchoredPosition = new Vector2(40f, -56f - (i * SlotGap));
-                rect.sizeDelta = new Vector2(SlotWidth, SlotHeight);
-
-                var image = host.GetComponent<Image>();
-                image.color = SlotColor;
-                image.raycastTarget = false;
-
-                var label = CreateLabel(rect, SlotDisplayName(slots[i]), new Vector2(8f, 0f), SlotWidth - 16f, SlotHeight, 13);
-
-                m_Slots.Add(new SlotWidget
-                {
-                    Slot = slots[i],
-                    Rect = rect,
-                    Background = image,
-                    Label = label,
-                });
-            }
-        }
-
-        /// <summary>创建负重条。</summary>
-        private void BuildWeightBar(RectTransform parent)
-        {
-            var top = 56f + (5f * SlotGap) + 24f;
-
-            var backHost = new GameObject("WeightBarBack", typeof(RectTransform), typeof(Image));
-            var backRect = (RectTransform)backHost.transform;
-            backRect.SetParent(parent, worldPositionStays: false);
-            backRect.anchorMin = new Vector2(0f, 1f);
-            backRect.anchorMax = new Vector2(0f, 1f);
-            backRect.pivot = new Vector2(0f, 1f);
-            backRect.anchoredPosition = new Vector2(40f, -top);
-            backRect.sizeDelta = new Vector2(BarWidth, BarHeight);
-            var backImage = backHost.GetComponent<Image>();
-            backImage.color = BarBackColor;
-            backImage.raycastTarget = false;
-
-            var fillHost = new GameObject("WeightBarFill", typeof(RectTransform), typeof(Image));
-            var fillRect = (RectTransform)fillHost.transform;
-            fillRect.SetParent(backRect, worldPositionStays: false);
-            fillRect.anchorMin = new Vector2(0f, 0f);
-            fillRect.anchorMax = new Vector2(0f, 1f);
-            fillRect.pivot = new Vector2(0f, 0.5f);
-            fillRect.anchoredPosition = Vector2.zero;
-            fillRect.sizeDelta = new Vector2(0f, 0f);
-            m_BarFill = fillHost.GetComponent<Image>();
-            m_BarFill.color = LightColor;
-            m_BarFill.raycastTarget = false;
-
-            m_BarLabel = CreateLabel(parent, string.Empty, new Vector2(40f, top + BarHeight + 4f), BarWidth, 20f, 13);
-
-            // 价值放在负重条下方：两者回答的是同一个准备问题——
-            // "这一趟带了多少，输了会亏多少"。
-            m_ValueLabel = CreateLabel(
+            UiFactory.CreatePanel(
                 parent,
-                string.Empty,
-                new Vector2(40f, top + BarHeight + 28f),
-                320f,
-                20f,
-                13);
-            m_ValueLabel.color = new Color(0.95f, 0.82f, 0.35f);
+                "TitleBar",
+                new Vector2(PanelWidth, TitleBarHeight),
+                UiSprites.CardDim,
+                Vector2.zero);
+
+            UiFactory.CreateLabel(
+                parent,
+                "背包",
+                new Vector2(LeftColumnX, 14f),
+                new Vector2(200f, 38f),
+                26f,
+                TextAlignmentOptions.Left,
+                UiPalette.Ink);
+
+            UiFactory.CreateLabel(
+                parent,
+                "Tab 关闭　F 整理　双击快速搬运　拖拽中按 R 旋转　右键菜单 / Shift+右键 拆分",
+                new Vector2(LeftColumnX + 120f, 22f),
+                new Vector2(PanelWidth - LeftColumnX - 160f, 26f),
+                UiPalette.SmallSize,
+                TextAlignmentOptions.Right,
+                UiPalette.InkSoft);
         }
 
         /// <summary>创建一个网格视图。</summary>
@@ -234,67 +183,6 @@ namespace RaidDemo.UI
             RefreshValueLabel();
         }
 
-        /// <summary>刷新装备槽显示。</summary>
-        private void RefreshEquipmentSlots()
-        {
-            for (var i = 0; i < m_Slots.Count; i++)
-            {
-                var widget = m_Slots[i];
-                var item = m_Loadout.Equipment.Get(widget.Slot);
-                widget.Item = item;
-                widget.Background.color = SlotColor;
-                widget.Label.text = item == null
-                    ? $"{SlotDisplayName(widget.Slot)}：空"
-                    : $"{SlotDisplayName(widget.Slot)}：{item.Definition.DisplayName}";
-            }
-        }
-
-        /// <summary>刷新负重条。</summary>
-        private void RefreshWeightBar()
-        {
-            if (m_BarFill == null)
-            {
-                return;
-            }
-
-            var weight = m_Loadout.TotalWeightKg;
-            var capacity = m_EncumbranceProfile != null ? m_EncumbranceProfile.CapacityKg : 0f;
-            var ratio = capacity > 0f ? weight / capacity : 0f;
-
-            m_BarFill.rectTransform.sizeDelta = new Vector2(BarWidth * Mathf.Clamp01(ratio), 0f);
-            m_BarFill.color = ratio > 1f ? OverloadedColor : ratio >= 0.7f ? HeavyColor : LightColor;
-            m_BarLabel.text = $"{weight:F1} / {capacity:F0} kg";
-        }
-
-        /// <summary>
-        /// 刷新背包价值与携带总值。
-        /// </summary>
-        /// <remarks>
-        /// 「背包价值」只统计主背包网格；「携带总值」与战局结算的带入价值同口径，
-        /// 包含装备槽、弹药挂与背包。两个数字同时显示，玩家既能看到背包里装了什么，
-        /// 也能看到这一趟输了会亏多少。
-        /// </remarks>
-        private void RefreshValueLabel()
-        {
-            if (m_ValueLabel == null || m_Loadout == null)
-            {
-                return;
-            }
-
-            var backpackValue = 0;
-            var backpackItems = m_Loadout.Backpack != null ? m_Loadout.Backpack.Items : null;
-            if (backpackItems != null)
-            {
-                for (var i = 0; i < backpackItems.Count; i++)
-                {
-                    backpackValue += backpackItems[i].TotalValue;
-                }
-            }
-
-            var carriedValue = RaidDemo.Raid.RaidResult.ComputeCarriedValue(m_Loadout);
-            m_ValueLabel.text = $"背包价值 {backpackValue:N0}　携带总值 {carriedValue:N0}";
-        }
-
         /// <summary>显示或隐藏整个界面。</summary>
         private void SetVisible(bool visible)
         {
@@ -306,9 +194,9 @@ namespace RaidDemo.UI
 
             // 打开界面时**如果什么容器都没指定**，就默认显示仓库（出击准备）。
             //
-            // 条件必须是「当前没有打开任何容器」而不是「当前不是仓库」：
+            // 条件必须是"当前没有打开任何容器"而不是"当前不是仓库"：
             // 后者会把刚被显式打开的容器顶掉——在安全屋里按 E 开测试箱，
-            // 面板会立刻被替换成仓库，看起来就像「按 E 只会开仓库」。
+            // 面板会立刻被替换成仓库，看起来就像"按 E 只会开仓库"。
             if (visible
                 && m_PrepStashContainerId > 0
                 && m_LootContainerId == 0)
@@ -324,11 +212,12 @@ namespace RaidDemo.UI
                 CloseContextMenu();
 
                 // 关闭界面即结束这次搜刮：战利品面板随之销毁，
-                // 想再搬东西就得重新走到箱子前读条。这样「开箱成本」对每次搜刮都成立，
+                // 想再搬东西就得重新走到箱子前读条。这样"开箱成本"对每次搜刮都成立，
                 // 而不是开一次之后就能无限次免费取用。
                 CloseLootContainer();
             }
         }
+
         /// <summary>装备槽的中文名。</summary>
         private static string SlotDisplayName(EquipmentSlot slot)
         {
@@ -347,8 +236,12 @@ namespace RaidDemo.UI
             }
         }
 
-        /// <summary>创建一个文本标签。</summary>
-        private static Text CreateLabel(
+        /// <summary>
+        /// 创建一个左上对齐的文本标签。
+        /// </summary>
+        /// <remarks>保留这个包装而不是让调用方直接用 UiFactory：右键菜单与刷新逻辑都按
+        /// "左上偏移 + 宽高 + 字号"这组参数调用它，换皮时不必改动那些调用点。</remarks>
+        private static TextMeshProUGUI CreateLabel(
             RectTransform parent,
             string content,
             Vector2 topLeft,
@@ -356,23 +249,14 @@ namespace RaidDemo.UI
             float height,
             int fontSize)
         {
-            var host = new GameObject("Label", typeof(RectTransform), typeof(Text));
-            var rect = (RectTransform)host.transform;
-            rect.SetParent(parent, worldPositionStays: false);
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = new Vector2(topLeft.x, -topLeft.y);
-            rect.sizeDelta = new Vector2(width, height);
-
-            var text = host.GetComponent<Text>();
-            text.font = UiFontProvider.Get(fontSize);
-            text.fontSize = fontSize;
-            text.text = content;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.color = new Color(0.92f, 0.92f, 0.95f);
-            text.raycastTarget = false;
-            return text;
+            return UiFactory.CreateLabel(
+                parent,
+                content,
+                topLeft,
+                new Vector2(width, height),
+                fontSize,
+                TextAlignmentOptions.Left,
+                UiPalette.Ink);
         }
     }
 }

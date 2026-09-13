@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using RaidDemo.Data;
 using RaidDemo.Inventory;
+using RaidDemo.Shared;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,18 +23,13 @@ namespace RaidDemo.UI
         public const float CellSize = 56f;
 
         /// <summary>格子之间的缝隙（像素）。留缝是为了让相邻物品能被看出是两件。</summary>
-        private const float CellGap = 1f;
+        private const float CellGap = 3f;
 
         /// <summary>标题区高度（像素）。</summary>
-        private const float TitleHeight = 22f;
+        private const float TitleHeight = 34f;
 
-        /// <summary>预览高亮的透明度。</summary>
-        private const float PreviewAlpha = 0.45f;
-
-        private static readonly Color PanelColor = new Color(0.16f, 0.16f, 0.18f, 0.92f);
-        private static readonly Color CellColor = new Color(0.24f, 0.24f, 0.27f, 1f);
-        private static readonly Color ValidPreviewColor = new Color(0.30f, 0.85f, 0.40f, PreviewAlpha);
-        private static readonly Color InvalidPreviewColor = new Color(0.95f, 0.30f, 0.30f, PreviewAlpha);
+        /// <summary>面板四周的内边距（像素）。</summary>
+        private const float PanelPadding = 8f;
 
         private readonly List<ItemCellView> m_ItemViews = new List<ItemCellView>();
         private readonly List<Image> m_CellImages = new List<Image>();
@@ -68,8 +65,8 @@ namespace RaidDemo.UI
             m_Grid = grid;
             ContainerId = containerId;
 
-            var width = grid.Width * CellSize;
-            var height = (grid.Height * CellSize) + TitleHeight;
+            var width = (grid.Width * CellSize) + (PanelPadding * 2f);
+            var height = (grid.Height * CellSize) + TitleHeight + (PanelPadding * 2f);
 
             var rect = gameObject.GetComponent<RectTransform>();
             if (rect == null)
@@ -84,13 +81,17 @@ namespace RaidDemo.UI
             rect.anchoredPosition = new Vector2(topLeft.x, -topLeft.y);
             rect.sizeDelta = new Vector2(width, height);
 
+            // 容器面板用比主面板略深的纸，靠色差把"这是另一块区域"表达出来，
+            // 而不是再加一层描边——背包界面上已经有很多层框了。
             var background = gameObject.AddComponent<Image>();
-            background.color = PanelColor;
+            background.sprite = UiSprites.CardDim;
+            background.type = Image.Type.Sliced;
+            background.pixelsPerUnitMultiplier = 1f;
             background.raycastTarget = false;
 
-            CreateLabel(rect, title, new Vector2(6f, 0f), width, TitleHeight);
+            CreateLabel(rect, title, new Vector2(PanelPadding + 4f, 4f), width - (PanelPadding * 2f), TitleHeight - 6f);
 
-            m_CellsRoot = CreateCellsRoot(rect, width, grid.Height * CellSize);
+            m_CellsRoot = CreateCellsRoot(rect, grid.Width * CellSize, grid.Height * CellSize);
             BuildCells(grid);
         }
 
@@ -187,7 +188,7 @@ namespace RaidDemo.UI
                 return;
             }
 
-            var color = valid ? ValidPreviewColor : InvalidPreviewColor;
+            var color = valid ? UiPalette.PreviewValid : UiPalette.PreviewInvalid;
             for (var y = 0; y < size.Height; y++)
             {
                 for (var x = 0; x < size.Width; x++)
@@ -208,11 +209,15 @@ namespace RaidDemo.UI
         {
             for (var i = 0; i < m_CellImages.Count; i++)
             {
-                m_CellImages[i].color = CellColor;
+                m_CellImages[i].color = Color.white;
             }
         }
 
-        /// <summary>构建格子底板。落点预览直接复用这些底板变色，不额外建对象。</summary>
+        /// <summary>
+        /// 构建格子底板。
+        /// </summary>
+        /// <remarks>落点预览直接复用这些底板改色，不额外建对象。
+        /// 底板贴图本身是浅色的，因此平时用白色（等于原色），预览时才染成绿 / 红。</remarks>
         private void BuildCells(InventoryGrid grid)
         {
             m_CellImages.Clear();
@@ -230,7 +235,10 @@ namespace RaidDemo.UI
                     rect.sizeDelta = new Vector2(CellSize - CellGap, CellSize - CellGap);
 
                     var image = host.GetComponent<Image>();
-                    image.color = CellColor;
+                    image.sprite = UiSprites.Cell;
+                    image.type = Image.Type.Sliced;
+                    image.pixelsPerUnitMultiplier = 1f;
+                    image.color = Color.white;
                     image.raycastTarget = false;
                     m_CellImages.Add(image);
                 }
@@ -238,7 +246,7 @@ namespace RaidDemo.UI
         }
 
         /// <summary>创建格子区域节点。</summary>
-        private static RectTransform CreateCellsRoot(RectTransform parent, float width, float height)
+        private RectTransform CreateCellsRoot(RectTransform parent, float width, float height)
         {
             var host = new GameObject("Cells", typeof(RectTransform));
             var rect = (RectTransform)host.transform;
@@ -246,15 +254,15 @@ namespace RaidDemo.UI
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(0f, 1f);
             rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -TitleHeight);
+            rect.anchoredPosition = new Vector2(PanelPadding, -TitleHeight - PanelPadding);
             rect.sizeDelta = new Vector2(width, height);
             return rect;
         }
 
-        /// <summary>创建一个标题文本。</summary>
+        /// <summary>创建容器标题。</summary>
         private static void CreateLabel(RectTransform parent, string content, Vector2 topLeft, float width, float height)
         {
-            var host = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            var host = new GameObject("Label", typeof(RectTransform));
             var rect = (RectTransform)host.transform;
             rect.SetParent(parent, worldPositionStays: false);
             rect.anchorMin = new Vector2(0f, 1f);
@@ -263,13 +271,19 @@ namespace RaidDemo.UI
             rect.anchoredPosition = new Vector2(topLeft.x, -topLeft.y);
             rect.sizeDelta = new Vector2(width, height);
 
-            var text = host.GetComponent<Text>();
-            text.font = UiFontProvider.Get(14);
-            text.fontSize = 14;
+            var text = host.AddComponent<TextMeshProUGUI>();
+            var font = TMP_Settings.defaultFontAsset;
+            if (font != null)
+            {
+                text.font = font;
+            }
+
             text.text = content;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.color = new Color(0.92f, 0.92f, 0.95f);
+            text.fontSize = UiPalette.SmallSize + 1f;
+            text.alignment = TextAlignmentOptions.Left;
+            text.color = UiPalette.Ink;
             text.raycastTarget = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
         }
     }
 }

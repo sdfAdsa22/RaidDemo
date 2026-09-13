@@ -90,6 +90,39 @@ namespace RaidDemo.UI
         /// <summary>HUD 元素压在场景上时的底色（半透明深色，保证白字可读）。</summary>
         public static readonly Color HudPlate = new Color(0.10f, 0.12f, 0.13f, 0.82f);
 
+        // ---- 背包专用 ----
+
+        /// <summary>空装备槽底色。</summary>
+        public static readonly Color SlotEmpty = FromHex("#E7DCC8");
+
+        /// <summary>装备槽 / 格子被鼠标悬停时的底色。</summary>
+        public static readonly Color SlotHover = FromHex("#CDE9E5");
+
+        /// <summary>拖拽落点预览：合法（绿）。</summary>
+        public static readonly Color PreviewValid = FromHex("#8FDCA0");
+
+        /// <summary>拖拽落点预览：非法（红）。</summary>
+        public static readonly Color PreviewInvalid = FromHex("#F0A19B");
+
+        /// <summary>
+        /// 物品格的填充色：把稀有度色向白色稀释。
+        /// </summary>
+        /// <param name="rarity">物品稀有度。</param>
+        /// <returns>浅到可以在上面写深色字的底色。</returns>
+        /// <remarks>稀释比例 0.78 是"能一眼看出颜色、又不影响读字"的取值：
+        /// 再深一点，深色文字就开始吃力；再浅一点，五个档位在纸面上分不出来。</remarks>
+        public static Color ItemFill(RaidDemo.Data.RarityTier rarity)
+        {
+            var color = RaidDemo.Data.RarityPalette.GetColorOnPaper(rarity);
+            return Color.Lerp(color, Color.white, 0.78f);
+        }
+
+        /// <summary>取某个稀有度在纸面上的描边色。</summary>
+        public static Color ItemOutline(RaidDemo.Data.RarityTier rarity)
+        {
+            return RaidDemo.Data.RarityPalette.GetColorOnPaper(rarity);
+        }
+
         // ---- 尺寸 ----
 
         /// <summary>描边宽度（参考像素）。</summary>
