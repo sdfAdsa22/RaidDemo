@@ -1,4 +1,4 @@
-﻿using RaidDemo.Data;
+using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
 using RaidDemo.Shared;
@@ -16,7 +16,7 @@ namespace RaidDemo.Combat
     /// "射速比配置快一倍"，极难定位。时间只在一处推进，是唯一不容易错的写法。</para>
     /// <para>命令处理器保持极薄：它们只把意图写进控制器，真正的循环在这里。</para>
     /// </remarks>
-    public sealed class PlayerWeaponController
+    public sealed partial class PlayerWeaponController
     {
         private readonly PlayerWeapon m_Weapon;
         private readonly PlayerLoadout m_Loadout;
@@ -291,102 +291,6 @@ namespace RaidDemo.Combat
                 runtime.MagazineAmmo,
                 loaded));
         }
-
-        /// <summary>发射一发：算散布、投射射线、结算伤害、广播事件。</summary>
-        private void FireOnce(WeaponRuntime runtime, float spreadOffsetDegrees)
-        {
-            var origin = m_MuzzlePosition;
-            var range = runtime.Weapon.RangeMeters;
-            var direction = ResolveShotDirection(spreadOffsetDegrees);
-
-            var didHit = m_Probe.TryRaycast(origin, direction, range, out var hit);
-            var endPoint = didHit ? hit.Point : origin + (direction * range);
-            var targetId = didHit ? hit.TargetId : 0;
-
-            if (targetId != 0)
-            {
-                ResolveDamage(targetId, hit, runtime);
-            }
-
-            m_EventBus.Publish(new WeaponFiredEvent(
-                m_PlayerId,
-                origin,
-                endPoint,
-                didHit,
-                targetId,
-                // 枪声半径 = 武器射程：本项目里"打得到多远"与"多远处能听见"是同一个数字，
-                // 短射程的手枪因此天然比步枪安静。将来加消音器时换成另一个值即可。
-                runtime.Weapon.RangeMeters,
-                0d,
-                m_Sequence));
-        }
-
-        /// <summary>
-        /// 计算这一发的三维方向：枪口水平指向"地面瞄准点按散布旋转后的方位"。
-        /// </summary>
-        /// <param name="spreadOffsetDegrees">散布造成的角度偏移（度）。</param>
-        /// <returns>单位方向向量。</returns>
-        /// <remarks>
-        /// <para><b>方向取水平，而不是"枪口指向瞄准点"。</b>
-        /// 后者会让射线在瞄准点处落到地面，看起来就是"子弹到准星为止"。</para>
-        /// <para>水平射线的长度由武器射程限制，因此子弹会**穿过准星继续飞**，
-        /// 直到命中目标或打满射程——手枪 25 米、步枪 40 米，射程差异体现在这里。</para>
-        /// <para>与准星的对齐改由表现层解决：弹道画在地面上（见 <c>TracerRenderer</c>），
-        /// 因此它仍然穿过准星，不会出现"子弹和准星不在一条线"的问题。</para>
-        /// </remarks>
-        private Vector3 ResolveShotDirection(float spreadOffsetDegrees)
-        {
-            var groundMuzzle = new Vector3(m_MuzzlePosition.x, 0f, m_MuzzlePosition.z);
-            var toAim = m_AimWorldPoint.IsNearlyZero
-                ? Vector2F.FromDegrees(m_AimDegrees)
-                : new Vector2F(m_AimWorldPoint.X - groundMuzzle.x, m_AimWorldPoint.Y - groundMuzzle.z);
-
-            if (toAim.IsNearlyZero)
-            {
-                // 瞄准点与角色重合时没有方向可言，退回当前朝向。
-                toAim = Vector2F.FromDegrees(m_AimDegrees);
-            }
-
-            // 散布绕竖直轴旋转瞄准点，因此弹着点的距离不变、只改变方位。
-            var rotated = Quaternion.AngleAxis(spreadOffsetDegrees, Vector3.up)
-                          * new Vector3(toAim.X, 0f, toAim.Y);
-
-            // 只取水平分量：射线因此不会落到地面，能一直飞到射程末端。
-            return rotated.sqrMagnitude > 1e-6f ? rotated.normalized : Vector3.forward;
-        }
-
-        /// <summary>对命中目标结算伤害。</summary>
-        private void ResolveDamage(int targetId, in HitInfo hit, WeaponRuntime runtime)
-        {
-            if (!m_World.TryGet(targetId, out var combatant) || !combatant.IsAlive)
-            {
-                return;
-            }
-
-            var isCritical = DamageCalculator.IsCriticalHit(hit.Point, hit.TargetCenter, m_Tuning);
-            var outcome = combatant.ApplyDamage(
-                runtime.Weapon.BaseDamage,
-                m_Weapon.LoadedPenetration,
-                isCritical,
-                m_Tuning);
-
-            var wasKilled = !combatant.IsAlive;
-            m_EventBus.Publish(new DamageAppliedEvent(
-                m_PlayerId,
-                targetId,
-                outcome.Damage,
-                outcome.ArmorDamage,
-                isCritical,
-                outcome.PenetrationFactor,
-                combatant.Health,
-                wasKilled,
-                0d,
-                m_Sequence));
-
-            if (wasKilled)
-            {
-                m_EventBus.Publish(new TargetDestroyedEvent(targetId, m_PlayerId));
-            }
-        }
     }
 }
+

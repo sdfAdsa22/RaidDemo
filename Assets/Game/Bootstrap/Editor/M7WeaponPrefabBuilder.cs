@@ -37,6 +37,12 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>手枪预制体路径。</summary>
         public const string PistolPrefabPath = WeaponsFolder + "/Weapon_Pistol.prefab";
 
+        /// <summary>冲锋枪预制体路径（M8 批次 2）。</summary>
+        public const string SmgPrefabPath = WeaponsFolder + "/Weapon_SMG.prefab";
+
+        /// <summary>霰弹枪预制体路径（M8 批次 2）。</summary>
+        public const string ShotgunPrefabPath = WeaponsFolder + "/Weapon_Shotgun.prefab";
+
         /// <summary>枪械模型来源：正式目录优先，暂存区兜底。</summary>
         private static readonly string[] GunFolders =
         {
@@ -68,7 +74,7 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>
-        /// 两把枪的设计尺寸。
+        /// 四把枪的设计尺寸。
         /// </summary>
         /// <remarks>
         /// 步枪取 1.25 米：AK 实枪约 0.88 米，这里刻意放大约 40%。
@@ -81,6 +87,11 @@ namespace RaidDemo.Bootstrap.Editor
         {
             new WeaponRecipe("AK", RiflePrefabPath, 1.25f),
             new WeaponRecipe("Pistol", PistolPrefabPath, 0.46f),
+            // 冲锋枪按乌兹的真实比例放大：真枪 0.47 米，这里取 0.66 米，
+            // 与"放大到看得清"的整体策略一致，同时明显比步枪短一截。
+            new WeaponRecipe("SMG", SmgPrefabPath, 0.66f),
+            // 泵动霰弹枪与步枪等长（1.15 米），在俯视角里一眼能认出是长家伙。
+            new WeaponRecipe("Shotgun", ShotgunPrefabPath, 1.15f),
         };
 
         /// <summary>源材质名到项目材质（路径、颜色）的映射表。</summary>

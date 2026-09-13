@@ -117,8 +117,7 @@ namespace RaidDemo.Diagnostics
             m_Panel = gameObject.AddComponent<AiDebugPanel>();
             m_Panel.Initialize(context, transform, eventBus);
 
-            // 枪声是全图最吵的声源（默认 20 米），但它是瞬时的：听者只会看到"AI 突然朝那边走"。
-            // 开火后短暂画一圈，才能把"这一枪惊动了多远"直接摆到眼前。
+            // 枪声是最吵的声源但转瞬即逝，开火后短暂画一圈才能看出"这一枪惊动了多远"。
             m_WeaponNoiseSubscription = eventBus?.Subscribe<WeaponFiredEvent>(OnWeaponFired);
 
             // 默认全关：调试工具的初始状态必须是"不存在"。
@@ -270,9 +269,13 @@ namespace RaidDemo.Diagnostics
         /// <summary>记录一次枪声，用于下一帧起短暂画出它的可听范围。</summary>
         private void OnWeaponFired(WeaponFiredEvent evt)
         {
+            if (evt.PelletIndex != 0) // 多弹丸武器只画第一颗，否则同一枪会叠六圈。
+            {
+                return;
+            }
+
             m_GunshotPosition = new Vector3(evt.Origin.x, 0f, evt.Origin.z);
-            // 半径取自开火方：手枪 8 米、步枪 12 米，画出来就能直接对比不同武器的暴露范围。
-            m_GunshotRadius = evt.NoiseRadiusMeters;
+            m_GunshotRadius = evt.NoiseRadiusMeters; // 半径来自开火方：手枪 8 米、步枪 12 米。
             m_GunshotFlashRemaining = GunshotFlashSeconds;
         }
 

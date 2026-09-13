@@ -100,6 +100,14 @@ namespace RaidDemo.Meta
                 new TraderStockEntry("medical.kit.field", 1, 80),
                 new TraderStockEntry("backpack.raider", 1, 90),
                 new TraderStockEntry("armor.vest.plate", 1, 100),
+                // M8 批次 2：冲锋枪与霰弹枪按"近战选择"排在步枪前后，
+                // 12 号霰弹与它们配套；四级套放在最后——它是最贵的一档，
+                // 摆在货架末尾本身就是一句"这是给攒够钱的人准备的"。
+                new TraderStockEntry("weapon.smg.uzi", 1, 55),
+                new TraderStockEntry("weapon.shotgun.pump", 1, 65),
+                new TraderStockEntry("ammo.12ga.buck", 20, 66),
+                new TraderStockEntry("armor.helmet.heavy", 1, 110),
+                new TraderStockEntry("armor.vest.heavy", 1, 120),
             });
         }
     }

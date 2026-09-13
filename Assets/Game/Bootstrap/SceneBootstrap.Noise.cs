@@ -60,6 +60,13 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 一次射击只报一次噪音：霰弹枪一发的多颗弹丸各自广播一条事件，
+            // 否则"开一枪"会让附近敌人收到六条枪声。
+            if (evt.PelletIndex != 0)
+            {
+                return;
+            }
+
             var noise = new NoiseEvent(
                 evt.ShooterId,
                 new Vector2F(evt.Origin.x, evt.Origin.z),

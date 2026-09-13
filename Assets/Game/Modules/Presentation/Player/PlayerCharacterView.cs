@@ -191,6 +191,12 @@ namespace RaidDemo.Presentation
         /// <summary>只有玩家自己的枪声才触发开火动画（敌人的射击由各自的视图处理）。</summary>
         private void OnWeaponFired(WeaponFiredEvent evt)
         {
+            // 开火动画每发只播一次：霰弹枪的多颗弹丸会在同一帧重复触发同一个动作。
+            if (evt.PelletIndex != 0)
+            {
+                return;
+            }
+
             if (!ShouldPlayShootAnimation(m_Animator != null, m_IsDead, IsLocalPlayer(evt.ShooterId)))
             {
                 return;

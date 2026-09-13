@@ -65,6 +65,15 @@ namespace RaidDemo.UI
                     TextAlignmentOptions.Left,
                     UiPalette.Ink);
 
+                // 口径徽标：让"这把枪吃什么弹"在购买前就能对上（M8 批次 2）。
+                CaliberBadge.CreateAnchored(
+                    row,
+                    RaidDemo.Data.CaliberPalette.ResolveCaliber(definition),
+                    anchor: new Vector2(0f, 1f),
+                    pivot: new Vector2(0f, 1f),
+                    offset: new Vector2(LeftWidth - 168f, 12f),
+                    size: new Vector2(44f, 18f));
+
                 var buy = UiFactory.CreateButton(
                     row,
                     "购买",

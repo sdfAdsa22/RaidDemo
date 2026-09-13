@@ -131,10 +131,12 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
-        public void 两把武器预制体都存在并带枪口标记()
+        public void 四把武器预制体都存在并带枪口标记()
         {
             AssertWeapon(M7WeaponPrefabBuilder.RiflePrefabPath);
             AssertWeapon(M7WeaponPrefabBuilder.PistolPrefabPath);
+            AssertWeapon(M7WeaponPrefabBuilder.SmgPrefabPath);
+            AssertWeapon(M7WeaponPrefabBuilder.ShotgunPrefabPath);
         }
 
         [Test]
@@ -164,8 +166,18 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsNotNull(catalog, $"表现层目录缺失：{M7PresentationCatalogBuilder.CatalogPath}。{RebuildHint}");
 
             Assert.IsNotNull(catalog.Audio, "表现层目录没有引用音效目录。" + RebuildHint);
-            Assert.IsNotNull(catalog.RifleWeaponPrefab, "表现层目录没有引用步枪预制体。" + RebuildHint);
-            Assert.IsNotNull(catalog.PistolWeaponPrefab, "表现层目录没有引用手枪预制体。" + RebuildHint);
+            // 四把武器都要登记：模型、枪声类别都从这张表取，缺一把会退回灰盒。
+            foreach (var itemId in new[]
+                     {
+                         "weapon.pistol.pm", "weapon.rifle.ak74",
+                         "weapon.smg.uzi", "weapon.shotgun.pump"
+                     })
+            {
+                var entry = catalog.FindWeaponEntry(itemId);
+                Assert.IsNotNull(entry, $"{itemId} 没有登记武器模型。" + RebuildHint);
+                Assert.IsNotNull(entry.Prefab, $"{itemId} 的武器模型引用为空。" + RebuildHint);
+            }
+
             Assert.IsNotNull(catalog.MuzzleFlashPrefab, "表现层目录没有引用枪口火焰。" + RebuildHint);
             Assert.IsNotNull(catalog.ImpactSparkPrefab, "表现层目录没有引用命中火花。" + RebuildHint);
             Assert.IsNotNull(catalog.ImpactDustPrefab, "表现层目录没有引用命中尘土。" + RebuildHint);

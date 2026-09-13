@@ -244,6 +244,12 @@ namespace RaidDemo.Presentation
                 return;
             }
 
+            // 与玩家一样：多弹丸武器的一发只触发一次开火动画。
+            if (evt.PelletIndex != 0)
+            {
+                return;
+            }
+
             m_Animator.SetTrigger(ShootId);
         }
 

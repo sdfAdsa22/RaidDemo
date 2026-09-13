@@ -112,8 +112,13 @@ namespace RaidDemo.Presentation
             var forward = direction.sqrMagnitude > 1e-4f ? direction.normalized : Vector3.forward;
             var rotation = Quaternion.LookRotation(forward, Vector3.up);
 
-            m_MuzzleFlash?.Play(evt.Origin, rotation);
-            PlayedCount++;
+            // 枪口火焰每发只喷一次：霰弹枪一发的六颗弹丸共用同一个枪口，
+            // 六个火焰叠在一起只会更亮、更费对象池；命中特效则每颗都要有。
+            if (evt.PelletIndex == 0)
+            {
+                m_MuzzleFlash?.Play(evt.Origin, rotation);
+                PlayedCount++;
+            }
 
             if (!evt.DidHit)
             {

@@ -66,6 +66,16 @@ namespace RaidDemo.AI
         public float RangeMeters { get; set; } = 12f;
 
         /// <summary>
+        /// 一次射击的弹丸数。
+        /// </summary>
+        /// <remarks>AI 目前全部用单弹丸武器（与玩家步枪同型的灰盒枪），
+        /// 保留这个字段只是为了满足契约——将来给某个敌人配霰弹枪时改这里即可。</remarks>
+        public int PelletCount { get; set; } = 1;
+
+        /// <summary>弹丸扇面宽度（度）。单弹丸武器不使用。</summary>
+        public float PelletSpreadDegrees { get; set; }
+
+        /// <summary>
         /// 创建一把默认的灰盒 AI 步枪。
         /// </summary>
         /// <remarks>

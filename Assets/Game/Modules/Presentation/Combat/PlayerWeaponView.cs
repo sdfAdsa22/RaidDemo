@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RaidDemo.Shared;
 using UnityEngine;
 
@@ -7,7 +8,8 @@ namespace RaidDemo.Presentation
     /// 角色手持武器的模型：跟随瞄准方向转动，并对外提供枪口位置。
     /// </summary>
     /// <remarks>
-    /// <para><b>模型优先、灰盒兜底：</b>装配层传入步枪与手枪两个预制体，都拿不到时退回一个细长方块。
+    /// <para><b>模型优先、灰盒兜底：</b>装配层传入表现层目录，组件按"当前武器的物品 ID"取模型；
+    /// 目录里找不到时按占格宽度回退到长枪 / 短枪两类；一个模型都没有时退回一个细长方块。
     /// 兜底不是"开发期偷懒"，而是分发要求——别人克隆仓库时若少了某个素材包，
     /// 仍然要能看出"我拿着枪、朝哪边"，而不是手里空空如也。</para>
     /// <para><b>枪口位置交给本组件提供：</b>弹道起点、枪口火焰、AI 视线都从枪口出发。
@@ -38,12 +40,19 @@ namespace RaidDemo.Presentation
         /// <summary>灰盒枪身颜色。</summary>
         private static readonly Color WeaponColor = new Color(0.18f, 0.18f, 0.20f);
 
+        /// <summary>已实例化的一把武器模型。</summary>
+        private sealed class WeaponModelInstance
+        {
+            public string ItemId;
+            public WeaponPresentationKind Kind;
+            public GameObject Model;
+            public Transform Muzzle;
+        }
+
         private Transform m_Mount;
         private GameObject m_FallbackModel;
-        private GameObject m_RifleModel;
-        private GameObject m_PistolModel;
-        private Transform m_RifleMuzzle;
-        private Transform m_PistolMuzzle;
+        private readonly List<WeaponModelInstance> m_Models = new List<WeaponModelInstance>();
+        private WeaponModelInstance m_Active;
         private Vector3 m_LastForward = Vector3.forward;
         private float m_FallbackLength = 0.68f;
 
@@ -54,7 +63,7 @@ namespace RaidDemo.Presentation
         public WeaponPresentationKind Kind { get; private set; } = WeaponPresentationKind.Rifle;
 
         /// <summary>是否用上了真实模型（false 表示正在用灰盒立方体兜底）。</summary>
-        public bool UsesRealModel => m_RifleModel != null || m_PistolModel != null;
+        public bool UsesRealModel => m_Models.Count > 0;
 
         /// <summary>
         /// 枪口的世界坐标。
@@ -81,18 +90,37 @@ namespace RaidDemo.Presentation
         /// 把武器模型挂到角色身上。
         /// </summary>
         /// <param name="owner">角色根节点。</param>
-        /// <param name="riflePrefab">步枪预制体，可为 null。</param>
-        /// <param name="pistolPrefab">手枪预制体，可为 null。</param>
-        public void Build(Transform owner, GameObject riflePrefab = null, GameObject pistolPrefab = null)
+        /// <param name="catalog">表现层目录；为 null 时全部走灰盒兜底。</param>
+        public void Build(Transform owner, PresentationCatalog catalog = null)
         {
             var mountHost = new GameObject("WeaponMount");
             m_Mount = mountHost.transform;
             m_Mount.SetParent(owner, worldPositionStays: false);
 
-            m_RifleModel = InstantiateModel(riflePrefab, "RifleModel", out m_RifleMuzzle);
-            m_PistolModel = InstantiateModel(pistolPrefab, "PistolModel", out m_PistolMuzzle);
+            m_Models.Clear();
+            var entries = catalog != null ? catalog.WeaponModels : null;
+            if (entries != null)
+            {
+                for (var i = 0; i < entries.Count; i++)
+                {
+                    var entry = entries[i];
+                    if (entry == null || entry.Prefab == null || string.IsNullOrEmpty(entry.ItemId))
+                    {
+                        continue;
+                    }
 
-            // 两个模型都没拿到时才建灰盒；拿到模型就不该再多一个方块穿在枪里。
+                    var model = InstantiateModel(entry.Prefab, "Weapon_" + entry.ItemId, out var muzzle);
+                    m_Models.Add(new WeaponModelInstance
+                    {
+                        ItemId = entry.ItemId,
+                        Kind = entry.Kind,
+                        Model = model,
+                        Muzzle = muzzle,
+                    });
+                }
+            }
+
+            // 一个模型都没拿到时才建灰盒；拿到模型就不该再多一个方块穿在枪里。
             if (!UsesRealModel)
             {
                 BuildFallbackModel();
@@ -107,12 +135,21 @@ namespace RaidDemo.Presentation
         /// <param name="playerPosition">角色根节点（脚底）的世界坐标。</param>
         /// <param name="aimDegrees">瞄准角度（度）。</param>
         /// <param name="equipped">当前是否装备了武器。</param>
-        /// <param name="lengthInGridCells">武器在背包里占的格数，用于判定长枪/短枪与灰盒长度。</param>
-        public void UpdateView(Vector3 playerPosition, float aimDegrees, bool equipped, int lengthInGridCells)
+        /// <param name="lengthInGridCells">武器在背包里占的格数，用于灰盒长度与目录缺项时的回退判定。</param>
+        /// <param name="weaponItemId">当前武器的物品 ID；目录命中时按它取模型与表现类别。</param>
+        public void UpdateView(
+            Vector3 playerPosition,
+            float aimDegrees,
+            bool equipped,
+            int lengthInGridCells,
+            string weaponItemId = null)
         {
             IsEquipped = equipped;
-            Kind = AudioPlaybackRules.ResolveWeaponKind(lengthInGridCells);
             m_FallbackLength = Mathf.Max(1, lengthInGridCells) * LengthPerGridCell;
+            m_Active = ResolveActiveModel(weaponItemId, lengthInGridCells);
+            Kind = m_Active != null
+                ? m_Active.Kind
+                : AudioPlaybackRules.ResolveWeaponKind(lengthInGridCells);
 
             if (m_Mount == null)
             {
@@ -146,16 +183,51 @@ namespace RaidDemo.Presentation
         /// <summary>按当前类别显示对应模型。</summary>
         private void SelectModel()
         {
-            var useRifle = Kind == WeaponPresentationKind.Rifle;
-            if (m_RifleModel != null)
+            for (var i = 0; i < m_Models.Count; i++)
             {
-                m_RifleModel.SetActive(useRifle);
+                var instance = m_Models[i];
+                if (instance.Model != null)
+                {
+                    instance.Model.SetActive(instance == m_Active);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 选出这次的武器模型：先按物品 ID 精确命中，再按占格宽度回退到长枪 / 短枪。
+        /// </summary>
+        /// <param name="itemId">武器物品 ID。</param>
+        /// <param name="lengthInGridCells">占格宽度，用于回退判定。</param>
+        /// <returns>选中的模型实例；目录里没有可用模型时返回 null（由灰盒兜底接管）。</returns>
+        private WeaponModelInstance ResolveActiveModel(string itemId, int lengthInGridCells)
+        {
+            if (m_Models.Count == 0)
+            {
+                return null;
             }
 
-            if (m_PistolModel != null)
+            if (!string.IsNullOrEmpty(itemId))
             {
-                m_PistolModel.SetActive(!useRifle);
+                for (var i = 0; i < m_Models.Count; i++)
+                {
+                    if (m_Models[i].ItemId == itemId)
+                    {
+                        return m_Models[i];
+                    }
+                }
             }
+
+            // 目录里没有这件武器时按宽度回退：短枪找第一把短枪模型，长枪找第一把长枪模型。
+            var fallbackKind = AudioPlaybackRules.ResolveWeaponKind(lengthInGridCells);
+            for (var i = 0; i < m_Models.Count; i++)
+            {
+                if (m_Models[i].Kind == fallbackKind)
+                {
+                    return m_Models[i];
+                }
+            }
+
+            return m_Models[0];
         }
 
         /// <summary>整组显示 / 隐藏。</summary>
@@ -170,7 +242,7 @@ namespace RaidDemo.Presentation
         /// <summary>取当前类别的枪口标记。</summary>
         private Transform ActiveMuzzle()
         {
-            return Kind == WeaponPresentationKind.Rifle ? m_RifleMuzzle : m_PistolMuzzle;
+            return m_Active != null ? m_Active.Muzzle : null;
         }
 
         /// <summary>实例化一个武器模型，并寻找它下面的枪口标记。</summary>

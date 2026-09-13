@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94c467a04d36ac24fb3fbed7947cf45f, type: 3}
+  m_Name: ammo.12ga.buck
+  m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.ItemDefinition
+  m_Id: ammo.12ga.buck
+  m_DisplayName: "12 \u53F7\u9730\u5F39"
+  m_Category: 1
+  m_Rarity: 0
+  m_Width: 1
+  m_Height: 1
+  m_WeightKg: 0.045
+  m_BaseValue: 20
+  m_MaxStack: 30
+  m_CanRotate: 0
+  m_IsContainer: 0
+  m_ContainerWidth: 4
+  m_ContainerHeight: 4
+  m_Behavior: {fileID: 11400000, guid: 6ef9327971b991e418bcef91343c67e3, type: 2}
+  m_Icon: {fileID: 21300000, guid: 93039ff590c63694cb5b64837b052ab3, type: 3}
+  m_Description: "12 \u53F7\u9730\u5F39\uFF0C\u4E00\u53D1\u88C5\u516D\u9897\u5F39\u4E38\u3002\u8FD1\u8DDD\u79BB\u5A01\u529B\u6700\u5927\uFF0C\u5BF9\u62A4\u7532\u5374\u5F88\u5403\u529B\u3002"

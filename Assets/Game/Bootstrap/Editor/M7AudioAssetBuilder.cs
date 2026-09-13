@@ -94,6 +94,17 @@ namespace RaidDemo.Bootstrap.Editor
                 summary, "手枪枪声", GunSeconds, GunPeak, FirearmRoot,
                 new[] { "1911/A_42P.wav", "Walther PPQ/X_39P.wav" },
                 "Weapons/Pistol_Shot");
+            // 冲锋枪用 Carl Gustav M45（经典的 9 毫米冲锋枪）两条不同录音：
+            // 900 发/分的连射里，同一把枪的两个录音比两支不同的枪更不容易听出重复。
+            var smg = BakeGroup(
+                summary, "冲锋枪枪声", GunSeconds, GunPeak, FirearmRoot,
+                new[] { "Carl Gustav M45/G_20P.wav", "Carl Gustav M45/G_24P.wav" },
+                "Weapons/SMG_Shot");
+            // 霰弹枪用 Mossberg 泵动霰弹枪的两条录音：低频更重，与步枪/冲锋枪明显区分。
+            var shotgun = BakeGroup(
+                summary, "霰弹枪枪声", GunSeconds, GunPeak, FirearmRoot,
+                new[] { "Mossberg/N_26P.wav", "Mossberg/N_30P.wav" },
+                "Weapons/Shotgun_Shot");
 
             var dryFire = BakeOne(summary, "空仓干响", MechanismSeconds, MechanismPeak,
                 InterfaceRoot, "click_004.ogg", "Weapons/DryFire");
@@ -183,6 +194,8 @@ namespace RaidDemo.Bootstrap.Editor
             var serialized = new SerializedObject(catalog);
             SetArray(serialized, "m_RifleShots", rifle);
             SetArray(serialized, "m_PistolShots", pistol);
+            SetArray(serialized, "m_SmgShots", smg);
+            SetArray(serialized, "m_ShotgunShots", shotgun);
             SetArray(serialized, "m_ImpactFlesh", flesh);
             SetArray(serialized, "m_ImpactHard", hard);
             SetArray(serialized, "m_FootstepGrass", grass);

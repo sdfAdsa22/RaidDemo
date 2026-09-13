@@ -24,3 +24,5 @@ MonoBehaviour:
   m_MaxSpreadDegrees: 6
   m_SpreadRecoveryPerSecond: 4
   m_RangeMeters: 12
+  m_PelletCount: 1
+  m_PelletSpreadDegrees: 0

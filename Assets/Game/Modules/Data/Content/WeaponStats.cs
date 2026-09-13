@@ -55,6 +55,20 @@ namespace RaidDemo.Data
         /// <summary>有效射程（米）。同时决定射线检测距离与准星的最大显示距离。</summary>
         [SerializeField] private float m_RangeMeters = 40f;
 
+        /// <summary>
+        /// 一次射击射出的弹丸数。
+        /// </summary>
+        /// <remarks>一发子弹（一次扳机、一颗弹药）打出 1 颗以上弹丸：霰弹枪取 6，
+        /// 其余武器保持 1。弹丸彼此独立结算命中与伤害，但只消耗一颗弹药、只报一次枪声。</remarks>
+        [SerializeField] private int m_PelletCount = 1;
+
+        /// <summary>
+        /// 弹丸扇面总宽度（度）。
+        /// </summary>
+        /// <remarks>多颗弹丸在扇面内均匀排开，因此 6 颗弹丸、4 度的扇面
+        /// 在 6 米处大约铺开 0.42 米——近距一发全中，远距只能擦到一两颗。</remarks>
+        [SerializeField] private float m_PelletSpreadDegrees;
+
         /// <inheritdoc />
         public float BaseDamage
         {
@@ -127,6 +141,18 @@ namespace RaidDemo.Data
             get { return m_RangeMeters; }
         }
 
+        /// <inheritdoc />
+        public int PelletCount
+        {
+            get { return m_PelletCount < 1 ? 1 : m_PelletCount; }
+        }
+
+        /// <inheritdoc />
+        public float PelletSpreadDegrees
+        {
+            get { return m_PelletSpreadDegrees; }
+        }
+
         /// <summary>射击间隔（秒）。射速非正时返回一个极大值，避免除零。</summary>
         public float ShotIntervalSeconds
         {
@@ -173,6 +199,16 @@ namespace RaidDemo.Data
             if (m_RangeMeters <= 0f)
             {
                 return "射程必须大于 0。";
+            }
+
+            if (m_PelletCount < 1)
+            {
+                return "弹丸数至少为 1：没有弹丸的枪打不出任何东西。";
+            }
+
+            if (m_PelletSpreadDegrees < 0f)
+            {
+                return "弹丸扇面宽度不能为负。";
             }
 
             return null;

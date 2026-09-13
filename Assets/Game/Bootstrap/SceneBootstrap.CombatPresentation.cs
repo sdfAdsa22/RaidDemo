@@ -77,8 +77,7 @@ namespace RaidDemo.Bootstrap
             m_WeaponView = viewHost.AddComponent<PlayerWeaponView>();
             m_WeaponView.Build(
                 m_PlayerMotor != null ? m_PlayerMotor.transform : transform,
-                catalog != null ? catalog.RifleWeaponPrefab : null,
-                catalog != null ? catalog.PistolWeaponPrefab : null);
+                catalog);
 
             var hudHost = new GameObject("CombatHud");
             hudHost.transform.SetParent(transform, worldPositionStays: false);
@@ -255,15 +254,27 @@ namespace RaidDemo.Bootstrap
         private void ApplyWeaponPresentation(ItemInstance weaponItem)
         {
             m_WeaponLengthCells = weaponItem != null ? weaponItem.Definition.GridSize.Width : 2;
+            m_WeaponItemId = weaponItem != null ? weaponItem.Definition.Id : null;
 
             var stats = weaponItem?.Definition?.WeaponStats;
             m_CombatHud?.SetWeapon(
                 weaponItem != null ? weaponItem.Definition.DisplayName : null,
                 stats != null ? stats.CaliberId : null);
 
-            // 枪声、武器模型、枪口火焰共用同一条"长枪 / 短枪"判定，
+            // 枪声、武器模型、枪口火焰共用同一份"物品 ID → 表现类别"登记表，
             // 三者的切换点因此永远一致：不会出现"换了手枪、模型变了、枪声还是步枪"。
-            m_GameAudio?.SetLocalWeaponGridWidth(m_WeaponLengthCells);
+            m_GameAudio?.SetLocalWeaponKind(ResolveWeaponPresentationKind());
+        }
+
+        /// <summary>按物品 ID 查表现类别；目录里没有登记时回退到按占格宽度判长短枪。</summary>
+        private WeaponPresentationKind ResolveWeaponPresentationKind()
+        {
+            var entry = m_PresentationCatalog != null
+                ? m_PresentationCatalog.FindWeaponEntry(m_WeaponItemId)
+                : null;
+            return entry != null
+                ? entry.Kind
+                : AudioPlaybackRules.ResolveWeaponKind(m_WeaponLengthCells);
         }
 
         /// <summary>让灰盒武器模型跟随角色与瞄准方向。</summary>
@@ -279,7 +290,8 @@ namespace RaidDemo.Bootstrap
                 anchor,
                 m_WeaponController.AimDegrees,
                 m_WeaponController.Weapon.IsEquipped,
-                m_WeaponLengthCells);
+                m_WeaponLengthCells,
+                m_WeaponItemId);
         }
 
     }

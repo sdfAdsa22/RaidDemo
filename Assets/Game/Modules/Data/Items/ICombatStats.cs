@@ -73,6 +73,17 @@ namespace RaidDemo.Data
 
         /// <summary>有效射程（米）。同时用于限制射线检测距离与准星的最大显示距离。</summary>
         float RangeMeters { get; }
+
+        /// <summary>
+        /// 一次射击射出的弹丸数。常规枪械为 1；霰弹枪大于 1（一发消耗一颗子弹，多颗弹丸独立结算命中与伤害）。
+        /// </summary>
+        int PelletCount { get; }
+
+        /// <summary>
+        /// 弹丸扇面的总宽度（度）。多颗弹丸均匀分布在这个扇面内；单弹丸武器忽略此值。
+        /// </summary>
+        /// <remarks>它与散布不同：散布描述"这一发整体偏多少"，扇面描述"同一发的弹丸彼此散开多少"。</remarks>
+        float PelletSpreadDegrees { get; }
     }
 
     /// <summary>

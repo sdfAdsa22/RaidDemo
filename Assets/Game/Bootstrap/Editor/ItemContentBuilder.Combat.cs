@@ -32,7 +32,9 @@ namespace RaidDemo.Bootstrap.Editor
                 float spreadPerShot,
                 float maxSpread,
                 float spreadRecovery,
-                float rangeMeters)
+                float rangeMeters,
+                int pelletCount = 1,
+                float pelletSpreadDegrees = 0f)
             {
                 CaliberId = caliberId;
                 Damage = damage;
@@ -46,6 +48,8 @@ namespace RaidDemo.Bootstrap.Editor
                 MaxSpread = maxSpread;
                 SpreadRecovery = spreadRecovery;
                 RangeMeters = rangeMeters;
+                PelletCount = pelletCount;
+                PelletSpreadDegrees = pelletSpreadDegrees;
             }
 
             public string CaliberId { get; }
@@ -71,6 +75,12 @@ namespace RaidDemo.Bootstrap.Editor
             public float SpreadRecovery { get; }
 
             public float RangeMeters { get; }
+
+            /// <summary>一次射击的弹丸数。霰弹枪大于 1。</summary>
+            public int PelletCount { get; }
+
+            /// <summary>弹丸扇面总宽度（度）。仅多弹丸武器使用。</summary>
+            public float PelletSpreadDegrees { get; }
         }
 
         /// <summary>弹药战斗参数的生成数据。</summary>
@@ -127,6 +137,20 @@ namespace RaidDemo.Bootstrap.Editor
                     burstCount: 3, magazineCapacity: 30, reloadSeconds: 2.2f,
                     baseSpread: 1.5f, spreadPerShot: 0.5f, maxSpread: 6f, spreadRecovery: 4f,
                     rangeMeters: 12f),
+                // 冲锋枪：与手枪同口径（9x19），靠 900 发/分与 25 发弹匣取胜。
+                // 射程 10 米夹在手枪 8 米与步枪 12 米之间，定位是"想贴脸的近战主武器"。
+                ["weapon.smg.uzi"] = new WeaponSpec(
+                    "9x19", damage: 13f, roundsPerMinute: 900f, fireMode: WeaponFireMode.Auto,
+                    burstCount: 1, magazineCapacity: 25, reloadSeconds: 1.8f,
+                    baseSpread: 3.2f, spreadPerShot: 0.55f, maxSpread: 7f, spreadRecovery: 5.5f,
+                    rangeMeters: 10f),
+                // 霰弹枪：一发六颗弹丸、单颗 11 点伤害（贴脸全中 66 点），射程只有 6 米；
+                // 射速 75 发/分（泵动节奏 0.8 秒一发），换弹 3 秒——打空弹匣的代价最大。
+                ["weapon.shotgun.pump"] = new WeaponSpec(
+                    "12ga", damage: 11f, roundsPerMinute: 75f, fireMode: WeaponFireMode.Single,
+                    burstCount: 1, magazineCapacity: 6, reloadSeconds: 3f,
+                    baseSpread: 3f, spreadPerShot: 0.6f, maxSpread: 5f, spreadRecovery: 4f,
+                    rangeMeters: 6f, pelletCount: 6, pelletSpreadDegrees: 7f),
             };
 
         /// <summary>
@@ -141,6 +165,9 @@ namespace RaidDemo.Bootstrap.Editor
             {
                 ["ammo.9x19.standard"] = new AmmoSpec("9x19", 15f),
                 ["ammo.5.45.standard"] = new AmmoSpec("5.45", 22f),
+                // 霰弹：弹丸多但单颗穿透低，打无甲目标最狠、打四级甲几乎挠痒——
+                // 这让"重甲敌人用什么打"变成一道真实的选择题。
+                ["ammo.12ga.buck"] = new AmmoSpec("12ga", 12f),
             };
 
         /// <summary>护甲参数表。</summary>
@@ -149,6 +176,9 @@ namespace RaidDemo.Bootstrap.Editor
             {
                 ["armor.helmet.steel"] = new ArmorSpec(protectionLevel: 2, maxDurability: 40f, wearFactor: 0.3f),
                 ["armor.vest.plate"] = new ArmorSpec(protectionLevel: 3, maxDurability: 60f, wearFactor: 0.35f),
+                // 四级套：耐久与减伤都上了一个台阶，代价是重量（8 kg / 2 kg）与价格。
+                ["armor.helmet.heavy"] = new ArmorSpec(protectionLevel: 4, maxDurability: 60f, wearFactor: 0.22f),
+                ["armor.vest.heavy"] = new ArmorSpec(protectionLevel: 4, maxDurability: 90f, wearFactor: 0.25f),
             };
 
         /// <summary>
@@ -184,6 +214,8 @@ namespace RaidDemo.Bootstrap.Editor
                 serialized.FindProperty("m_MaxSpreadDegrees").floatValue = weapon.MaxSpread;
                 serialized.FindProperty("m_SpreadRecoveryPerSecond").floatValue = weapon.SpreadRecovery;
                 serialized.FindProperty("m_RangeMeters").floatValue = weapon.RangeMeters;
+                serialized.FindProperty("m_PelletCount").intValue = weapon.PelletCount;
+                serialized.FindProperty("m_PelletSpreadDegrees").floatValue = weapon.PelletSpreadDegrees;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(asset);
                 AssignBehavior(definition, asset);

@@ -48,6 +48,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>灰盒枪身长度（格）。步枪更长，手枪更短。</summary>
         private int m_WeaponLengthCells = 2;
 
+        /// <summary>当前主武器的物品 ID（表现层按它查模型与枪声）。没有武器时为空。</summary>
+        private string m_WeaponItemId;
+
         /// <summary>准星（战局里由场景启动层负责，安全屋同样需要）。</summary>
         private AimCrosshair m_Crosshair;
 
@@ -115,8 +118,7 @@ namespace RaidDemo.Bootstrap
             m_WeaponView = viewHost.AddComponent<PlayerWeaponView>();
             m_WeaponView.Build(
                 playerTransform != null ? playerTransform : transform,
-                catalog != null ? catalog.RifleWeaponPrefab : null,
-                catalog != null ? catalog.PistolWeaponPrefab : null);
+                catalog);
 
             var hudHost = new GameObject("CombatHud");
             hudHost.transform.SetParent(transform, worldPositionStays: false);
@@ -171,10 +173,18 @@ namespace RaidDemo.Bootstrap
             {
                 m_LastShownWeapon = weapon;
                 m_WeaponLengthCells = weapon != null ? weapon.Definition.GridSize.Width : 2;
+                m_WeaponItemId = weapon != null ? weapon.Definition.Id : null;
                 m_CombatHud?.SetWeapon(
                     weapon != null ? weapon.Definition.DisplayName : null,
                     weapon?.Definition?.WeaponStats?.CaliberId);
-                m_GameAudio?.SetLocalWeaponGridWidth(m_WeaponLengthCells);
+                // 枪声类别按物品 ID 查表；目录里没有登记时回退到"按占格宽度判长短枪"。
+                var entry = m_PresentationCatalog != null
+                    ? m_PresentationCatalog.FindWeaponEntry(m_WeaponItemId)
+                    : null;
+                m_GameAudio?.SetLocalWeaponKind(
+                    entry != null
+                        ? entry.Kind
+                        : AudioPlaybackRules.ResolveWeaponKind(m_WeaponLengthCells));
             }
 
             if (m_WeaponView != null && m_PlayerMotor != null && m_WeaponController != null)
@@ -183,7 +193,8 @@ namespace RaidDemo.Bootstrap
                     m_PlayerMotor.transform.position,
                     m_WeaponController.AimDegrees,
                     m_WeaponController.Weapon.IsEquipped,
-                    m_WeaponLengthCells);
+                    m_WeaponLengthCells,
+                    m_WeaponItemId);
             }
 
             UpdateCrosshair();

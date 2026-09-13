@@ -18,6 +18,12 @@ MonoBehaviour:
   m_PistolShots:
   - {fileID: 8300000, guid: 506796029a08b834b872ce8ca4c0a46c, type: 3}
   - {fileID: 8300000, guid: e5521a5b06fb36c4ab29934c65d00d32, type: 3}
+  m_SmgShots:
+  - {fileID: 8300000, guid: 4cbdb88c1956a6445a44b95f2a4d622c, type: 3}
+  - {fileID: 8300000, guid: 99e9c6ad6b98541418bf7e76592c8000, type: 3}
+  m_ShotgunShots:
+  - {fileID: 8300000, guid: 25f35483a69a5d841b7b48bc4dd2e062, type: 3}
+  - {fileID: 8300000, guid: d11c46a8f3fa01a4faa2b255de639b01, type: 3}
   m_DryFire: {fileID: 8300000, guid: dab729997efa46a46af2cbebe0c94c91, type: 3}
   m_MagazineOut: {fileID: 8300000, guid: 1a4ad78ea34fdbe43a526423576847c0, type: 3}
   m_MagazineIn: {fileID: 8300000, guid: 066837d57f62a1c4c8b4c4772249d6c7, type: 3}

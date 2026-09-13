@@ -42,8 +42,8 @@ namespace RaidDemo.Presentation
         [SerializeField] private AudioCatalog m_Audio;
 
         [Header("武器模型")]
-        [SerializeField] private GameObject m_RifleWeaponPrefab;
-        [SerializeField] private GameObject m_PistolWeaponPrefab;
+        [SerializeField] private List<WeaponModelEntry> m_WeaponModels =
+            new List<WeaponModelEntry>();
 
         [Header("战斗特效")]
         [SerializeField] private GameObject m_MuzzleFlashPrefab;
@@ -62,11 +62,58 @@ namespace RaidDemo.Presentation
         /// <summary>音效目录。</summary>
         public AudioCatalog Audio => m_Audio;
 
-        /// <summary>步枪模型预制体。</summary>
-        public GameObject RifleWeaponPrefab => m_RifleWeaponPrefab;
+        /// <summary>
+        /// 一把武器在表现层的登记项：模型预制体 + 它属于哪一类（决定枪声与枪口火焰）。
+        /// </summary>
+        /// <remarks>
+        /// <para>M8 批次 2 从"步枪 / 手枪两个字段"改成按物品 ID 登记的表：
+        /// 每加一把枪（冲锋枪、霰弹枪……）都要在两个字段之间做选择，
+        /// 而"哪把枪用哪套枪声"本来就是逐个武器决定的事，用表更贴近事实。</para>
+        /// <para>物品 ID 与 <c>ItemDefinition.Id</c> 一一对应：表里写的是稳定 ID，不是显示名，
+        /// 因此改名不会让登记失效。</para>
+        /// </remarks>
+        [Serializable]
+        public sealed class WeaponModelEntry
+        {
+            [SerializeField] private string m_ItemId;
+            [SerializeField] private GameObject m_Prefab;
+            [SerializeField] private WeaponPresentationKind m_Kind = WeaponPresentationKind.Rifle;
 
-        /// <summary>手枪模型预制体。</summary>
-        public GameObject PistolWeaponPrefab => m_PistolWeaponPrefab;
+            public string ItemId => m_ItemId;
+
+            public GameObject Prefab => m_Prefab;
+
+            public WeaponPresentationKind Kind => m_Kind;
+        }
+
+        /// <summary>全部武器模型登记项。</summary>
+        public IReadOnlyList<WeaponModelEntry> WeaponModels => m_WeaponModels;
+
+        /// <summary>
+        /// 按物品 ID 查找武器的表现登记项。
+        /// </summary>
+        /// <param name="itemId">武器物品的稳定 ID，可为空。</param>
+        /// <returns>找到的登记项；找不到（或表里没有有效项）时返回 null。</returns>
+        /// <remarks>找不到时由调用方回退到"按占格宽度判长短枪"的旧规则，
+        /// 因此新增武器即使忘了登记，也不会出现"手里没有枪"。</remarks>
+        public WeaponModelEntry FindWeaponEntry(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId) || m_WeaponModels == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < m_WeaponModels.Count; i++)
+            {
+                var entry = m_WeaponModels[i];
+                if (entry != null && entry.ItemId == itemId)
+                {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
 
         /// <summary>枪口火焰预制体。</summary>
         public GameObject MuzzleFlashPrefab => m_MuzzleFlashPrefab;

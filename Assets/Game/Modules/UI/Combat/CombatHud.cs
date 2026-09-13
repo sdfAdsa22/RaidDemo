@@ -16,7 +16,7 @@ namespace RaidDemo.UI
     /// 弹匣数量会因为开火、换弹、换枪三条路径变化，任何一条漏发事件，
     /// 界面就会显示错误且不会再自愈。每帧读取的开销只是几次属性访问。</para>
     /// </remarks>
-    public sealed class CombatHud : MonoBehaviour
+    public sealed partial class CombatHud : MonoBehaviour
     {
         /// <summary>界面根节点。隐藏它需要拿到画布本身，而不是本组件所在的节点。</summary>
         private GameObject m_CanvasHost;
@@ -46,7 +46,9 @@ namespace RaidDemo.UI
         /// </remarks>
         private const float PanelWidth = 240f;
 
-        private const float PanelHeight = 176f;
+        /// <remarks>M8 批次 2 从 176 加到 196：底部多了一行"弹药口径提醒 / 换弹失败原因"，
+        /// 那一行必须与换弹进度条各占各的位置，不能叠在一起。</remarks>
+        private const float PanelHeight = 196f;
 
         /// <summary>换弹进度条高度（像素）。</summary>
         private const float BarHeight = 10f;
@@ -73,10 +75,18 @@ namespace RaidDemo.UI
 
         /// <summary>护甲显示（身体护甲与头盔的等级和耐久）。</summary>
         private TextMeshProUGUI m_ArmorLabel;
+        /// <summary>底部提示行：弹药口径提醒与换弹失败原因。</summary>
+        private TextMeshProUGUI m_HintLabel;
         private Image m_ReloadBarFill;
         private RectTransform m_ReloadBarRoot;
         private string m_WeaponName = "无武器";
         private string m_CaliberId;
+
+        /// <summary>换弹失败等一次性提示的剩余显示时间（秒）。</summary>
+        private float m_HintRemaining;
+
+        /// <summary>一次性提示的显示时长。</summary>
+        private const float HintSeconds = 3f;
 
         /// <summary>生命比例低于该值时生命数字变红。</summary>
         private const float LowHealthRatio = 0.3f;
@@ -124,8 +134,27 @@ namespace RaidDemo.UI
             // 但"设置之后立刻可读"让这套状态在调试与自动化验证中都更可靠。
             if (m_WeaponLabel != null)
             {
-                m_WeaponLabel.text = m_WeaponName;
+                m_WeaponLabel.text = BuildWeaponText();
             }
+        }
+
+        /// <summary>
+        /// 显示一条一次性提示（例如"弹药挂里没有 5.45 弹药"）。
+        /// </summary>
+        /// <param name="message">提示内容；为空时立即清空。</param>
+        /// <param name="isWarning">true 用警告色，false 用普通文字色。</param>
+        /// <remarks>提示会自动消失；显示期间优先于底部的常驻弹药提醒，
+        /// 因为"刚刚按了 R 却没反应"的答案比背景提醒更紧急。</remarks>
+        public void ShowHint(string message, bool isWarning = true)
+        {
+            if (m_HintLabel == null)
+            {
+                return;
+            }
+
+            m_HintLabel.text = message ?? string.Empty;
+            m_HintLabel.color = isWarning ? LowAmmoColor : DimTextColor;
+            m_HintRemaining = string.IsNullOrEmpty(message) ? 0f : HintSeconds;
         }
 
         /// <summary>
@@ -199,7 +228,7 @@ namespace RaidDemo.UI
                 return;
             }
 
-            m_WeaponLabel.text = m_WeaponName;
+            m_WeaponLabel.text = BuildWeaponText();
 
             var runtime = m_Controller.Runtime;
             if (runtime == null)
@@ -207,6 +236,7 @@ namespace RaidDemo.UI
                 m_AmmoLabel.text = "-- / --";
                 m_AmmoLabel.color = DimTextColor;
                 m_ReserveLabel.text = "无弹匣";
+                m_HintLabel.text = string.Empty;
                 SetBarVisible(false);
                 return;
             }
@@ -223,7 +253,71 @@ namespace RaidDemo.UI
             var backpack = m_CaliberId == null ? 0 : AmmoReserve.CountAvailable(m_Loadout.Backpack, m_CaliberId);
             m_ReserveLabel.text = $"弹挂 {pouch}   背包 {backpack}";
 
+            UpdateHint(runtime, pouch, backpack);
             UpdateReloadBar(runtime);
+        }
+
+        /// <summary>武器行文字：名字 + 按口径着色的口径徽标文字。</summary>
+        private string BuildWeaponText()
+        {
+            if (string.IsNullOrEmpty(m_CaliberId))
+            {
+                return m_WeaponName;
+            }
+
+            var display = RaidDemo.Data.CaliberPalette.GetDisplayName(m_CaliberId);
+            var hex = RaidDemo.Data.CaliberPalette.GetHex(m_CaliberId);
+            return $"{m_WeaponName}  <color={hex}>· {display}</color>";
+        }
+
+        /// <summary>
+        /// 维护底部提示行：一次性提示优先，否则显示常驻的弹药提醒。
+        /// </summary>
+        /// <param name="runtime">武器运行时。</param>
+        /// <param name="pouch">弹药挂里当前口径的余量。</param>
+        /// <param name="backpack">背包里当前口径的余量。</param>
+        /// <remarks>
+        /// <para>常驻提醒只覆盖两种会让人卡住的情况：</para>
+        /// <list type="bullet">
+        /// <item><description>弹匣没满、弹药挂是空的，但背包里有——提醒去搬弹药（换弹只从弹药挂取弹）；</description></item>
+        /// <item><description>弹匣没满、两处都没有——明确写出"没有 xx 弹药"，而不是按 R 毫无反应。</description></item>
+        /// </list>
+        /// </remarks>
+        private void UpdateHint(WeaponRuntime runtime, int pouch, int backpack)
+        {
+            if (m_HintLabel == null)
+            {
+                return;
+            }
+
+            if (m_HintRemaining > 0f)
+            {
+                m_HintRemaining -= Time.unscaledDeltaTime;
+                if (m_HintRemaining <= 0f)
+                {
+                    m_HintLabel.text = string.Empty;
+                }
+
+                return;
+            }
+
+            var magazineNotFull = runtime.MagazineAmmo < runtime.Weapon.MagazineCapacity;
+            var display = RaidDemo.Data.CaliberPalette.GetDisplayName(m_CaliberId);
+
+            if (magazineNotFull && pouch <= 0 && backpack > 0)
+            {
+                m_HintLabel.text = $"弹药挂是空的：背包里有 {backpack} 发 {display}";
+                m_HintLabel.color = LowAmmoColor;
+            }
+            else if (magazineNotFull && pouch <= 0 && backpack <= 0)
+            {
+                m_HintLabel.text = $"没有 {display} 弹药";
+                m_HintLabel.color = LowHealthColor;
+            }
+            else
+            {
+                m_HintLabel.text = string.Empty;
+            }
         }
 
         /// <summary>刷新换弹进度条。</summary>
@@ -249,74 +343,6 @@ namespace RaidDemo.UI
             {
                 m_ReloadBarRoot.gameObject.SetActive(visible);
             }
-        }
-
-        /// <summary>构建整套界面。</summary>
-        private void BuildLayout()
-        {
-            // 高于准星（100），低于背包面板（200）：
-            // 背包打开时面板会盖住屏幕中央，而弹药信息在左下角，两者不冲突。
-            var canvas = UiFactory.CreateCanvas(transform, "CombatHudCanvas", 150);
-            m_CanvasHost = canvas.gameObject;
-
-            // 一块深色半透明底板托住全部信息：HUD 直接压在草地上时，
-            // 浅色文字会与亮绿背景糊在一起；底板让它在任何背景上都读得清。
-            var plateRect = UiFactory.CreateAnchored(
-                canvas,
-                "Plate",
-                UiSprites.Card,
-                anchor: new Vector2(0f, 0f),
-                pivot: new Vector2(0f, 0f),
-                offset: new Vector2(Margin, Margin),
-                size: new Vector2(PanelWidth, PanelHeight));
-
-            // 生命值放在最上方：它是玩家最先要看的数字，
-            // 而弹匣数量在交火中反而是次要信息。
-            m_HealthLabel = CreateLabel(plateRect, "生命 -- / --", 12f, 19f, TextColor);
-            m_ArmorLabel = CreateLabel(plateRect, "甲 无  ｜  盔 无", 38f, 15f, DimTextColor);
-            m_WeaponLabel = CreateLabel(plateRect, "无武器", 72f, 15f, DimTextColor);
-            m_AmmoLabel = CreateLabel(plateRect, "-- / --", 92f, 34f, TextColor);
-            m_ReserveLabel = CreateLabel(plateRect, "弹挂 0   背包 0", 132f, 14f, DimTextColor);
-
-            BuildReloadBar(plateRect);
-        }
-
-        /// <summary>创建换弹进度条。</summary>
-        private void BuildReloadBar(RectTransform parent)
-        {
-            // 进度条贴在底板内部的最下沿：换弹时它出现，不换弹时整条隐藏，
-            // 因此不会长期占着屏幕空间。
-            m_ReloadBarRoot = UiFactory.CreateBar(
-                parent,
-                new Vector2(16f, PanelHeight - 22f),
-                new Vector2(PanelWidth - 32f, BarHeight),
-                BarFillColor,
-                out m_ReloadBarFill);
-
-            m_ReloadBarRoot.gameObject.SetActive(false);
-        }
-
-        /// <summary>在底板内创建一个左对齐的文本标签。</summary>
-        /// <param name="parent">底板。</param>
-        /// <param name="content">初始文字。</param>
-        /// <param name="top">距底板顶部的像素。</param>
-        /// <param name="fontSize">字号。</param>
-        /// <param name="color">颜色。</param>
-        private static TextMeshProUGUI CreateLabel(
-            RectTransform parent,
-            string content,
-            float top,
-            float fontSize,
-            Color color)
-        {
-            return UiFactory.CreateLabel(
-                parent,
-                content,
-                new Vector2(16f, top),
-                new Vector2(PanelWidth - 32f, fontSize + 8f),
-                fontSize,
-                TextAlignmentOptions.Left,
-                color);
         }
     }
 }

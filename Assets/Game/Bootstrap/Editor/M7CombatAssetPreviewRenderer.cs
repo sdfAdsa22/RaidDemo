@@ -61,11 +61,13 @@ namespace RaidDemo.Bootstrap.Editor
             var weaponView = CreateWeaponView(root.transform, character, catalog);
             var summary = new StringBuilder("[RaidDemo] 战斗资产预览图已输出：");
 
-            RenderWeapon(summary, weaponView, character, 3, "01_步枪_游戏视角");
-            RenderWeapon(summary, weaponView, character, 2, "02_手枪_游戏视角");
-            RenderWeapon(summary, weaponView, character, 3, "03_步枪_特写",
+            RenderWeapon(summary, weaponView, character, 3, "weapon.rifle.ak74", "01_步枪_游戏视角");
+            RenderWeapon(summary, weaponView, character, 2, "weapon.pistol.pm", "02_手枪_游戏视角");
+            RenderWeapon(summary, weaponView, character, 3, "weapon.shotgun.pump", "03_霰弹枪_游戏视角");
+            RenderWeapon(summary, weaponView, character, 2, "weapon.smg.uzi", "04_冲锋枪_游戏视角");
+            RenderWeapon(summary, weaponView, character, 3, "weapon.rifle.ak74", "05_步枪_特写",
                 pitch: 14f, distance: 2.6f, focusOffset: new Vector3(0.5f, 1.0f, 0f));
-            RenderWeapon(summary, weaponView, character, 2, "05_手枪_特写",
+            RenderWeapon(summary, weaponView, character, 2, "weapon.pistol.pm", "06_手枪_特写",
                 pitch: 14f, distance: 1.7f, focusOffset: new Vector3(0.25f, 1.0f, 0f));
             RenderEffects(summary, root.transform, catalog, light);
 
@@ -79,6 +81,7 @@ namespace RaidDemo.Bootstrap.Editor
             PlayerWeaponView view,
             GameObject character,
             int gridWidth,
+            string weaponItemId,
             string fileName,
             float pitch = 62f,
             float distance = 13f,
@@ -89,8 +92,9 @@ namespace RaidDemo.Bootstrap.Editor
                 return;
             }
 
-            // 更新视图：模型按格宽自动在长枪/短枪之间切换，预览因此与游戏里用的是同一套判定。
-            view.UpdateView(character.transform.position, 0f, true, gridWidth);
+            // 更新视图：模型按物品 ID 从表现层目录取值（格宽只作回退），
+            // 预览因此与游戏里用的是同一套判定。
+            view.UpdateView(character.transform.position, 0f, true, gridWidth, weaponItemId);
             if (!view.UsesRealModel)
             {
                 summary.Append('\n').Append("  · ").Append(fileName).Append("（没有武器模型，正在用灰盒兜底）");
@@ -226,10 +230,7 @@ namespace RaidDemo.Bootstrap.Editor
             SetLayerRecursively(host.transform);
 
             var view = host.AddComponent<PlayerWeaponView>();
-            view.Build(
-                character.transform,
-                catalog.RifleWeaponPrefab,
-                catalog.PistolWeaponPrefab);
+            view.Build(character.transform, catalog);
 
             // 武器模型是 Build 之后才创建出来的，必须在这之后再刷一次层：
             // 预览相机只渲染第 30 层，漏掉这一步的症状是"两张预览图一模一样"——

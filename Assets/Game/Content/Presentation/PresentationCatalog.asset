@@ -13,8 +13,19 @@ MonoBehaviour:
   m_Name: PresentationCatalog
   m_EditorClassIdentifier: RaidDemo.Presentation::RaidDemo.Presentation.PresentationCatalog
   m_Audio: {fileID: 11400000, guid: 7847872bda9d2bf4c895fc34738c2229, type: 2}
-  m_RifleWeaponPrefab: {fileID: 3769420007951657483, guid: 279fc7ce223e5d2468fe55f39d9ef2b7, type: 3}
-  m_PistolWeaponPrefab: {fileID: 428816534921247050, guid: 10961d9c7ccadb94a8384b77fb52ac72, type: 3}
+  m_WeaponModels:
+  - m_ItemId: weapon.pistol.pm
+    m_Prefab: {fileID: 428816534921247050, guid: 10961d9c7ccadb94a8384b77fb52ac72, type: 3}
+    m_Kind: 0
+  - m_ItemId: weapon.rifle.ak74
+    m_Prefab: {fileID: 3769420007951657483, guid: 279fc7ce223e5d2468fe55f39d9ef2b7, type: 3}
+    m_Kind: 1
+  - m_ItemId: weapon.smg.uzi
+    m_Prefab: {fileID: 7481631397988006778, guid: 755c9b5411cf53b4187caf25b77e5f40, type: 3}
+    m_Kind: 2
+  - m_ItemId: weapon.shotgun.pump
+    m_Prefab: {fileID: 3623518623121255500, guid: 2936fdffb7c55be479f307006cfd250d, type: 3}
+    m_Kind: 3
   m_MuzzleFlashPrefab: {fileID: 5131590034443407313, guid: 6cb77c6c587906b4792d6e2b979863ce, type: 3}
   m_ImpactSparkPrefab: {fileID: 8922675939398521961, guid: cc32a1a056dd003458b2d2a4394f81ca, type: 3}
   m_ImpactDustPrefab: {fileID: 2725729683819602947, guid: f6725b0498d7ff34e8d0d7b995e44eaa, type: 3}

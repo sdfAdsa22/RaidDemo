@@ -85,7 +85,35 @@ namespace RaidDemo.UI
 
             m_Label = EnsureLabel(m_Rect);
             m_Badge = EnsureBadge(m_Rect);
+            EnsureCaliberBadge(item.Definition);
             RefreshVisualState();
+        }
+
+        /// <summary>
+        /// 给武器与弹药格加一枚口径徽标。
+        /// </summary>
+        /// <param name="definition">物品定义。</param>
+        /// <remarks>
+        /// <para>放在左上角：右上角被"选中对勾"占用，底部是物品名。
+        /// 徽标按口径固定着色（见 <see cref="RaidDemo.Data.CaliberPalette"/>），
+        /// 于是"橙色的枪配橙色的子弹"不需要读文字就能对上。</para>
+        /// <para>只有武器与弹药有口径；其它物品不加，避免每格都挂一个"未知口径"。</para>
+        /// </remarks>
+        private void EnsureCaliberBadge(RaidDemo.Data.IItemDefinition definition)
+        {
+            var caliber = RaidDemo.Data.CaliberPalette.ResolveCaliber(definition);
+            if (string.IsNullOrEmpty(caliber) || m_Rect.Find("CaliberBadge") != null)
+            {
+                return;
+            }
+
+            CaliberBadge.CreateAnchored(
+                m_Rect,
+                caliber,
+                anchor: new Vector2(0f, 1f),
+                pivot: new Vector2(0f, 1f),
+                offset: new Vector2(3f, -3f),
+                size: new Vector2(40f, 15f));
         }
 
         /// <summary>

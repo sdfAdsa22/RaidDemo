@@ -48,6 +48,12 @@ namespace RaidDemo.Bootstrap
         /// <summary>手枪枪声的最远可听距离（米）。</summary>
         private const float PistolShotDistance = 32f;
 
+        /// <summary>冲锋枪枪声的最远可听距离（米）：与步枪同量级，它一开火就该被听见。</summary>
+        private const float SmgShotDistance = 42f;
+
+        /// <summary>霰弹枪枪声的最远可听距离（米）：射程只有 6 米，但动静最大。</summary>
+        private const float ShotgunShotDistance = 45f;
+
         /// <summary>换弹动作音的音量。</summary>
         private const float ReloadVolume = 0.6f;
 
@@ -108,9 +114,10 @@ namespace RaidDemo.Bootstrap
         /// 更新本地玩家的武器类别（换枪时由启动层调用）。
         /// </summary>
         /// <param name="gridWidth">主武器占几格宽；没有武器时传 0。</param>
-        public void SetLocalWeaponGridWidth(int gridWidth)
+        /// <summary>设置当前本地武器的表现类别（由装配层按物品 ID 查表得到）。</summary>
+        public void SetLocalWeaponKind(WeaponPresentationKind kind)
         {
-            LocalWeaponKind = AudioPlaybackRules.ResolveWeaponKind(gridWidth);
+            LocalWeaponKind = kind;
         }
 
         /// <summary>本地玩家位置（每帧由启动层刷新，玩家可能在场景中重生）。</summary>
@@ -193,19 +200,24 @@ namespace RaidDemo.Bootstrap
             }
 
             var isLocal = evt.ShooterId == m_LocalPlayerId;
-            var kind = isLocal ? LocalWeaponKind : WeaponPresentationKind.Rifle;
-            var clip = kind == WeaponPresentationKind.Rifle
-                ? catalog.PickRifleShot(m_ShotVariant++)
-                : catalog.PickPistolShot(m_ShotVariant++);
 
-            m_Audio.PlayAt(
-                clip,
-                evt.Origin,
-                isLocal ? LocalShotVolume : RemoteShotVolume,
-                kind == WeaponPresentationKind.Rifle ? RifleShotDistance : PistolShotDistance,
-                ShotPitchJitter,
-                // 自己的枪声不参与空间化：它必须满音量、居中；别人的枪声走 3D 才有方位与距离感。
+            // 枪声每发只响一次：霰弹枪一发的多颗弹丸各自广播一条事件，
+            // 六条枪声叠在同一帧会变成一声爆响。命中音不设这条限制——
+            // 六颗弹丸可能分别打在敌人与墙上，每一条命中都该有反馈。
+            if (evt.PelletIndex == 0)
+            {
+                var kind = isLocal ? LocalWeaponKind : WeaponPresentationKind.Rifle;
+                var clip = PickShotClip(catalog, kind, m_ShotVariant++);
+
+                m_Audio.PlayAt(
+                    clip,
+                    evt.Origin,
+                    isLocal ? LocalShotVolume : RemoteShotVolume,
+                    ResolveShotDistance(kind),
+                    ShotPitchJitter,
+                    // 自己的枪声不参与空间化：它必须满音量、居中；别人的枪声走 3D 才有方位与距离感。
                 flat: isLocal);
+            }
 
             if (!evt.DidHit)
             {
@@ -221,6 +233,45 @@ namespace RaidDemo.Bootstrap
                 evt.EndPoint,
                 isUnit ? FleshImpactVolume : HardImpactVolume,
                 isUnit ? FleshImpactDistance : HardImpactDistance);
+        }
+
+        /// <summary>
+        /// 按武器表现类别挑选一条枪声。
+        /// </summary>
+        /// <param name="catalog">音效目录。</param>
+        /// <param name="kind">武器表现类别。</param>
+        /// <param name="variant">变体序号，调用方自增以轮换同类的多条录音。</param>
+        /// <returns>选中的剪辑；类别没有配录音时返回 null（播放层静默跳过）。</returns>
+        private static AudioClip PickShotClip(
+            AudioCatalog catalog, WeaponPresentationKind kind, int variant)
+        {
+            switch (kind)
+            {
+                case WeaponPresentationKind.SMG:
+                    return catalog.PickSmgShot(variant);
+                case WeaponPresentationKind.Shotgun:
+                    return catalog.PickShotgunShot(variant);
+                case WeaponPresentationKind.Pistol:
+                    return catalog.PickPistolShot(variant);
+                default:
+                    return catalog.PickRifleShot(variant);
+            }
+        }
+
+        /// <summary>按武器表现类别取枪声的最远可听距离（米）。</summary>
+        private static float ResolveShotDistance(WeaponPresentationKind kind)
+        {
+            switch (kind)
+            {
+                case WeaponPresentationKind.SMG:
+                    return SmgShotDistance;
+                case WeaponPresentationKind.Shotgun:
+                    return ShotgunShotDistance;
+                case WeaponPresentationKind.Pistol:
+                    return PistolShotDistance;
+                default:
+                    return RifleShotDistance;
+            }
         }
 
         /// <summary>换弹：开始是"卸弹匣"，完成是"推弹匣 + 拉栓"。</summary>

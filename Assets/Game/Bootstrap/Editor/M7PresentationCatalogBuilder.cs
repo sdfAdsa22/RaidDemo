@@ -70,10 +70,7 @@ namespace RaidDemo.Bootstrap.Editor
             var serialized = new SerializedObject(catalog);
             SetReference(serialized, "m_Audio",
                 AssetDatabase.LoadAssetAtPath<AudioCatalog>(M7AudioAssetBuilder.CatalogPath));
-            SetReference(serialized, "m_RifleWeaponPrefab",
-                AssetDatabase.LoadAssetAtPath<GameObject>(M7WeaponPrefabBuilder.RiflePrefabPath));
-            SetReference(serialized, "m_PistolWeaponPrefab",
-                AssetDatabase.LoadAssetAtPath<GameObject>(M7WeaponPrefabBuilder.PistolPrefabPath));
+            SetWeapons(serialized);
             SetReference(serialized, "m_MuzzleFlashPrefab",
                 AssetDatabase.LoadAssetAtPath<GameObject>(M7VfxPrefabBuilder.VfxFolder + "/Vfx_MuzzleFlash.prefab"));
             SetReference(serialized, "m_ImpactSparkPrefab",
@@ -138,6 +135,43 @@ namespace RaidDemo.Bootstrap.Editor
             }
 
             property.objectReferenceValue = value;
+        }
+
+        /// <summary>
+        /// 把四把武器的模型与表现类别写进表现层目录。
+        /// </summary>
+        /// <remarks>
+        /// <para>表里写物品 ID，而不是"第几把枪"：运行时按装备的物品 ID 精确查模型，
+        /// 因此给某个敌人或某件未来武器换模型时，改这一张表即可。</para>
+        /// <para>表现类别（Rifle / Pistol / SMG / Shotgun）决定用哪套枪声与枪口火焰距离，
+        /// 与模型一一对应地写在同一行，避免"换了模型、忘了换枪声"。</para>
+        /// </remarks>
+        private static void SetWeapons(SerializedObject serialized)
+        {
+            var property = serialized.FindProperty("m_WeaponModels");
+            if (property == null)
+            {
+                Debug.LogWarning("[RaidDemo] 表现层目录缺少 m_WeaponModels 字段，武器模型将全部回退为灰盒。");
+                return;
+            }
+
+            var entries = new[]
+            {
+                ("weapon.pistol.pm", M7WeaponPrefabBuilder.PistolPrefabPath, WeaponPresentationKind.Pistol),
+                ("weapon.rifle.ak74", M7WeaponPrefabBuilder.RiflePrefabPath, WeaponPresentationKind.Rifle),
+                ("weapon.smg.uzi", M7WeaponPrefabBuilder.SmgPrefabPath, WeaponPresentationKind.SMG),
+                ("weapon.shotgun.pump", M7WeaponPrefabBuilder.ShotgunPrefabPath, WeaponPresentationKind.Shotgun),
+            };
+
+            property.arraySize = entries.Length;
+            for (var i = 0; i < entries.Length; i++)
+            {
+                var element = property.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("m_ItemId").stringValue = entries[i].Item1;
+                element.FindPropertyRelative("m_Prefab").objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<GameObject>(entries[i].Item2);
+                element.FindPropertyRelative("m_Kind").enumValueIndex = (int)entries[i].Item3;
+            }
         }
 
         /// <summary>

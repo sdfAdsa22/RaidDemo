@@ -16,6 +16,12 @@ namespace RaidDemo.Presentation
 
         /// <summary>长枪：步枪类。占 3 格及以上。</summary>
         Rifle = 1,
+
+        /// <summary>冲锋枪：射速高、枪声更密更脆。</summary>
+        SMG = 2,
+
+        /// <summary>霰弹枪：一次射击多颗弹丸，枪声更沉、更闷。</summary>
+        Shotgun = 3,
     }
 
     /// <summary>脚步的路面类别。</summary>

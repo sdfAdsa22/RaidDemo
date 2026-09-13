@@ -56,6 +56,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>当前武器在背包里占的格数。用于推算灰盒枪身长度与枪声变体。</summary>
         private int m_WeaponLengthCells = 2;
 
+        /// <summary>当前主武器的物品 ID（表现层按它查模型与枪声）。没有武器时为空。</summary>
+        private string m_WeaponItemId;
+
         private readonly Dictionary<int, CombatTargetView> m_TargetViews = new Dictionary<int, CombatTargetView>();
 
         /// <summary>战斗世界，供调试与测试读取。</summary>
@@ -188,9 +191,18 @@ namespace RaidDemo.Bootstrap
             // 换弹与开火是彼此独立的两件事：不按住左键也应该能按 R 换弹。
             if (wantsToReload)
             {
-                m_CommandRouter.Dispatch(new PlayerReloadIntent(
+                var reloadResult = m_CommandRouter.Dispatch(new PlayerReloadIntent(
                     m_InputCollector.PlayerId,
                     ++m_CommandSequence));
+                // 失败必须说清原因：旧版本里"弹药挂没有匹配弹药"和"游戏卡了"长得一模一样。
+                var hint = ReloadFeedback.BuildMessage(
+                    reloadResult.Code,
+                    m_WeaponController.Runtime?.Weapon?.CaliberId,
+                    m_Loadout);
+                if (hint != null)
+                {
+                    m_CombatHud?.ShowHint(hint);
+                }
             }
         }
 

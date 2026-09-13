@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94c467a04d36ac24fb3fbed7947cf45f, type: 3}
+  m_Name: armor.helmet.heavy
+  m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.ItemDefinition
+  m_Id: armor.helmet.heavy
+  m_DisplayName: "\u91CD\u578B\u5934\u76D4"
+  m_Category: 3
+  m_Rarity: 3
+  m_Width: 2
+  m_Height: 2
+  m_WeightKg: 2
+  m_BaseValue: 28000
+  m_MaxStack: 1
+  m_CanRotate: 0
+  m_IsContainer: 0
+  m_ContainerWidth: 4
+  m_ContainerHeight: 4
+  m_Behavior: {fileID: 11400000, guid: 65e10dd63df11e242a16911d2b6c6632, type: 2}
+  m_Icon: {fileID: 21300000, guid: 2f12eaf30dc270643955a0553f4c3eb9, type: 3}
+  m_Description: "\u56DB\u7EA7\u91CD\u578B\u5934\u76D4\uFF0C\u7528\u914D\u91CD\u6362\u6765\u5934\u90E8\u7684\u6700\u9AD8\u9632\u62A4\u2014\u2014\u6234\u4E0A\u5B83\u4F60\u4F1A\u66F4\u60F3\u65E9\u70B9\u64A4\u79BB\u3002"

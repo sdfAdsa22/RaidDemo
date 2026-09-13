@@ -22,6 +22,8 @@ namespace RaidDemo.Presentation
         [Header("武器")]
         [SerializeField] private AudioClip[] m_RifleShots;
         [SerializeField] private AudioClip[] m_PistolShots;
+        [SerializeField] private AudioClip[] m_SmgShots;
+        [SerializeField] private AudioClip[] m_ShotgunShots;
         [SerializeField] private AudioClip m_DryFire;
         [SerializeField] private AudioClip m_MagazineOut;
         [SerializeField] private AudioClip m_MagazineIn;
@@ -59,6 +61,12 @@ namespace RaidDemo.Presentation
 
         /// <summary>手枪枪声（多个变体轮换播放）。</summary>
         public AudioClip[] PistolShots => m_PistolShots;
+
+        /// <summary>冲锋枪枪声（多个变体轮换播放）。</summary>
+        public AudioClip[] SmgShots => m_SmgShots;
+
+        /// <summary>霰弹枪枪声（多个变体轮换播放）。</summary>
+        public AudioClip[] ShotgunShots => m_ShotgunShots;
 
         /// <summary>空仓扣扳机的干响。</summary>
         public AudioClip DryFire => m_DryFire;
@@ -135,7 +143,8 @@ namespace RaidDemo.Presentation
         /// <remarks>启动层用它打印一条明确的警告。缺几个脚步音不该报警，
         /// 但如果连枪声都没有，玩家会以为射击功能坏了。</remarks>
         public bool HasCombatSounds =>
-            HasAny(m_RifleShots) || HasAny(m_PistolShots);
+            HasAny(m_RifleShots) || HasAny(m_PistolShots)
+            || HasAny(m_SmgShots) || HasAny(m_ShotgunShots);
 
         /// <summary>按索引取一个步枪枪声（循环取值，取不到返回 null）。</summary>
         public AudioClip PickRifleShot(int index)
@@ -147,6 +156,18 @@ namespace RaidDemo.Presentation
         public AudioClip PickPistolShot(int index)
         {
             return Pick(m_PistolShots, index);
+        }
+
+        /// <summary>按索引取一个冲锋枪枪声（循环取值，取不到返回 null）。</summary>
+        public AudioClip PickSmgShot(int index)
+        {
+            return Pick(m_SmgShots, index);
+        }
+
+        /// <summary>按索引取一个霰弹枪枪声（循环取值，取不到返回 null）。</summary>
+        public AudioClip PickShotgunShot(int index)
+        {
+            return Pick(m_ShotgunShots, index);
         }
 
         /// <summary>按索引取一个活体命中音。</summary>

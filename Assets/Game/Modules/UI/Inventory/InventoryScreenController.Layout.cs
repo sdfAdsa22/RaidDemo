@@ -315,6 +315,7 @@ namespace RaidDemo.UI
             RefreshEquipmentSlots();
             RefreshWeightBar();
             RefreshValueLabel();
+            RefreshAmmoPouchTitle();
         }
 
         /// <summary>显示或隐藏整个界面。</summary>
@@ -322,8 +323,6 @@ namespace RaidDemo.UI
         {
             var changed = m_IsOpen != visible;
             m_IsOpen = visible;
-            // 开关作用在屏幕根上：遮罩与面板一起显隐。
-            // 只切面板会让遮罩留在屏幕上，把关掉界面之后的游戏画面持续压暗。
             var target = m_ScreenRoot != null ? m_ScreenRoot : m_Root;
             if (target != null)
             {

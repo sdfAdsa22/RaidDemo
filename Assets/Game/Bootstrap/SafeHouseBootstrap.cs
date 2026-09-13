@@ -272,8 +272,17 @@ namespace RaidDemo.Bootstrap
 
             if (wantsToReload)
             {
-                m_CommandRouter.Dispatch(new PlayerReloadIntent(
+                var reloadResult = m_CommandRouter.Dispatch(new PlayerReloadIntent(
                     m_InputCollector.PlayerId, ++m_CommandSequence));
+                // 与战局同一条提示链路：安全屋试枪时也能看到"没有匹配弹药"的原因。
+                var hint = ReloadFeedback.BuildMessage(
+                    reloadResult.Code,
+                    m_WeaponController?.Runtime?.Weapon?.CaliberId,
+                    m_Loadout);
+                if (hint != null)
+                {
+                    m_CombatHud?.ShowHint(hint);
+                }
             }
 
             m_WeaponController.SetTriggerHeld(wantsToFire);

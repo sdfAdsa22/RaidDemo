@@ -132,7 +132,9 @@ namespace RaidDemo.Tests.EditMode
             float spreadPerShotDegrees = 0f,
             float maxSpreadDegrees = 0f,
             float spreadRecoveryPerSecond = 0f,
-            float rangeMeters = 40f)
+            float rangeMeters = 40f,
+            int pelletCount = 1,
+            float pelletSpreadDegrees = 0f)
         {
             BaseDamage = baseDamage;
             RoundsPerMinute = roundsPerMinute;
@@ -146,6 +148,8 @@ namespace RaidDemo.Tests.EditMode
             MaxSpreadDegrees = maxSpreadDegrees;
             SpreadRecoveryPerSecond = spreadRecoveryPerSecond;
             RangeMeters = rangeMeters;
+            PelletCount = pelletCount;
+            PelletSpreadDegrees = pelletSpreadDegrees;
         }
 
         /// <inheritdoc />
@@ -183,6 +187,12 @@ namespace RaidDemo.Tests.EditMode
 
         /// <inheritdoc />
         public float RangeMeters { get; }
+
+        /// <inheritdoc />
+        public int PelletCount { get; }
+
+        /// <inheritdoc />
+        public float PelletSpreadDegrees { get; }
     }
 
     /// <summary>供测试使用的弹药参数替身。</summary>

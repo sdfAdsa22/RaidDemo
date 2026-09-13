@@ -26,6 +26,15 @@ namespace RaidDemo.Combat
         /// </param>
         /// <param name="timestamp">事件时间戳（秒）。</param>
         /// <param name="sequence">来源命令序号。</param>
+        /// <param name="pelletIndex">
+        /// 本次射击里的第几颗弹丸（从 0 开始）。
+        /// </param>
+        /// <remarks>
+        /// <para><b>为什么弹丸要带序号：</b>霰弹枪一次射击会广播多条事件（每颗弹丸一条），
+        /// 但"枪声、枪口火焰、开火动画、AI 噪声"这些每发只该发生一次。
+        /// 消费方按 <c>PelletIndex == 0</c> 过滤即可，不需要认识武器类型；
+        /// 弹道与命中特效则对每颗弹丸都响应，散开的六条弹道正是霰弹的观感来源。</para>
+        /// </remarks>
         public WeaponFiredEvent(
             int shooterId,
             Vector3 origin,
@@ -34,7 +43,8 @@ namespace RaidDemo.Combat
             int hitTargetId,
             float noiseRadiusMeters,
             double timestamp = 0d,
-            uint sequence = 0u)
+            uint sequence = 0u,
+            int pelletIndex = 0)
         {
             ShooterId = shooterId;
             Origin = origin;
@@ -44,6 +54,7 @@ namespace RaidDemo.Combat
             NoiseRadiusMeters = noiseRadiusMeters;
             Timestamp = timestamp;
             Sequence = sequence;
+            PelletIndex = pelletIndex;
         }
 
         /// <summary>射手标识。</summary>
@@ -81,6 +92,9 @@ namespace RaidDemo.Combat
 
         /// <inheritdoc />
         public uint Sequence { get; }
+
+        /// <summary>本次射击里的第几颗弹丸（从 0 开始）。0 代表"每发只发生一次"的那一类表现。</summary>
+        public int PelletIndex { get; }
 
         public override string ToString()
         {

@@ -36,6 +36,7 @@ namespace RaidDemo.UI
 
         private InventoryGrid m_Grid;
         private RectTransform m_CellsRoot;
+        private TextMeshProUGUI m_TitleLabel;
 
         /// <summary>本视图对应的容器网格。</summary>
         public InventoryGrid Grid
@@ -89,10 +90,25 @@ namespace RaidDemo.UI
             background.pixelsPerUnitMultiplier = 1f;
             background.raycastTarget = false;
 
-            CreateLabel(rect, title, new Vector2(PanelPadding + 4f, 4f), width - (PanelPadding * 2f), TitleHeight - 6f);
+            m_TitleLabel = CreateLabel(
+                rect, title, new Vector2(PanelPadding + 4f, 4f), width - (PanelPadding * 2f), TitleHeight - 6f);
 
             m_CellsRoot = CreateCellsRoot(rect, grid.Width * CellSize, grid.Height * CellSize);
             BuildCells(grid);
+        }
+
+        /// <summary>
+        /// 更新标题文字（内容不变、尺寸不变时只改字）。
+        /// </summary>
+        /// <param name="title">新的标题文字。</param>
+        /// <remarks>弹药挂的标题会跟着装备的武器变化（"弹药挂 · 5.45 + 9x19"），
+        /// 但它不需要像其它容器那样整块重排，因此单独留一个只改文字的入口。</remarks>
+        public void SetTitle(string title)
+        {
+            if (m_TitleLabel != null)
+            {
+                m_TitleLabel.text = title;
+            }
         }
 
         /// <summary>
@@ -260,7 +276,8 @@ namespace RaidDemo.UI
         }
 
         /// <summary>创建容器标题。</summary>
-        private static void CreateLabel(RectTransform parent, string content, Vector2 topLeft, float width, float height)
+        private static TextMeshProUGUI CreateLabel(
+            RectTransform parent, string content, Vector2 topLeft, float width, float height)
         {
             var host = new GameObject("Label", typeof(RectTransform));
             var rect = (RectTransform)host.transform;
@@ -284,6 +301,7 @@ namespace RaidDemo.UI
             text.color = UiPalette.Ink;
             text.raycastTarget = false;
             text.textWrappingMode = TextWrappingModes.NoWrap;
+            return text;
         }
     }
 }

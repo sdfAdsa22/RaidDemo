@@ -147,6 +147,7 @@ namespace RaidDemo.Raid
                 {
                     Entry("ammo.9x19.standard", 40, 30, 60),
                     Entry("ammo.5.45.standard", 35, 20, 45),
+                    Entry("ammo.12ga.buck", 16, 6, 14),
                     Entry("medical.bandage.small", 10, 1, 2),
                     Entry("loot.bolt.copper", 9, 2, 5),
                     Entry("armor.helmet.steel", 6),
@@ -199,6 +200,9 @@ namespace RaidDemo.Raid
                     Entry("weapon.pistol.pm", 22),
                     Entry("ammo.9x19.standard", 20, 15, 30),
                     Entry("weapon.rifle.ak74", 14),
+                    Entry("weapon.smg.uzi", 10),
+                    Entry("weapon.shotgun.pump", 8),
+                    Entry("ammo.12ga.buck", 8, 6, 12),
                     Entry("armor.helmet.steel", 8),
                     Entry("armor.vest.plate", 6),
                 }));
@@ -233,6 +237,10 @@ namespace RaidDemo.Raid
                     Entry("medical.kit.field", 12),
                     Entry("loot.watch.gold", 12),
                     Entry("weapon.rifle.ak74", 15),
+                    // 四级套只从保险柜出：它是最贵的一档装备，
+                    // "想变强就得赌保险柜"正是贪婪循环想要的选择。
+                    Entry("armor.helmet.heavy", 4),
+                    Entry("armor.vest.heavy", 3),
                     Entry("armor.vest.plate", 10),
                     Entry("backpack.raider", 6),
                 }));
