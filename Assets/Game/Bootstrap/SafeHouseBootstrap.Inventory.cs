@@ -25,9 +25,6 @@ namespace RaidDemo.Bootstrap
         private TraderCatalog m_TraderCatalog;
         private MerchantScreenController m_MerchantScreen;
 
-        /// <summary>开发期测试箱的容器 ID；0 表示没有（定义被删掉之后就是这样）。</summary>
-        private int m_DebugCrateContainerId;
-
         private void InitializeInventory()
         {
             m_Registry = new ContainerRegistry();
@@ -40,7 +37,6 @@ namespace RaidDemo.Bootstrap
             m_BackpackContainerId = m_Registry.Register(m_Loadout.Backpack, ContainerKind.PlayerBackpack);
             m_AmmoPouchContainerId = m_Registry.Register(m_Loadout.AmmoPouch, ContainerKind.AmmoPouch);
             m_StashContainerId = m_Registry.Register(m_Progress.Stash, ContainerKind.Stash);
-            BuildDebugCrate();
 
             var context = new InventoryContext(m_Registry, m_Loadout, m_EventBus);
             m_CommandRouter.Register<InventoryMoveIntent>(new InventoryMoveCommandHandler(context));
@@ -143,35 +139,5 @@ namespace RaidDemo.Bootstrap
             m_InputCollector?.SetCursorLock(locked);
         }
 
-        /// <summary>
-        /// 生成开发期测试箱：固定产出武器、护甲、头盔、背包。
-        /// </summary>
-        /// <remarks>
-        /// <para>放在安全屋而不是战局地图里：它是**准备装备**用的，
-        /// 而准备动作本来就发生在安全屋。放进战局还会污染那一局的掉落与结算数据。</para>
-        ///
-        /// <para>目录里找不到 <c>crate.debug</c> 时静默跳过——删除测试箱时
-        /// 只需要删定义与场景标记，这段代码不需要动。</para>
-        /// </remarks>
-        private void BuildDebugCrate()
-        {
-            var definition = RaidDemo.Raid.LootContainerCatalog.Get("crate.debug");
-            if (definition == null)
-            {
-                return;
-            }
-
-            var grid = new InventoryGrid(
-                definition.GridSize.Width,
-                definition.GridSize.Height,
-                definition.DisplayName);
-            m_DebugCrateContainerId = m_Registry.Register(grid, ContainerKind.Loot);
-
-            var roller = new RaidDemo.Raid.LootRoller(
-                m_ItemCatalog,
-                new DeterministicRandom(20260912u),
-                new ItemFactory());
-            roller.Roll(definition.Table, grid, definition.FixedContents);
-        }
     }
 }

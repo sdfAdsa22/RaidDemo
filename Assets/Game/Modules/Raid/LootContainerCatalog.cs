@@ -90,7 +90,6 @@ namespace RaidDemo.Raid
                 BuildMedicalBox(),
                 BuildWeaponRack(),
                 BuildSafe(),
-                BuildDebugCrate(),
             };
         }
 
@@ -203,39 +202,6 @@ namespace RaidDemo.Raid
                     Entry("armor.helmet.steel", 8),
                     Entry("armor.vest.plate", 6),
                 }));
-        }
-
-        /// <summary>
-        /// 测试箱：**开发期专用，交付前必须连同场景里的标记一起删除**。
-        /// </summary>
-        /// <remarks>
-        /// <para>固定产出武器、护甲、头盔、背包各一件，用于快速验证
-        /// 「装备是否生效」这条链路（护甲减伤、头盔挡上部位、背包改变容量）。
-        /// 用固定产出而不是随机掉落，是因为验证需要的是**每次都有**，
-        /// 而不是「多开几次总会出现」。</para>
-        ///
-        /// <para>ID 里带 debug 前缀，便于全局搜索清理；
-        /// 场景里的标记名同样是 Loot_xx_crate.debug，一眼能认出来。</para>
-        /// </remarks>
-        private static LootContainerDefinition BuildDebugCrate()
-        {
-            return new LootContainerDefinition(
-                "crate.debug",
-                "测试箱",
-                ContainerFlavor.Crate,
-                6,
-                5,
-                new LootTable("loot.debug", "测试箱掉落", 1, new[]
-                {
-                    Entry("ammo.5.45.standard", 1, 30, 30),
-                }),
-                new[]
-                {
-                    Entry("weapon.rifle.ak74", 1),
-                    Entry("armor.vest.plate", 1),
-                    Entry("armor.helmet.steel", 1),
-                    Entry("backpack.small", 1),
-                });
         }
 
         /// <summary>

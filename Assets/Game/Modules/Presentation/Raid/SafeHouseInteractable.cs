@@ -28,14 +28,8 @@ namespace RaidDemo.Presentation
             /// <summary>任务板（批次 4）。</summary>
             QuestBoard = 3,
 
-            /// <summary>
-            /// 开发期测试箱：固定产出武器、护甲、头盔、背包。
-            /// </summary>
-            /// <remarks>交付前连同 <c>crate.debug</c> 定义一起删除。</remarks>
-            DebugCrate = 4,
-
             /// <summary>更衣镜：打开角色选择界面。</summary>
-            Wardrobe = 5,
+            Wardrobe = 4,
         }
 
         /// <summary>设施类型。</summary>

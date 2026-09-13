@@ -42,6 +42,20 @@ namespace RaidDemo.Bootstrap.Editor
             InboxRoot + "/KenneyNature"
         };
 
+        /// <summary>肯尼工厂套件：正式目录与暂存目录（M7 批次 6 的厂房加厚）。</summary>
+        private static readonly string[] FactoryKitFolders =
+        {
+            ExternalRoot + "/Kenney/FactoryKit/FBX",
+            InboxRoot + "/KenneyFactoryKit/Models/FBX format"
+        };
+
+        /// <summary>肯尼车辆套件：正式目录与暂存目录（M7 批次 6 的工业区点缀）。</summary>
+        private static readonly string[] CarKitFolders =
+        {
+            ExternalRoot + "/Kenney/CarKit/FBX",
+            InboxRoot + "/KenneyCarKit/Models/FBX format"
+        };
+
         /// <summary>Quaternius Toon Shooter 的场景道具目录。</summary>
         private static readonly string[] ToonShooterFolders =
         {
@@ -174,6 +188,18 @@ namespace RaidDemo.Bootstrap.Editor
         public static GameObject LoadIndustrialProp(string fileName)
         {
             return LoadModel(CityKitFolders, fileName);
+        }
+
+        /// <summary>载入肯尼工厂套件里的一个道具（批次 6 的厂房机器、管线与检修件）。</summary>
+        public static GameObject LoadFactoryProp(string fileName)
+        {
+            return LoadModel(FactoryKitFolders, fileName);
+        }
+
+        /// <summary>载入肯尼车辆套件里的一个模型（批次 6 的卡车、厢式车与工程车辆）。</summary>
+        public static GameObject LoadVehicleProp(string fileName)
+        {
+            return LoadModel(CarKitFolders, fileName);
         }
 
         /// <summary>载入 Quaternius Toon Shooter 的场景道具。</summary>

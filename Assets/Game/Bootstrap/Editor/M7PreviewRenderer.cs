@@ -103,6 +103,12 @@ namespace RaidDemo.Bootstrap.Editor
 
             // 对照组：同一机位、同一个代用角色，但关闭透视孔——两图对比即可看出孔的作用。
             new Shot("08_遮挡透视孔_关闭对照", new Vector3(10f, -5f, -1.2f), 62f, 0f, 13f, 55f, peephole: false, marker: true),
+
+            // 厂房内部（批次 6）：检查加固机床、料斗、机器人与地面标识组成的近战区。
+            new Shot("09_厂房内部", new Vector3(-19f, 1f, 1f), 58f, 0f, 16f, 60f),
+
+            // 堆场工业车辆（批次 6）：集装箱、卡车、工程车与水塔 / 吊车同框，检查主题是否成立。
+            new Shot("10_堆场工业车辆", new Vector3(18f, 1f, 6f), 52f, 0f, 20f, 60f),
         };
 
         /// <summary>菜单入口。</summary>

@@ -121,6 +121,7 @@ namespace RaidDemo.Bootstrap.Editor
             CreateLoadingDockZone();
             CreateOuterRing();
             CreateIndustrialLandmarks();
+            CreateIndustrialProps();
             CreateExtractionZones();
             CreateLootContainers();
             CreatePlayer();

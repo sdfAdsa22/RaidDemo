@@ -149,7 +149,7 @@ namespace RaidDemo.Bootstrap.Editor
                 case "crate.medical":
                     return "Prop_Box_Cardboard_A";
                 default:
-                    // safe.rare（保险柜）与 crate.debug（开发期测试箱）保持灰盒外观。
+                    // safe.rare（保险柜）保持灰盒外观。
                     return null;
             }
         }
@@ -174,9 +174,6 @@ namespace RaidDemo.Bootstrap.Editor
                     return new LootVisual(new Vector3(2.2f, 1.2f, 0.8f), new Color(0.28f, 0.31f, 0.38f));
                 case "safe.rare":
                     return new LootVisual(new Vector3(1.2f, 1.6f, 1.2f), new Color(0.22f, 0.22f, 0.25f));
-                case "crate.debug":
-                    // 品红色：与地图上任何正常物件都不同，一眼能看出这是临时物件。
-                    return new LootVisual(new Vector3(1.6f, 1.2f, 1.2f), new Color(0.85f, 0.25f, 0.85f));
                 default:
                     return new LootVisual(new Vector3(1.4f, 1f, 1f), new Color(0.35f, 0.42f, 0.33f));
             }
