@@ -41,6 +41,7 @@ namespace RaidDemo.Meta
                 savedAtUtc = DateTime.UtcNow.ToString("o"),
                 raidInProgress = raidInProgress,
                 trackedQuestId = progress.Quests.TrackedQuestId,
+                selectedCharacterId = progress.SelectedCharacterId,
                 backpackWidth = backpack != null ? backpack.Width : 0,
                 backpackHeight = backpack != null ? backpack.Height : 0,
                 stash = CaptureGrid(progress.Stash),
@@ -89,6 +90,7 @@ namespace RaidDemo.Meta
             var progress = new MetaProgress(0);
             progress.AttachCatalog(catalog);
             progress.RestoreMoney(data.money);
+            progress.RestoreSelectedCharacter(data.selectedCharacterId);
 
             var width = ClampGridSide(data.backpackWidth, MetaProgress.PocketWidth);
             var height = ClampGridSide(data.backpackHeight, MetaProgress.PocketHeight);

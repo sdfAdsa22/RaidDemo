@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Shared;
+using UnityEngine;
 
 namespace RaidDemo.Raid
 {
@@ -199,7 +200,8 @@ namespace RaidDemo.Raid
                     existing.DisplayName,
                     merged,
                     existing.UnitValue,
-                    existing.Rarity);
+                    existing.Rarity,
+                    existing.Icon);
                 return;
             }
 
@@ -209,7 +211,14 @@ namespace RaidDemo.Raid
                 item.Definition.DisplayName,
                 item.StackCount,
                 item.Definition.BaseValue,
-                item.Definition.Rarity));
+                item.Definition.Rarity,
+                ResolveIcon(item)));
+        }
+
+        /// <summary>取物品的界面图标；规则层接口不暴露 Sprite，因此这里转成具体定义。</summary>
+        private static Sprite ResolveIcon(ItemInstance item)
+        {
+            return item.Definition is ItemDefinition definition ? definition.Icon : null;
         }
 
         /// <summary>累加一行行的合计价值。</summary>

@@ -44,6 +44,16 @@ namespace RaidDemo.Presentation
         [SerializeField] private AudioClip m_RaidSuccess;
         [SerializeField] private AudioClip m_RaidFail;
 
+        [Header("界面")]
+        [SerializeField] private AudioClip m_UiClick;
+        [SerializeField] private AudioClip m_UiPanelOpen;
+        [SerializeField] private AudioClip m_UiPanelClose;
+        [SerializeField] private AudioClip m_UiTabSwitch;
+        [SerializeField] private AudioClip m_UiConfirm;
+        [SerializeField] private AudioClip m_UiCancel;
+        [SerializeField] private AudioClip m_UiLocked;
+        [SerializeField] private AudioClip m_UiBuy;
+
         /// <summary>步枪枪声（多个变体轮换播放）。</summary>
         public AudioClip[] RifleShots => m_RifleShots;
 
@@ -94,6 +104,30 @@ namespace RaidDemo.Presentation
 
         /// <summary>阵亡或超时。</summary>
         public AudioClip RaidFail => m_RaidFail;
+
+        /// <summary>普通按钮点击。</summary>
+        public AudioClip UiClick => m_UiClick;
+
+        /// <summary>面板打开。</summary>
+        public AudioClip UiPanelOpen => m_UiPanelOpen;
+
+        /// <summary>面板关闭。</summary>
+        public AudioClip UiPanelClose => m_UiPanelClose;
+
+        /// <summary>页签切换。</summary>
+        public AudioClip UiTabSwitch => m_UiTabSwitch;
+
+        /// <summary>确认 / 出击 / 购买成功。</summary>
+        public AudioClip UiConfirm => m_UiConfirm;
+
+        /// <summary>取消 / 返回。</summary>
+        public AudioClip UiCancel => m_UiCancel;
+
+        /// <summary>未开放或操作被拒绝。</summary>
+        public AudioClip UiLocked => m_UiLocked;
+
+        /// <summary>购买成功。</summary>
+        public AudioClip UiBuy => m_UiBuy;
 
         /// <summary>
         /// 是否存在最小可用的一组音效（枪声 + 命中）。

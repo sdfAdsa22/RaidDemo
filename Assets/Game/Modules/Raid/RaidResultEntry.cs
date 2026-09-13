@@ -1,4 +1,5 @@
 using RaidDemo.Data;
+using UnityEngine;
 
 namespace RaidDemo.Raid
 {
@@ -20,12 +21,19 @@ namespace RaidDemo.Raid
         /// <param name="count">数量。</param>
         /// <param name="unitValue">单价。</param>
         /// <param name="rarity">稀有度，界面用来上色。</param>
-        public RaidResultEntry(string displayName, int count, int unitValue, RarityTier rarity)
+        /// <param name="icon">界面图标；可为空，界面会自动退回稀有度色块。</param>
+        public RaidResultEntry(
+            string displayName,
+            int count,
+            int unitValue,
+            RarityTier rarity,
+            Sprite icon = null)
         {
             DisplayName = displayName;
             Count = count > 0 ? count : 0;
             UnitValue = unitValue > 0 ? unitValue : 0;
             Rarity = rarity;
+            Icon = icon;
             TotalValue = UnitValue * Count;
         }
 
@@ -43,6 +51,9 @@ namespace RaidDemo.Raid
 
         /// <summary>稀有度。</summary>
         public RarityTier Rarity { get; }
+
+        /// <summary>界面图标；可能为空。</summary>
+        public Sprite Icon { get; }
 
         /// <inheritdoc />
         public override string ToString()

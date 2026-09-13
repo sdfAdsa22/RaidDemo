@@ -21,3 +21,40 @@ MonoBehaviour:
   m_ImpactFleshPrefab: {fileID: 4093384041635255389, guid: 33bd2d1024c005c49b51bcfba2c0e0b2, type: 3}
   m_CrosshairSprite: {fileID: 1338022970059654511, guid: 330c1e26bdaba53468ec6196d4a89299, type: 3}
   m_CrosshairReloadSprite: {fileID: -15259688750184389, guid: e7616934742f6d542a6599aca753e82a, type: 3}
+  m_PlayerCharacters:
+  - m_Id: female-a
+    m_DisplayName: "\u5973\u961F\u5458 A"
+    m_Prefab: {fileID: 7257367876856123537, guid: 4b8da152e4e13144881acaf7a675437b, type: 3}
+  - m_Id: female-b
+    m_DisplayName: "\u5973\u961F\u5458 B"
+    m_Prefab: {fileID: 6426999674062031064, guid: f023150db3ac02548a9d3d41073da7bb, type: 3}
+  - m_Id: female-c
+    m_DisplayName: "\u5973\u961F\u5458 C"
+    m_Prefab: {fileID: 6775920823996915349, guid: b082828ca705b924db13c2d409f897d1, type: 3}
+  - m_Id: female-d
+    m_DisplayName: "\u5973\u961F\u5458 D"
+    m_Prefab: {fileID: 2587268544097629898, guid: bcb0fbd14c73c464d8ad9da918a4f887, type: 3}
+  - m_Id: female-e
+    m_DisplayName: "\u5973\u961F\u5458 E"
+    m_Prefab: {fileID: 6966687194965950011, guid: b682910afba7b484ea8ac7fe8fa1820b, type: 3}
+  - m_Id: female-f
+    m_DisplayName: "\u5973\u961F\u5458 F"
+    m_Prefab: {fileID: 4954360797150378119, guid: e52244713d619844a94aabc8cb781bb7, type: 3}
+  - m_Id: male-a
+    m_DisplayName: "\u7537\u961F\u5458 A"
+    m_Prefab: {fileID: 8430689351154578713, guid: ded1801e0f87b004296d96995297908a, type: 3}
+  - m_Id: male-b
+    m_DisplayName: "\u7537\u961F\u5458 B"
+    m_Prefab: {fileID: 8288414671177233507, guid: 3cb1ceb7ac0eb194e8173daa5aafb7f3, type: 3}
+  - m_Id: male-c
+    m_DisplayName: "\u7537\u961F\u5458 C"
+    m_Prefab: {fileID: 7947345736758156975, guid: eeea17b0c30515b4bb210e4f7e54131c, type: 3}
+  - m_Id: male-d
+    m_DisplayName: "\u7537\u961F\u5458 D"
+    m_Prefab: {fileID: 7580568567989857280, guid: ca2f2ca110728c04b85441986d65c82f, type: 3}
+  - m_Id: male-e
+    m_DisplayName: "\u7537\u961F\u5458 E"
+    m_Prefab: {fileID: 854119637635988377, guid: 8ccc44976db9b01438f20b3d7bf67a33, type: 3}
+  - m_Id: male-f
+    m_DisplayName: "\u7537\u961F\u5458 F"
+    m_Prefab: {fileID: 9079275846472826911, guid: 5fba92cc07c01654a9d770df6efc7e83, type: 3}

@@ -143,9 +143,15 @@ namespace RaidDemo.UI
                     continue;
                 }
 
+                if (m_ActiveTab == tab.Tab)
+                {
+                    return;
+                }
+
                 m_ActiveTab = tab.Tab;
                 ApplyTabVisibility();
                 RefreshAll();
+                UiAudio.Play(UiCue.TabSwitch);
                 return;
             }
         }
@@ -170,6 +176,7 @@ namespace RaidDemo.UI
                         ? $"已购买 {row.Definition.DisplayName} x{Mathf.Max(1, row.Entry.BundleCount)}。"
                         : result.Message,
                     result.Success);
+                UiAudio.Play(result.Success ? UiCue.Buy : UiCue.Locked);
                 return;
             }
         }

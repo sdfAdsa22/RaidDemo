@@ -61,6 +61,17 @@ namespace RaidDemo.Data
         /// <summary>可选的特殊行为。M2 阶段没有任何实现。</summary>
         [SerializeField] private ItemBehavior m_Behavior;
 
+        /// <summary>
+        /// 界面图标。
+        /// </summary>
+        /// <remarks>
+        /// <para>规则层刻意不暴露 Sprite：<see cref="IItemDefinition"/> 在无引擎引用的 Data 程序集里，
+        /// 物品规则不应该因为“界面上画什么”而依赖 UnityEngine。图标只给 UI 侧读取具体
+        /// <see cref="ItemDefinition"/> 时使用。</para>
+        /// <para>缺图标时 UI 自动退回纯文字表现，不影响背包、商人、结算的逻辑。</para>
+        /// </remarks>
+        [SerializeField] private Sprite m_Icon;
+
         /// <inheritdoc />
         public string Id
         {
@@ -131,6 +142,12 @@ namespace RaidDemo.Data
         public ItemBehavior Behavior
         {
             get { return m_Behavior; }
+        }
+
+        /// <summary>界面图标；可以为 null。</summary>
+        public Sprite Icon
+        {
+            get { return m_Icon; }
         }
 
         /// <inheritdoc />

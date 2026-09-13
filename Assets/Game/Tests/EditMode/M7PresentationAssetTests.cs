@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using RaidDemo.Bootstrap.Editor;
+using RaidDemo.Data;
 using RaidDemo.Presentation;
 using UnityEditor;
 using UnityEngine;
@@ -50,6 +52,55 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsNotNull(catalog.MagazineOut, "缺少换弹音。" + RebuildHint);
             Assert.IsNotNull(catalog.PickLootRummage(0), "缺少翻找音。" + RebuildHint);
             Assert.IsNotNull(catalog.RaidSuccess, "缺少撤离成功提示音。" + RebuildHint);
+        }
+
+        [Test]
+        public void 界面音效槽位都已接线()
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<AudioCatalog>(M7AudioAssetBuilder.CatalogPath);
+            Assert.IsNotNull(catalog, RebuildHint);
+            Assert.IsNotNull(catalog.UiClick, "缺少按钮点击音。" + RebuildHint);
+            Assert.IsNotNull(catalog.UiPanelOpen, "缺少面板打开音。" + RebuildHint);
+            Assert.IsNotNull(catalog.UiPanelClose, "缺少面板关闭音。" + RebuildHint);
+            Assert.IsNotNull(catalog.UiTabSwitch, "缺少页签切换音。" + RebuildHint);
+            Assert.IsNotNull(catalog.UiConfirm, "缺少确认音。" + RebuildHint);
+            Assert.IsNotNull(catalog.UiCancel, "缺少取消音。" + RebuildHint);
+            Assert.IsNotNull(catalog.UiLocked, "缺少未开放提示音。" + RebuildHint);
+            Assert.IsNotNull(catalog.UiBuy, "缺少购买成功音。" + RebuildHint);
+        }
+
+        [Test]
+        public void 表现层目录包含12个可用玩家角色()
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<PresentationCatalog>(
+                M7PresentationCatalogBuilder.CatalogPath);
+            Assert.IsNotNull(catalog, RebuildHint);
+            Assert.AreEqual(12, catalog.PlayerCharacters.Count, "角色选择应有 12 个可动角色。");
+
+            var ids = new HashSet<string>();
+            for (var i = 0; i < catalog.PlayerCharacters.Count; i++)
+            {
+                var entry = catalog.PlayerCharacters[i];
+                Assert.IsNotNull(entry, $"第 {i} 个角色目录项为空。");
+                Assert.IsTrue(ids.Add(entry.Id), $"角色 id 重复：{entry.Id}");
+                Assert.IsNotNull(entry.Prefab, $"角色 {entry.Id} 没有预制体。{RebuildHint}");
+            }
+        }
+
+        [Test]
+        public void 物品图标已按分类接入()
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<ItemCatalog>(
+                "Assets/Game/Content/Items/ItemCatalog.asset");
+            Assert.IsNotNull(catalog, "物品目录缺失，请先执行「RaidDemo/生成初始物品资产」。");
+
+            for (var i = 0; i < catalog.All.Count; i++)
+            {
+                var definition = catalog.All[i];
+                Assert.IsNotNull(definition, $"物品目录第 {i} 项为空。");
+                Assert.IsNotNull(definition.Icon,
+                    $"{definition.Id} 没有图标，请执行「RaidDemo/生成初始物品资产」。");
+            }
         }
 
         [Test]

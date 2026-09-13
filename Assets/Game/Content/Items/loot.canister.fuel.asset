@@ -26,3 +26,4 @@ MonoBehaviour:
   m_ContainerWidth: 4
   m_ContainerHeight: 4
   m_Behavior: {fileID: 0}
+  m_Icon: {fileID: 21300000, guid: b88657c01f4f4c9468480dd3f5971558, type: 3}

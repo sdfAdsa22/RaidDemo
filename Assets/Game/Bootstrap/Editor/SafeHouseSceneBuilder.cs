@@ -1,7 +1,7 @@
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace RaidDemo.Bootstrap.Editor
 {
@@ -39,8 +39,11 @@ namespace RaidDemo.Bootstrap.Editor
 
         private const float CameraFieldOfView = 55f;
 
-        /// <summary>创建玩家。根节点在脚底，身体与头部向上堆叠（与战局一致）。</summary>
-        private static void CreatePlayer()
+        /// <summary>
+        /// 创建玩家。根节点在脚底，身体与头部向上堆叠（与战局一致）。
+        /// </summary>
+        /// <returns>玩家根节点：墙上的说明牌需要把玩家写进自己的序列化引用，才能判断"玩家走近了"。</returns>
+        private static GameObject CreatePlayer()
         {
             var player = new GameObject("Player");
             player.transform.position = PlayerSpawn;
@@ -66,6 +69,7 @@ namespace RaidDemo.Bootstrap.Editor
 
             player.AddComponent<RaidDemo.Presentation.PlayerMotor>();
             player.AddComponent<RaidDemo.Presentation.PlayerCharacterView>();
+            return player;
         }
 
         /// <summary>相机与启动对象。</summary>
@@ -150,8 +154,9 @@ namespace RaidDemo.Bootstrap.Editor
             CreateRoom();
             CreateFacilities();
             CreateTargets();
-            CreateSignBoard();
-            CreatePlayer();
+            // 玩家必须早于说明牌创建：说明牌要把玩家对象写进自己的序列化引用。
+            var player = CreatePlayer();
+            CreateSignBoard(player);
             CreateBootstrap();
 
             EnsureFolder("Assets/Game/Content");
@@ -209,59 +214,6 @@ namespace RaidDemo.Bootstrap.Editor
             }
         }
 
-        /// <summary>
-        /// 写在墙上的操作说明。
-        /// </summary>
-        /// <remarks>
-        /// 用世界空间画布而不是贴在屏幕上的 UI：说明应当属于这个空间，
-        /// 玩家走到墙前读它——这也是把「操作说明」从主菜单搬进安全屋的意义。
-        /// </remarks>
-        private static void CreateSignBoard()
-        {
-            var board = CreateBox(
-                "SignBoard",
-                new Vector3(0f, 2.2f, 8.2f),
-                new Vector3(9f, 3f, 0.15f),
-                null);
-            SetColor(board, new Color(0.12f, 0.13f, 0.16f));
-
-            // 画的牌子与文字的载体刻意**不做父子关系**：牌子是个被缩放到 9x3x0.15 的立方体，
-            // 文字若挂在它下面会继承那份非等比缩放，字会被拉得又大又扁（还会看起来是镜像的）。
-            // 文字自己作为根节点、只做等比缩放，位置摆在牌面正前方。
-            var canvasHost = new GameObject("SignText", typeof(RectTransform), typeof(Canvas));
-            var canvas = canvasHost.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-
-            var rect = (RectTransform)canvasHost.transform;
-            rect.sizeDelta = new Vector2(900f, 300f);
-            rect.position = new Vector3(0f, 2.2f, 8f);
-            // 不旋转：世界空间画布的正面朝向 +Z（房间在 z 更小的一侧），
-            // 从房间里看过去正好是正面。加 180 度反而会看到镜像的文字。
-            rect.rotation = Quaternion.identity;
-            rect.localScale = Vector3.one * 0.01f;
-
-            var textHost = new GameObject("Text", typeof(RectTransform), typeof(Text));
-            var textRect = (RectTransform)textHost.transform;
-            textRect.SetParent(rect, worldPositionStays: false);
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = Vector2.zero;
-            textRect.offsetMax = Vector2.zero;
-
-            var text = textHost.GetComponent<Text>();
-            text.font = RaidDemo.UI.UiFontProvider.Get(28);
-            text.fontSize = 28;
-            text.color = new Color(0.92f, 0.92f, 0.95f);
-            text.alignment = TextAnchor.MiddleCenter;
-            text.text =
-                "安全屋 · 出击准备\n\n" +
-                "WASD 移动    鼠标 瞄准    左键 射击\n" +
-                "R 装弹    滚轮 / 1 2 换武器    Tab 背包    E 交互\n" +
-                "H 使用医疗品    右键菜单\n\n" +
-                "走到仓库前按 E 整理装备，走到出口前按 E 选择地图出击。\n" +
-                "阵亡会丢掉随身携带的一切，仓库里的东西永远安全。";
-        }
-
         /// <summary>地面与四面墙。</summary>
         private static void CreateRoom()
         {
@@ -280,109 +232,5 @@ namespace RaidDemo.Bootstrap.Editor
             CreateWall("Wall_North", 0f, halfZ, RoomWidth, true, room, wallColor);
         }
 
-        /// <summary>设施：仓库（西）、商人（中）、出口（东）沿北墙排开，测试箱在仓库前方。</summary>
-        private static void CreateFacilities()
-        {
-            var root = new GameObject("Facilities").transform;
-
-            CreateStashBox(root, new Vector3(-8f, 0f, 5f));
-            CreateMerchantStall(root, new Vector3(-2f, 0f, 5f));
-            CreateExitGate(root, new Vector3(5f, 0f, 5f));
-            CreateDebugCrate(root, new Vector3(-8f, 0f, 1.5f));
-        }
-
-        /// <summary>
-        /// 开发期测试箱：固定产出武器、护甲、头盔、背包，摆在仓库前方。
-        /// </summary>
-        /// <remarks>品红色是刻意的：它必须一眼就能与任何正式物件区分开。交付前删除。</remarks>
-        private static void CreateDebugCrate(Transform parent, Vector3 position)
-        {
-            var host = new GameObject("Facility_DebugCrate");
-            host.transform.SetParent(parent, worldPositionStays: false);
-            host.transform.position = position;
-
-            var box = CreateBox(
-                "TestCrate",
-                position + new Vector3(0f, 0.6f, 0f),
-                new Vector3(1.6f, 1.2f, 1.2f),
-                host.transform);
-            SetColor(box, new Color(0.85f, 0.25f, 0.85f));
-
-            AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.DebugCrate, "测试箱", position);
-        }
-
-        /// <summary>仓库箱：一个带交互标记的箱子。</summary>
-        private static void CreateStashBox(Transform parent, Vector3 position)
-        {
-            var host = new GameObject("Facility_Stash");
-            host.transform.SetParent(parent, worldPositionStays: false);
-            // 先把宿主摆到设施位置，**再**创建子物体：子物体是按世界坐标造的，
-            // 若之后再挪宿主，子物体会被跟着推一次——表现为「设施被推到房间外面」，
-            // 而交互标记位置正确、提示照常出现，很难看出是哪一步错了。
-            host.transform.position = position;
-
-            var box = CreateBox(
-                "StashBox",
-                position + new Vector3(0f, 0.7f, 0f),
-                new Vector3(2f, 1.4f, 1.2f),
-                host.transform);
-            SetColor(box, new Color(0.30f, 0.42f, 0.34f));
-
-            AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.Stash, "仓库", position);
-        }
-
-        /// <summary>商人摊位：一张柜台 + 一个「人」的占位块。</summary>
-        private static void CreateMerchantStall(Transform parent, Vector3 position)
-        {
-            var host = new GameObject("Facility_Merchant");
-            host.transform.SetParent(parent, worldPositionStays: false);
-            host.transform.position = position;
-
-            var counter = CreateBox(
-                "Counter",
-                position + new Vector3(0f, 0.55f, 0f),
-                new Vector3(2.4f, 1.1f, 1f),
-                host.transform);
-            SetColor(counter, new Color(0.52f, 0.42f, 0.28f));
-
-            var keeper = CreateBox(
-                "Keeper",
-                position + new Vector3(0f, 1.7f, -0.8f),
-                new Vector3(0.6f, 1.8f, 0.6f),
-                host.transform);
-            SetColor(keeper, new Color(0.85f, 0.72f, 0.2f));
-
-            AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.Merchant, "商人", position);
-        }
-
-        /// <summary>出口：一道门框，走近选地图。</summary>
-        private static void CreateExitGate(Transform parent, Vector3 position)
-        {
-            var host = new GameObject("Facility_Exit");
-            host.transform.SetParent(parent, worldPositionStays: false);
-            host.transform.position = position;
-
-            var pad = CreateBox(
-                "Pad",
-                position + new Vector3(0f, 0.03f, 0f),
-                new Vector3(3f, 0.06f, 3f),
-                host.transform);
-            SetColor(pad, new Color(0.18f, 0.62f, 0.38f));
-
-            var left = CreateBox(
-                "Post_L",
-                position + new Vector3(-1.5f, 1.4f, 0f),
-                new Vector3(0.25f, 2.8f, 0.25f),
-                host.transform);
-            var right = CreateBox(
-                "Post_R",
-                position + new Vector3(1.5f, 1.4f, 0f),
-                new Vector3(0.25f, 2.8f, 0.25f),
-                host.transform);
-            SetColor(left, new Color(0.16f, 0.18f, 0.20f));
-            SetColor(right, new Color(0.16f, 0.18f, 0.20f));
-
-            AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.Exit, "出口", position);
-        }
     }
 }

@@ -320,8 +320,8 @@ namespace RaidDemo.UI
         /// <summary>显示或隐藏整个界面。</summary>
         private void SetVisible(bool visible)
         {
+            var changed = m_IsOpen != visible;
             m_IsOpen = visible;
-
             // 开关作用在屏幕根上：遮罩与面板一起显隐。
             // 只切面板会让遮罩留在屏幕上，把关掉界面之后的游戏画面持续压暗。
             var target = m_ScreenRoot != null ? m_ScreenRoot : m_Root;
@@ -329,9 +329,11 @@ namespace RaidDemo.UI
             {
                 target.SetActive(visible);
             }
-
+            if (changed)
+            {
+                UiAudio.Play(visible ? UiCue.PanelOpen : UiCue.PanelClose);
+            }
             // 打开界面时**如果什么容器都没指定**，就默认显示仓库（出击准备）。
-            //
             // 条件必须是"当前没有打开任何容器"而不是"当前不是仓库"：
             // 后者会把刚被显式打开的容器顶掉——在安全屋里按 E 开测试箱，
             // 面板会立刻被替换成仓库，看起来就像"按 E 只会开仓库"。
@@ -341,14 +343,12 @@ namespace RaidDemo.UI
             {
                 OpenStash(m_PrepStashContainerId);
             }
-
             m_SetCursorLock?.Invoke(!visible);
 
             if (!visible)
             {
                 CancelDrag();
                 CloseContextMenu();
-
                 // 关闭界面即结束这次搜刮：战利品面板随之销毁，
                 // 想再搬东西就得重新走到箱子前读条。这样"开箱成本"对每次搜刮都成立，
                 // 而不是开一次之后就能无限次免费取用。

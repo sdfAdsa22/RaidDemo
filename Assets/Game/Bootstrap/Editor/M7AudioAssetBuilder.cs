@@ -63,6 +63,12 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>提示音归一化峰值。</summary>
         private const float CuePeak = 0.78f;
 
+        /// <summary>界面音效保留时长（秒）：短促，不能拖到下一次点击之后。</summary>
+        private const float UiSeconds = 0.4f;
+
+        /// <summary>界面音效归一化峰值：比战斗音效低，避免连续点击时吵闹。</summary>
+        private const float UiPeak = 0.6f;
+
         /// <summary>菜单入口。</summary>
         [MenuItem("RaidDemo/M7/重建音效资产与音效目录")]
         public static void BuildFromMenu()
@@ -154,6 +160,25 @@ namespace RaidDemo.Bootstrap.Editor
             var fail = BakeOne(summary, "战局失败", CueSeconds, CuePeak,
                 InterfaceRoot, "error_004.ogg", "Raid/Fail");
 
+            // 界面音效与战斗音效刻意分组：它们只在菜单/背包里响，
+            // 与枪声、脚步不在同一混音层级；音量也更低，连续点击不会盖住游戏内信息。
+            var uiClick = BakeOne(summary, "按钮点击", UiSeconds, UiPeak,
+                InterfaceRoot, "click_001.ogg", "UI/Click");
+            var uiPanelOpen = BakeOne(summary, "面板打开", UiSeconds, UiPeak,
+                InterfaceRoot, "open_001.ogg", "UI/PanelOpen");
+            var uiPanelClose = BakeOne(summary, "面板关闭", UiSeconds, UiPeak,
+                InterfaceRoot, "minimize_001.ogg", "UI/PanelClose");
+            var uiTabSwitch = BakeOne(summary, "页签切换", UiSeconds, UiPeak,
+                InterfaceRoot, "switch_001.ogg", "UI/TabSwitch");
+            var uiConfirm = BakeOne(summary, "确认操作", UiSeconds, UiPeak,
+                InterfaceRoot, "confirmation_001.ogg", "UI/Confirm");
+            var uiCancel = BakeOne(summary, "取消返回", UiSeconds, UiPeak,
+                InterfaceRoot, "back_001.ogg", "UI/Cancel");
+            var uiLocked = BakeOne(summary, "未开放提示", UiSeconds, UiPeak,
+                InterfaceRoot, "error_001.ogg", "UI/Locked");
+            var uiBuy = BakeOne(summary, "购买成功", UiSeconds, UiPeak,
+                InterfaceRoot, "select_001.ogg", "UI/Buy");
+
             var catalog = LoadOrCreateCatalog();
             var serialized = new SerializedObject(catalog);
             SetArray(serialized, "m_RifleShots", rifle);
@@ -173,6 +198,14 @@ namespace RaidDemo.Bootstrap.Editor
             SetClip(serialized, "m_ExtractionTick", extractionTick);
             SetClip(serialized, "m_RaidSuccess", success);
             SetClip(serialized, "m_RaidFail", fail);
+            SetClip(serialized, "m_UiClick", uiClick);
+            SetClip(serialized, "m_UiPanelOpen", uiPanelOpen);
+            SetClip(serialized, "m_UiPanelClose", uiPanelClose);
+            SetClip(serialized, "m_UiTabSwitch", uiTabSwitch);
+            SetClip(serialized, "m_UiConfirm", uiConfirm);
+            SetClip(serialized, "m_UiCancel", uiCancel);
+            SetClip(serialized, "m_UiLocked", uiLocked);
+            SetClip(serialized, "m_UiBuy", uiBuy);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(catalog);
 

@@ -26,6 +26,10 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>物品目录资产的路径。</summary>
         private const string CatalogPath = ItemFolder + "/ItemCatalog.asset";
 
+        /// <summary>正式采用的 Kenney Game Icons 图标目录（CC0）。</summary>
+        private const string IconFolder =
+            "Assets/Game/Content/External/Kenney/GameIcons";
+
         /// <summary>一条物品定义的数据。</summary>
         private readonly struct ItemSpec
         {
@@ -135,6 +139,7 @@ namespace RaidDemo.Bootstrap.Editor
         public static void Build()
         {
             EnsureFolder();
+            EnsureIconImports();
 
             var definitions = new List<ItemDefinition>(s_Specs.Length);
             for (var i = 0; i < s_Specs.Length; i++)
@@ -142,6 +147,7 @@ namespace RaidDemo.Bootstrap.Editor
                 var definition = CreateOrUpdate(s_Specs[i]);
                 AttachCombatStats(definition);
                 AttachMedicalBehavior(definition);
+                AttachCategoryIcon(definition);
                 definitions.Add(definition);
             }
 
@@ -217,6 +223,90 @@ namespace RaidDemo.Bootstrap.Editor
             serialized.FindProperty("m_Behavior").objectReferenceValue = behavior;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(definition);
+        }
+
+        /// <summary>
+        /// 按分类给物品写一张共用图标。
+        /// </summary>
+        /// <remarks>
+        /// <para>五类图标是刻意的粗粒度：武器/弹药/医疗/贵重/任务。逐件配图需要 13 张以上的
+        /// 独立素材，而当前 Kenney Game Icons 里并没有对应的枪械、弹药、药品写实图标；
+        /// 先用语义接近的符号保证“不同类别一眼能分开”，以后再逐件替换不会影响规则层。</para>
+        /// <para>装备类（武器、头盔、护甲、背包）统一用武器图标，表示“可穿戴装备”；
+        /// 钥匙属于任务道具，用任务图标。找不到 PNG 时留空，UI 会退回文字显示。</para>
+        /// </remarks>
+        private static void AttachCategoryIcon(ItemDefinition definition)
+        {
+            var fileName = ResolveIconFileName(definition.Category);
+            var icon = fileName != null
+                ? AssetDatabase.LoadAssetAtPath<Sprite>($"{IconFolder}/{fileName}")
+                : null;
+
+            var serialized = new SerializedObject(definition);
+            var property = serialized.FindProperty("m_Icon");
+            property.objectReferenceValue = icon;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(definition);
+        }
+
+        /// <summary>
+        /// 把五张共用图标导入成 Sprite。
+        /// </summary>
+        /// <remarks>
+        /// Kenney 的 PNG 默认会按普通贴图导入，直接 LoadAssetAtPath&lt;Sprite&gt; 会返回 null。
+        /// 这里在构建物品资产之前统一改一次导入设置；Point 过滤保证小尺寸图标不被磨糊，
+        /// 不压缩则避免 64×64 线稿被 DXT 压出噪点。
+        /// </remarks>
+        private static void EnsureIconImports()
+        {
+            var fileNames = new[]
+            {
+                "icon_weapon.png",
+                "icon_ammo.png",
+                "icon_medical.png",
+                "icon_valuable.png",
+                "icon_quest.png",
+            };
+
+            for (var i = 0; i < fileNames.Length; i++)
+            {
+                var path = $"{IconFolder}/{fileNames[i]}";
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null || importer.textureType == TextureImporterType.Sprite)
+                {
+                    continue;
+                }
+
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.filterMode = FilterMode.Point;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.alphaIsTransparency = true;
+                importer.SaveAndReimport();
+            }
+        }
+
+        /// <summary>分类到图标文件名的映射。</summary>
+        private static string ResolveIconFileName(ItemCategory category)
+        {
+            switch (category)
+            {
+                case ItemCategory.Weapon:
+                case ItemCategory.Helmet:
+                case ItemCategory.BodyArmor:
+                case ItemCategory.Backpack:
+                    return "icon_weapon.png";
+                case ItemCategory.Ammo:
+                    return "icon_ammo.png";
+                case ItemCategory.Medical:
+                    return "icon_medical.png";
+                case ItemCategory.Loot:
+                    return "icon_valuable.png";
+                case ItemCategory.Key:
+                    return "icon_quest.png";
+                default:
+                    return null;
+            }
         }
 
         /// <summary>按数据表创建或更新一条物品定义。</summary>

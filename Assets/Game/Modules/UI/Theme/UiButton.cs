@@ -18,8 +18,8 @@ namespace RaidDemo.UI
     /// 简易按钮：矩形 + 九宫格底色 + 文字，由所属界面每帧轮询鼠标状态。
     /// </summary>
     /// <remarks>
-    /// <para>与工程既有的 <c>RaidButtonWidget</c> 一样，它不是 MonoBehaviour，
-    /// 也**不使用 Unity 的 Button 与 EventSystem**：整个项目至今没有事件系统，
+    /// <para>它不是 MonoBehaviour，也**不使用 Unity 的 Button 与 EventSystem**：
+    /// 整个项目至今没有事件系统，
     /// 背包拖拽与按钮点击都是轮询鼠标。为一个按钮引入第二套输入通路，
     /// 最容易产生的就是"按钮点不动"这类只有实机才能发现的问题。</para>
     ///
@@ -120,7 +120,15 @@ namespace RaidDemo.UI
         /// <param name="pressed">鼠标左键是否正按在这个按钮上。</param>
         public void ApplyVisual(bool pressed)
         {
+            var wasPressed = m_Pressed;
             m_Pressed = pressed && m_Hovered;
+
+            // 只在"从松开变成按下"的那一帧发声。调用方每帧都会把当前鼠标状态传进来，
+            // 直接 if (m_Pressed) 会让一次按住变成连续几十次点击音。
+            if (m_Pressed && !wasPressed && Interactable)
+            {
+                UiAudio.Play(UiCue.Click);
+            }
 
             Rect.anchoredPosition = m_BasePosition + new Vector2(0f, m_Hovered && !m_Pressed ? HoverLift : 0f);
             m_Background.sprite = m_Pressed ? m_PressedSprite : m_NormalSprite;

@@ -251,10 +251,12 @@ namespace RaidDemo.UI
                 ShowStatus($"已出售 {refs.Length} 件物品，获得 {total:N0} 金币。", true);
                 // 批量出售成功后退出出售模式，避免连续误卖。
                 ExitSellMode();
+                UiAudio.Play(UiCue.Confirm);
             }
             else
             {
                 ShowStatus(result.Message, false);
+                UiAudio.Play(UiCue.Locked);
             }
         }
 

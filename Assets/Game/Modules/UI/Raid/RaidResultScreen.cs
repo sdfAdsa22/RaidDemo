@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using RaidDemo.Raid;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 namespace RaidDemo.UI
 {
@@ -13,43 +13,33 @@ namespace RaidDemo.UI
     /// <remarks>
     /// <para><b>结算的重点是收支对比，而不是物品清单。</b>清单只回答「我拿了什么」，
     /// 而玩家真正要做的判断是「为了这些东西冒的险值不值」。
-    /// 因此界面上「带入」与「带出」两个数字并列显示，且用颜色表达盈亏。</para>
+    /// 因此界面上「带入」与「带出 / 损失」两个数字并列显示，且用颜色表达盈亏。</para>
     ///
     /// <para>阵亡与超时都会如实列出损失价值。M5 阶段这些损失并不会真正扣除物品
     /// （仓库要等 M6），界面里会写明这一点，避免把「暂时不做」伪装成「已经做了」。</para>
+    ///
+    /// <para><b>M7 批次 4 换皮：</b>从 <c>RaidScreenFactory</c>（纯色方板 + 旧版 Text）
+    /// 迁到 <c>UiFactory</c>。排版集中在 <c>RaidResultScreen.Layout.cs</c>，
+    /// 本文件只保留"数据怎么变成界面上的字与颜色"这一半，两部分各自都读得完。</para>
     /// </remarks>
     [DisallowMultipleComponent]
-    public sealed class RaidResultScreen : MonoBehaviour
+    public sealed partial class RaidResultScreen : MonoBehaviour
     {
+        /// <summary>清单最多显示的行数。</summary>
         private const int MaxItemRows = 9;
 
-        private static readonly Color OverlayColor = new Color(0.04f, 0.05f, 0.07f, 0.90f);
-        private static readonly Color PanelColor = new Color(0.10f, 0.11f, 0.13f, 0.98f);
-        private static readonly Color TitleColor = new Color(0.96f, 0.94f, 0.88f);
-        private static readonly Color BodyColor = new Color(0.82f, 0.83f, 0.87f);
-        private static readonly Color HintColor = new Color(0.60f, 0.61f, 0.66f);
-        private static readonly Color ProfitColor = new Color(0.36f, 0.85f, 0.52f);
-        private static readonly Color LossColor = new Color(0.95f, 0.42f, 0.36f);
-        private static readonly Color SuccessColor = new Color(0.36f, 0.85f, 0.52f);
-        private static readonly Color FailureColor = new Color(0.95f, 0.35f, 0.30f);
-        private static readonly Color TimeoutColor = new Color(0.95f, 0.72f, 0.30f);
-        private static readonly Color ButtonColor = new Color(0.18f, 0.46f, 0.80f);
-        private static readonly Color ButtonHoverColor = new Color(0.26f, 0.58f, 0.94f);
-        private static readonly Color SecondaryButtonColor = new Color(0.24f, 0.25f, 0.28f);
-        private static readonly Color SecondaryHoverColor = new Color(0.32f, 0.33f, 0.37f);
-
-        private readonly List<Text> m_ItemRows = new List<Text>(MaxItemRows);
+        private readonly List<ResultRow> m_ItemRows = new List<ResultRow>(MaxItemRows);
 
         private RectTransform m_Root;
-        private Text m_TitleLabel;
-        private Text m_SummaryLabel;
-        private Text m_BroughtLabel;
-        private Text m_ExtractedLabel;
-        private Text m_ListHeaderLabel;
-        private Text m_ListFooterLabel;
-        private Text m_QuestLabel;
-        private Text m_NoteLabel;
-        private RaidButtonWidget m_MenuButton;
+        private TextMeshProUGUI m_TitleLabel;
+        private TextMeshProUGUI m_SummaryLabel;
+        private TextMeshProUGUI m_BroughtLabel;
+        private TextMeshProUGUI m_ExtractedLabel;
+        private TextMeshProUGUI m_ListHeaderLabel;
+        private TextMeshProUGUI m_ListFooterLabel;
+        private TextMeshProUGUI m_QuestLabel;
+        private TextMeshProUGUI m_NoteLabel;
+        private UiButton m_MenuButton;
         private Action m_OnReturnToMenu;
         private bool m_IsVisible;
 
@@ -58,63 +48,7 @@ namespace RaidDemo.UI
         public void Initialize(Action onReturnToMenu)
         {
             m_OnReturnToMenu = onReturnToMenu;
-
-            m_Root = RaidScreenFactory.CreateCanvas(transform, "RaidResultCanvas", 310);
-            RaidScreenFactory.CreatePanel(
-                m_Root,
-                "Overlay",
-                new Vector2(RaidScreenFactory.ReferenceWidth, RaidScreenFactory.ReferenceHeight),
-                OverlayColor);
-
-            var panel = RaidScreenFactory.CreatePanel(m_Root, "Panel", new Vector2(900f, 680f), PanelColor);
-
-            m_TitleLabel = RaidScreenFactory.CreateLabel(
-                panel, "战局结束", new Vector2(48f, 32f), new Vector2(800f, 52f),
-                42, TextAnchor.MiddleLeft, TitleColor);
-
-            m_SummaryLabel = RaidScreenFactory.CreateLabel(
-                panel, string.Empty, new Vector2(48f, 100f), new Vector2(800f, 30f),
-                19, TextAnchor.MiddleLeft, BodyColor);
-
-            m_BroughtLabel = RaidScreenFactory.CreateLabel(
-                panel, string.Empty, new Vector2(48f, 148f), new Vector2(380f, 40f),
-                26, TextAnchor.MiddleLeft, HintColor);
-
-            m_ExtractedLabel = RaidScreenFactory.CreateLabel(
-                panel, string.Empty, new Vector2(440f, 148f), new Vector2(420f, 40f),
-                26, TextAnchor.MiddleLeft, ProfitColor);
-
-            m_ListHeaderLabel = RaidScreenFactory.CreateLabel(
-                panel, "带出的物品", new Vector2(48f, 216f), new Vector2(800f, 26f),
-                17, TextAnchor.MiddleLeft, HintColor);
-
-            for (var i = 0; i < MaxItemRows; i++)
-            {
-                var row = RaidScreenFactory.CreateLabel(
-                    panel, string.Empty, new Vector2(48f, 250f + (i * 26f)), new Vector2(800f, 24f),
-                    17, TextAnchor.MiddleLeft, BodyColor);
-                m_ItemRows.Add(row);
-            }
-
-            m_ListFooterLabel = RaidScreenFactory.CreateLabel(
-                panel, string.Empty, new Vector2(48f, 250f + (MaxItemRows * 26f)), new Vector2(800f, 24f),
-                16, TextAnchor.MiddleLeft, HintColor);
-
-            m_QuestLabel = RaidScreenFactory.CreateLabel(
-                panel, string.Empty, new Vector2(48f, 506f), new Vector2(800f, 26f),
-                16, TextAnchor.MiddleLeft, ProfitColor);
-
-            m_NoteLabel = RaidScreenFactory.CreateLabel(
-                panel, string.Empty, new Vector2(48f, 540f), new Vector2(800f, 26f),
-                15, TextAnchor.MiddleLeft, HintColor);
-
-            // 结算后只有一条去处：回安全屋整理与再接任务。
-            // 保留单一按钮而不是"再来一局 / 返回安全屋"两条路，避免玩家在结算界面
-            // 直接跳过局外准备，也避免两个按钮在视觉上争夺主次。
-            m_MenuButton = RaidScreenFactory.CreateButton(
-                panel, "返回安全屋（Esc）", new Vector2(290f, 588f), new Vector2(320f, 58f),
-                SecondaryButtonColor, SecondaryHoverColor);
-
+            BuildLayout();
             SetVisible(false);
         }
 
@@ -129,6 +63,8 @@ namespace RaidDemo.UI
         }
 
         /// <summary>用一份战局结算数据刷新界面。</summary>
+        /// <param name="result">结算数据。</param>
+        /// <param name="questSummary">任务进度摘要；为空时隐藏该行。</param>
         public void Show(RaidResult result, string questSummary = null)
         {
             if (result == null)
@@ -138,18 +74,22 @@ namespace RaidDemo.UI
 
             m_TitleLabel.text = ResolveOutcomeTitle(result.Outcome);
             m_TitleLabel.color = ResolveOutcomeColor(result.Outcome);
-            m_SummaryLabel.text =
-                $"存活 {FormatDuration(result.ElapsedSeconds)}   ｜   击杀 {result.Kills}";
+            m_SummaryLabel.text = $"存活 {FormatDuration(result.ElapsedSeconds)}   ｜   击杀 {result.Kills}";
 
             m_BroughtLabel.text = $"带入 {result.BroughtInValue:N0}";
+
+            // 阵亡与超时看的是「损失」，撤离看的是「带出 + 盈亏」：
+            // 同一个位置回答两个问题，比再加一行数字更清楚。
             var profit = result.ExtractedValue - result.BroughtInValue;
             var failed = result.Outcome != RaidOutcome.Extracted;
             m_ExtractedLabel.text = failed
                 ? $"损失 {result.LostValue:N0}"
                 : $"带出 {result.ExtractedValue:N0}（{(profit >= 0 ? "+" : string.Empty)}{profit:N0}）";
             m_ExtractedLabel.color = failed
-                ? LossColor
-                : profit >= 0 ? ProfitColor : TimeoutColor;
+                ? UiPalette.Bad
+                : profit >= 0
+                    ? UiPalette.Ok
+                    : UiPalette.Warn;
 
             var items = failed ? result.LostItems : result.ExtractedItems;
             m_ListHeaderLabel.text = failed ? "损失清单" : "带出的物品";
@@ -167,6 +107,10 @@ namespace RaidDemo.UI
         }
 
         /// <summary>把物品清单写进固定的行里。</summary>
+        /// <remarks>
+        /// 行对象在构建时一次性建好（行数固定为 <see cref="MaxItemRows"/>），每次结算只改文字与图标。
+        /// 每局的清单长度不同，但重建行会让结算界面在打开的瞬间抖一下——那一帧正好是玩家最注意画面的时候。
+        /// </remarks>
         private void FillItemRows(IReadOnlyList<RaidResultEntry> items)
         {
             var count = items != null ? items.Count : 0;
@@ -175,18 +119,39 @@ namespace RaidDemo.UI
                 var row = m_ItemRows[i];
                 if (items == null || i >= count)
                 {
-                    row.text = string.Empty;
+                    row.Root.SetActive(false);
                     continue;
                 }
 
                 var entry = items[i];
-                var amount = entry.Count > 1 ? $" x{entry.Count}" : string.Empty;
-                row.text = $"{entry.DisplayName}{amount}   单价 {entry.UnitValue:N0}   合计 {entry.TotalValue:N0}";
+                row.Root.SetActive(true);
+                row.Name.text = entry.DisplayName;
+                row.Count.text = entry.Count > 1 ? $"x{entry.Count}" : string.Empty;
+                row.Unit.text = $"单价 {entry.UnitValue:N0}";
+                row.Total.text = $"合计 {entry.TotalValue:N0}";
+
+                // 有图标就画图标，没有就退回「稀有度色小方块」。
+                // 图标按类别共用（武器 / 弹药 / 医疗 / 贵重 / 任务），
+                // 因此这里只保证"一眼能分辨类别"，具体是不是某一把枪仍然靠名字。
+                var icon = entry.Icon;
+                var hasIcon = icon != null;
+                row.Icon.gameObject.SetActive(hasIcon);
+                row.Chip.gameObject.SetActive(!hasIcon);
+                if (hasIcon)
+                {
+                    row.Icon.sprite = icon;
+                }
+                else
+                {
+                    row.Chip.color = UiPalette.ItemOutline(entry.Rarity);
+                }
             }
 
             m_ListFooterLabel.text = count > MaxItemRows
                 ? $"…还有 {count - MaxItemRows} 件未显示"
-                : count == 0 ? "（没有带走任何东西）" : string.Empty;
+                : count == 0
+                    ? "（没有带走任何东西）"
+                    : string.Empty;
         }
 
         /// <summary>把秒数格式化成 分:秒。</summary>
@@ -212,23 +177,32 @@ namespace RaidDemo.UI
             }
         }
 
-        /// <summary>结果标题对应的颜色。</summary>
+        /// <summary>
+        /// 结果标题对应的颜色。
+        /// </summary>
+        /// <remarks>用主题层的三个状态色，而不是本文件自带的颜色常量：
+        /// 撤离成功必须是"全游戏通用的那个绿"，阵亡也必须是"全游戏通用的那个红"，
+        /// 否则结算界面的绿和血条旁的绿会是两个不同的绿。</remarks>
         private static Color ResolveOutcomeColor(RaidOutcome outcome)
         {
             switch (outcome)
             {
                 case RaidOutcome.Extracted:
-                    return SuccessColor;
+                    return UiPalette.Ok;
                 case RaidOutcome.Killed:
-                    return FailureColor;
+                    return UiPalette.Bad;
                 case RaidOutcome.TimeExpired:
-                    return TimeoutColor;
+                    return UiPalette.Warn;
                 default:
-                    return TitleColor;
+                    return UiPalette.Ink;
             }
         }
 
-        /// <summary>轮询两个按钮与快捷键。</summary>
+        /// <summary>轮询唯一按钮与 Esc。</summary>
+        /// <remarks>
+        /// 结算之后只有一条去处（回安全屋），因此这里没有"最后点过哪个按钮"的状态：
+        /// Esc 与点击走同一个回调，玩家按哪个键都只会发生一件事。
+        /// </remarks>
         private void Update()
         {
             if (!m_IsVisible)
@@ -243,21 +217,13 @@ namespace RaidDemo.UI
                 return;
             }
 
-            if (Mouse.current == null)
-            {
-                return;
-            }
-
-            var pointer = Mouse.current.position.ReadValue();
-            var overMenu = m_MenuButton.Contains(pointer);
+            var mouse = Mouse.current;
+            var pointer = mouse != null ? mouse.position.ReadValue() : Vector2.zero;
+            var overMenu = mouse != null && m_MenuButton.Contains(pointer);
             m_MenuButton.SetHovered(overMenu);
+            m_MenuButton.ApplyVisual(overMenu && mouse != null && mouse.leftButton.isPressed);
 
-            if (!Mouse.current.leftButton.wasPressedThisFrame)
-            {
-                return;
-            }
-
-            if (overMenu)
+            if (mouse != null && mouse.leftButton.wasPressedThisFrame && overMenu)
             {
                 m_OnReturnToMenu?.Invoke();
             }

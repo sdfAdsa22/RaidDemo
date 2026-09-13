@@ -86,6 +86,7 @@ namespace RaidDemo.Bootstrap.Editor
                 AssetDatabase.LoadAssetAtPath<Sprite>(CrosshairFolder + "/Crosshair_Normal.png"));
             SetReference(serialized, "m_CrosshairReloadSprite",
                 AssetDatabase.LoadAssetAtPath<Sprite>(CrosshairFolder + "/Crosshair_Reload.png"));
+            SetPlayerCharacters(serialized);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(catalog);
 
@@ -137,6 +138,35 @@ namespace RaidDemo.Bootstrap.Editor
             }
 
             property.objectReferenceValue = value;
+        }
+
+        /// <summary>
+        /// 把 12 个玩家角色预制体写进表现层目录。
+        /// </summary>
+        /// <remarks>
+        /// 角色预制体由 <see cref="PlayerCharacterBuilder"/> 生成；目录只保存 id、显示名与引用。
+        /// 这样运行时不需要按名字猜资源路径，也不会把角色列表复制到多个场景。
+        /// </remarks>
+        private static void SetPlayerCharacters(SerializedObject serialized)
+        {
+            var property = serialized.FindProperty("m_PlayerCharacters");
+            if (property == null)
+            {
+                Debug.LogWarning("[RaidDemo] 表现层目录缺少 m_PlayerCharacters 字段，角色选择列表会为空。");
+                return;
+            }
+
+            var options = PlayerCharacterBuilder.CharacterOptions;
+            property.arraySize = options.Count;
+            for (var i = 0; i < options.Count; i++)
+            {
+                var option = options[i];
+                var element = property.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("m_Id").stringValue = option.Id;
+                element.FindPropertyRelative("m_DisplayName").stringValue = option.DisplayName;
+                element.FindPropertyRelative("m_Prefab").objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<GameObject>(option.PrefabPath);
+            }
         }
     }
 }

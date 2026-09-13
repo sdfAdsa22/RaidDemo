@@ -33,6 +33,9 @@ namespace RaidDemo.Presentation
             /// </summary>
             /// <remarks>交付前连同 <c>crate.debug</c> 定义一起删除。</remarks>
             DebugCrate = 4,
+
+            /// <summary>更衣镜：打开角色选择界面。</summary>
+            Wardrobe = 5,
         }
 
         /// <summary>设施类型。</summary>

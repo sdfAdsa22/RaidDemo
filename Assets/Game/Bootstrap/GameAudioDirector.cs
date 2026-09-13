@@ -5,6 +5,7 @@ using RaidDemo.Inventory;
 using RaidDemo.Kernel;
 using RaidDemo.Presentation;
 using RaidDemo.Raid;
+using RaidDemo.UI;
 using UnityEngine;
 
 namespace RaidDemo.Bootstrap
@@ -21,7 +22,7 @@ namespace RaidDemo.Bootstrap
     /// 因此它走空间音效、按距离衰减，并且所有射手共用一条链路。</para>
     /// </remarks>
     [DisallowMultipleComponent]
-    public sealed class GameAudioDirector : MonoBehaviour
+    public sealed class GameAudioDirector : MonoBehaviour, IUiAudioSink
     {
         /// <summary>本地玩家开枪的音量。</summary>
         private const float LocalShotVolume = 0.85f;
@@ -85,6 +86,7 @@ namespace RaidDemo.Bootstrap
             m_Audio = audio;
             m_Player = player;
             m_LocalPlayerId = localPlayerId;
+            UiAudio.SetSink(this);
 
             DisposeSubscriptions();
             if (eventBus == null)
@@ -119,7 +121,52 @@ namespace RaidDemo.Bootstrap
 
         private void OnDestroy()
         {
+            UiAudio.ClearSink(this);
             DisposeSubscriptions();
+        }
+
+        /// <summary>
+        /// 播放界面音效。
+        /// </summary>
+        /// <remarks>
+        /// 界面模块只发语义事件（点击、开面板、锁定提示），由这里决定具体剪辑与音量。
+        /// 这样换界面音效只需要改 <c>AudioCatalog</c> 与构建器，不必回头修改几十个界面类。
+        /// </remarks>
+        public void PlayUiCue(UiCue cue)
+        {
+            var catalog = m_Audio != null ? m_Audio.Catalog : null;
+            if (catalog == null)
+            {
+                return;
+            }
+
+            switch (cue)
+            {
+                case UiCue.Click:
+                    PlayFlatCue(catalog.UiClick, 0.5f);
+                    break;
+                case UiCue.PanelOpen:
+                    PlayFlatCue(catalog.UiPanelOpen, 0.5f);
+                    break;
+                case UiCue.PanelClose:
+                    PlayFlatCue(catalog.UiPanelClose, 0.45f);
+                    break;
+                case UiCue.TabSwitch:
+                    PlayFlatCue(catalog.UiTabSwitch, 0.5f);
+                    break;
+                case UiCue.Confirm:
+                    PlayFlatCue(catalog.UiConfirm, 0.62f);
+                    break;
+                case UiCue.Cancel:
+                    PlayFlatCue(catalog.UiCancel, 0.5f);
+                    break;
+                case UiCue.Locked:
+                    PlayFlatCue(catalog.UiLocked, 0.55f);
+                    break;
+                case UiCue.Buy:
+                    PlayFlatCue(catalog.UiBuy, 0.6f);
+                    break;
+            }
         }
 
         private void DisposeSubscriptions()

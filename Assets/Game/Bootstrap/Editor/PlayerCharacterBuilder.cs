@@ -17,10 +17,11 @@ namespace RaidDemo.Bootstrap.Editor
     /// 因此 Animator 必须挂在**模型实例**上（它的子节点就叫 root），而不是外层容器上；
     /// 外层容器只负责摆放与缩放。这条约束如果搞错，表现是"模型完全不动"。</para>
     /// </remarks>
-    public static class PlayerCharacterBuilder
+    public static partial class PlayerCharacterBuilder
     {
-        /// <summary>角色模型（已提升为正式素材，CC0）。</summary>
-        private const string ModelPath = "Assets/Game/Content/External/Kenney/MiniCharacters/character-male-a.fbx";
+        /// <summary>默认角色模型（已提升为正式素材，CC0）。</summary>
+        private const string DefaultModelPath =
+            "Assets/Game/Content/External/Kenney/MiniCharacters/character-male-a.fbx";
 
         /// <summary>调色板贴图：Kenney 角色用一张 8×8 色板 + UV 映射上色。</summary>
         private const string PalettePath = "Assets/Game/Content/External/Kenney/MiniCharacters/colormap.png";
@@ -59,11 +60,21 @@ namespace RaidDemo.Bootstrap.Editor
             Directory.CreateDirectory(ArtFolder);
             AssetDatabase.Refresh();
 
-            var loopSettingsChanged = EnsureLoopingClips();
-            var controllerPath = BuildController();
-            var prefabPath = BuildPrefab(controllerPath);
+            // 所有角色共用 male-a 的动画控制器：Kenney Mini Characters 的 12 个角色是同一套骨架，
+            // 剪辑按骨骼路径驱动，因此换模型不需要复制 12 份控制器与 384 段剪辑引用。
+            var loopSettingsChanged = EnsureLoopingClips(DefaultModelPath);
+            var controllerPath = BuildController(DefaultModelPath);
+
+            var prefabPaths = new List<string>(CharacterOptions.Count);
+            for (var i = 0; i < CharacterOptions.Count; i++)
+            {
+                var option = CharacterOptions[i];
+                prefabPaths.Add(BuildPrefab(controllerPath, option.ModelPath, option.PrefabPath));
+            }
+
             var loopNote = loopSettingsChanged ? "（循环设置已校准）" : string.Empty;
-            return $"controller={controllerPath}{loopNote}\nprefab={prefabPath}";
+            return $"controller={controllerPath}{loopNote}\n"
+                   + $"prefabs={prefabPaths.Count}\n  " + string.Join("\n  ", prefabPaths);
         }
 
         /// <summary>
@@ -74,9 +85,9 @@ namespace RaidDemo.Bootstrap.Editor
         /// 看起来就是"走两步之后开始滑步"。一次性动作（射击、倒地、拾取）必须保持不循环。
         /// </remarks>
         /// <returns>导入设置发生变化时为 <c>true</c>。</returns>
-        private static bool EnsureLoopingClips()
+        private static bool EnsureLoopingClips(string modelPath)
         {
-            return CharacterAnimationLoopTool.ApplyLoopTable(ModelPath, LoopingClips);
+            return CharacterAnimationLoopTool.ApplyLoopTable(modelPath, LoopingClips);
         }
 
         /// <summary>创建动画控制器：Idle / ArmedIdle / Walk / Sprint / Shoot / Die。</summary>
@@ -87,7 +98,7 @@ namespace RaidDemo.Bootstrap.Editor
         /// 症状是"系统认为你在跑（掉体力、噪音按奔跑算），画面上还在走"。
         /// 现在动画与脚步都直接使用模拟层给出的 <c>IsSprinting</c>，全工程只剩一个判定点。</para>
         /// </remarks>
-        private static string BuildController()
+        private static string BuildController(string modelPath)
         {
             var path = ArtFolder + "/PlayerCharacter.controller";
             AssetDatabase.DeleteAsset(path);
@@ -100,21 +111,21 @@ namespace RaidDemo.Bootstrap.Editor
             controller.AddParameter("Die", AnimatorControllerParameterType.Trigger);
 
             var machine = controller.layers[0].stateMachine;
-            var idle = AddState(machine, "Idle", "idle");
-            var armedIdle = AddState(machine, "ArmedIdle", "holding-right");
-            var walk = AddState(machine, "Walk", "walk");
-            var sprint = AddState(machine, "Sprint", "sprint");
-            var shoot = AddState(machine, "Shoot", "holding-right-shoot");
-            var die = AddState(machine, "Die", "die");
+            var idle = AddState(machine, modelPath, "Idle", "idle");
+            var armedIdle = AddState(machine, modelPath, "ArmedIdle", "holding-right");
+            var walk = AddState(machine, modelPath, "Walk", "walk");
+            var sprint = AddState(machine, modelPath, "Sprint", "sprint");
+            var shoot = AddState(machine, modelPath, "Shoot", "holding-right-shoot");
+            var die = AddState(machine, modelPath, "Die", "die");
 
             machine.defaultState = idle;
 
             // 与敌人构建器同一道保险：会长期停留的状态必须绑循环剪辑，
             // 否则玩家会出现"走两步后保持姿势滑行"（M7 批次 1 已经踩过一次）。
-            EnsureStateLoops(idle);
-            EnsureStateLoops(armedIdle);
-            EnsureStateLoops(walk);
-            EnsureStateLoops(sprint);
+            EnsureStateLoops(modelPath, idle);
+            EnsureStateLoops(modelPath, armedIdle);
+            EnsureStateLoops(modelPath, walk);
+            EnsureStateLoops(modelPath, sprint);
 
             CharacterAnimatorWiring.AddTransition(idle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
             CharacterAnimatorWiring.AddTransition(armedIdle, walk, 0.15f, ("Speed", AnimatorConditionMode.Greater, 0.2f));
@@ -164,7 +175,7 @@ namespace RaidDemo.Bootstrap.Editor
         /// 换素材、换命名时容易漏；状态是循环语义，它绑的剪辑就必须循环。
         /// 修不了时只报错不抛异常，控制器其余部分仍然可用。
         /// </remarks>
-        private static void EnsureStateLoops(AnimatorState state)
+        private static void EnsureStateLoops(string modelPath, AnimatorState state)
         {
             var clip = state.motion as AnimationClip;
             if (clip == null || CharacterAnimationLoopTool.IsLooping(clip))
@@ -172,7 +183,7 @@ namespace RaidDemo.Bootstrap.Editor
                 return;
             }
 
-            var reloaded = CharacterAnimationLoopTool.EnsureLooping(ModelPath, clip);
+            var reloaded = CharacterAnimationLoopTool.EnsureLooping(modelPath, clip);
             if (reloaded == null)
             {
                 Debug.LogError(
@@ -189,27 +200,29 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>添加一个状态并绑定 Kenney 动画剪辑（自动跳过 __preview__ 副本）。</summary>
-        private static AnimatorState AddState(AnimatorStateMachine machine, string name, string clipName)
+        private static AnimatorState AddState(
+            AnimatorStateMachine machine,
+            string modelPath,
+            string name,
+            string clipName)
         {
             var state = machine.AddState(name);
-            state.motion = LoadClip(clipName);
+            state.motion = LoadClip(modelPath, clipName);
             return state;
         }
 
         /// <summary>从模型文件里按名称取动画剪辑。</summary>
-        private static AnimationClip LoadClip(string clipName)
+        private static AnimationClip LoadClip(string modelPath, string clipName)
         {
-            return CharacterAnimationLoopTool.FindClip(ModelPath, clipName);
+            return CharacterAnimationLoopTool.FindClip(modelPath, clipName);
         }
 
         /// <summary>
         /// 生成玩家角色预制体：外层容器负责摆放，模型实例挂 Animator 并缩放到目标身高。
         /// </summary>
-        private static string BuildPrefab(string controllerPath)
+        private static string BuildPrefab(string controllerPath, string modelPath, string prefabPath)
         {
-            var path = ArtFolder + "/PlayerCharacter.prefab";
-
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
             var container = new GameObject("PlayerCharacter");
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
             instance.name = "Model";
@@ -233,10 +246,10 @@ namespace RaidDemo.Bootstrap.Editor
 
             ApplyProjectMaterial(instance);
 
-            PrefabUtility.SaveAsPrefabAsset(container, path);
+            PrefabUtility.SaveAsPrefabAsset(container, prefabPath);
             Object.DestroyImmediate(container);
             AssetDatabase.SaveAssets();
-            return $"{path} (scale={scale:F3})";
+            return $"{prefabPath} (scale={scale:F3})";
         }
 
         /// <summary>把模型缩放到目标身高，并让脚底落在容器原点。</summary>

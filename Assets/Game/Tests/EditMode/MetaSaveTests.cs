@@ -58,6 +58,7 @@ namespace RaidDemo.Tests.EditMode
 
             Assert.AreEqual(progress.Money, data.money);
             Assert.AreEqual(6, data.backpackWidth);
+            Assert.AreEqual("female-b", data.selectedCharacterId);
             Assert.IsNotNull(data.quests);
 
             var restored = MetaSaveMapper.Restore(data, m_Catalog, out var problems);
@@ -65,6 +66,7 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsEmpty(problems);
             Assert.IsNotNull(restored);
             Assert.AreEqual(progress.Money, restored.Money);
+            Assert.AreEqual("female-b", restored.SelectedCharacterId);
             Assert.AreEqual(5, CountStash(restored, m_Bolt.Id));
             Assert.AreEqual(30, restored.Loadout.Backpack.Items.Count > 0
                 ? restored.Loadout.Backpack.Items[0].StackCount
@@ -79,6 +81,22 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(
                 2,
                 restored.Quests.Get(QuestCatalog.ScavengerId).Current);
+        }
+
+        [Test]
+        public void 旧存档没有角色字段时回退到默认角色()
+        {
+            var data = new MetaSaveData
+            {
+                schemaVersion = 1,
+                money = 100,
+                selectedCharacterId = null,
+            };
+
+            var restored = MetaSaveMapper.Restore(data, m_Catalog, out _);
+
+            Assert.IsNotNull(restored);
+            Assert.AreEqual(MetaProgress.DefaultCharacterId, restored.SelectedCharacterId);
         }
 
         [Test]
@@ -155,6 +173,7 @@ namespace RaidDemo.Tests.EditMode
             progress.Quests.TryAccept(QuestCatalog.ScavengerId, out _);
             progress.Quests.NotifyKill();
             progress.Quests.NotifyKill();
+            progress.SetSelectedCharacter("female-b");
             return progress;
         }
 

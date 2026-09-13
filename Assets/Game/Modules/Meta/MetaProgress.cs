@@ -38,6 +38,9 @@ namespace RaidDemo.Meta
 
         public const int StashHeight = 8;
 
+        /// <summary>默认角色 ID，与 PlayerCharacterBuilder 的 male-a 保持一致。</summary>
+        public const string DefaultCharacterId = "male-a";
+
         /// <summary>创建一个空的局外进度。</summary>
         public MetaProgress(int startingMoney = StartingMoney)
         {
@@ -57,6 +60,8 @@ namespace RaidDemo.Meta
                 null,
                 AddMoney,
                 _ => NotifyChanged());
+
+            SelectedCharacterId = DefaultCharacterId;
         }
 
         /// <summary>仓库网格。跨战局保留，每个场景重新登记进容器注册表。</summary>
@@ -70,6 +75,12 @@ namespace RaidDemo.Meta
 
         /// <summary>任务系统。与仓库共享同一份存档生命周期。</summary>
         public QuestSystem Quests { get; }
+
+        /// <summary>
+        /// 当前选择的玩家角色 ID。
+        /// </summary>
+        /// <remarks>Meta 层不校验角色目录——那属于表现层；这里只保存稳定 ID。</remarks>
+        public string SelectedCharacterId { get; private set; }
 
         /// <summary>局外进度发生任何变化时触发。存档与界面刷新订阅它。</summary>
         public event System.Action Changed;
@@ -122,6 +133,29 @@ namespace RaidDemo.Meta
         public void AttachCatalog(IItemDefinitionLookup catalog)
         {
             Quests.AttachCatalog(catalog);
+        }
+
+        /// <summary>
+        /// 选择玩家角色并广播变化。
+        /// </summary>
+        /// <param name="characterId">角色稳定 ID；为空时忽略。</param>
+        public void SetSelectedCharacter(string characterId)
+        {
+            if (string.IsNullOrEmpty(characterId) || characterId == SelectedCharacterId)
+            {
+                return;
+            }
+
+            SelectedCharacterId = characterId;
+            NotifyChanged();
+        }
+
+        /// <summary>存档还原专用：直接写入角色 ID，不触发变化事件。</summary>
+        internal void RestoreSelectedCharacter(string characterId)
+        {
+            SelectedCharacterId = string.IsNullOrEmpty(characterId)
+                ? DefaultCharacterId
+                : characterId;
         }
 
         /// <summary>

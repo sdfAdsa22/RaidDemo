@@ -125,6 +125,7 @@ namespace RaidDemo.UI
             ExitSellMode();
             RefreshAll();
             SetVisible(true);
+            UiAudio.Play(UiCue.PanelOpen);
         }
 
         /// <summary>关闭交易界面。</summary>
@@ -139,6 +140,7 @@ namespace RaidDemo.UI
             CloseSellMenu();
             ExitSellMode();
             SetVisible(false);
+            UiAudio.Play(UiCue.PanelClose);
         }
 
         private void OnDestroy()

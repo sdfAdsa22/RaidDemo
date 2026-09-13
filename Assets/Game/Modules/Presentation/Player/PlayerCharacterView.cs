@@ -29,6 +29,7 @@ namespace RaidDemo.Presentation
         private static readonly int DieId = Animator.StringToHash("Die");
 
         private Animator m_Animator;
+        private GameObject m_VisualRoot;
         private CombatTargetView m_TargetView;
         private PlayerWeaponView m_WeaponView;
         private EventBus m_EventBus;
@@ -39,7 +40,63 @@ namespace RaidDemo.Presentation
 
         private void Awake()
         {
-            m_Animator = GetComponentInChildren<Animator>();
+            CacheVisualRoot();
+        }
+
+        /// <summary>
+        /// 运行时切换角色外观。
+        /// </summary>
+        /// <param name="prefab">角色预制体；为空时不做任何事。</param>
+        /// <remarks>
+        /// <para>只替换视觉模型，不碰移动、碰撞、武器视图与事件订阅：
+        /// 武器挂点由 <c>PlayerWeaponView</c> 单独挂在 Player 根节点上，
+        /// 因此换模型不会出现“枪跟着旧角色一起被销毁”。</para>
+        /// <para>选择角色只发生在安全屋/主菜单，但方法本身不假设这一点；
+        /// 阵亡状态、动画参数等运行时状态保持原样。</para>
+        /// </remarks>
+        public void SetCharacter(GameObject prefab)
+        {
+            if (prefab == null)
+            {
+                return;
+            }
+
+            var instance = Instantiate(prefab, transform, false);
+            instance.name = prefab.name;
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+
+            if (m_VisualRoot != null && m_VisualRoot != instance)
+            {
+                Destroy(m_VisualRoot);
+            }
+
+            m_VisualRoot = instance;
+            m_Animator = instance.GetComponentInChildren<Animator>(true);
+        }
+
+        /// <summary>
+        /// 缓存当前视觉根节点与 Animator。
+        /// </summary>
+        /// <remarks>
+        /// 场景里的默认角色由生成器直接实例化成 Player 的子预制体；
+        /// 这里通过 Animator 反推它的容器节点，确保 <see cref="SetCharacter"/> 销毁的是整份外观，
+        /// 而不是只销毁挂着 Animator 的那一层。
+        /// </remarks>
+        private void CacheVisualRoot()
+        {
+            m_Animator = GetComponentInChildren<Animator>(true);
+            if (m_Animator == null)
+            {
+                m_VisualRoot = null;
+                return;
+            }
+
+            var parent = m_Animator.transform.parent;
+            m_VisualRoot = parent != null && parent != transform
+                ? parent.gameObject
+                : m_Animator.gameObject;
         }
 
         private void Start()

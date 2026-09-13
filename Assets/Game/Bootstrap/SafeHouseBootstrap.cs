@@ -27,12 +27,10 @@ namespace RaidDemo.Bootstrap
     {
         /// <summary>玩家出生点。</summary>
         [SerializeField] private Vector2 m_PlayerSpawnPosition;
-
         [SerializeField] private PlayerMotor m_PlayerMotor;
         [SerializeField] private PlayerInputCollector m_InputCollector;
         [SerializeField] private TopDownCameraController m_CameraController;
         [SerializeField] private ItemCatalog m_ItemCatalog;
-
         private EventBus m_EventBus;
         private ServiceLocator m_Services;
         private CommandRouter m_CommandRouter;
@@ -362,6 +360,10 @@ namespace RaidDemo.Bootstrap
                 case SafeHouseInteractable.Kind.DebugCrate:
                     // 与战利品共用同一块右侧面板；开完拿走即可，箱子本身不会再生。
                     m_InventoryScreen?.OpenLootContainer(m_DebugCrateContainerId, "测试箱");
+                    break;
+
+                case SafeHouseInteractable.Kind.Wardrobe:
+                    OpenCharacterSelect();
                     break;
 
                 default:

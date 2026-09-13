@@ -33,9 +33,11 @@ namespace RaidDemo.UI
         private RectTransform m_Root;
         private UiButton m_ContinueButton;
         private UiButton m_NewGameButton;
+        private UiButton m_CharacterButton;
         private TextMeshProUGUI m_NoticeLabel;
         private Action m_OnContinue;
         private Action m_OnNewGame;
+        private Action m_OnCharacterSelect;
         private bool m_IsVisible;
         private bool m_HasSave;
         private bool m_ConfirmNewGame;
@@ -44,10 +46,11 @@ namespace RaidDemo.UI
         /// <summary>构建界面。</summary>
         /// <param name="onContinue">点击「继续 / 开始」时执行的回调。</param>
         /// <param name="onNewGame">点击「新游戏」时执行的回调。</param>
-        public void Initialize(Action onContinue, Action onNewGame)
+        public void Initialize(Action onContinue, Action onNewGame, Action onCharacterSelect = null)
         {
             m_OnContinue = onContinue;
             m_OnNewGame = onNewGame;
+            m_OnCharacterSelect = onCharacterSelect;
 
             m_Root = UiFactory.CreateCanvas(transform, "MainMenuCanvas", 300);
 
@@ -111,10 +114,18 @@ namespace RaidDemo.UI
                 new Vector2(Padding + 440f, top + 88f),
                 new Vector2(320f, 88f));
 
+            // 角色选择是次入口：不挤占“开始/继续”的主按钮位置，
+            // 放在次按钮下方，玩家想换角色时能一眼找到，不想换也不会被它挡住出击。
+            m_CharacterButton = UiFactory.CreateButton(
+                panel,
+                "选择角色",
+                new Vector2(Padding + 440f, top + 186f),
+                new Vector2(320f, 52f));
+
             m_NoticeLabel = UiFactory.CreateLabel(
                 panel,
                 string.Empty,
-                new Vector2(Padding, top + 200f),
+                new Vector2(Padding, top + 250f),
                 new Vector2(PanelSize.x - (Padding * 2f), 40f),
                 UiPalette.BodySize,
                 TextAlignmentOptions.Left,
@@ -125,7 +136,7 @@ namespace RaidDemo.UI
                 panel,
                 "在一块不大的安全屋里，你可以整理仓库、试枪、从出口选地图出击。\n"
                 + "操作说明写在安全屋的墙上；出击前的准备也都在那里完成。",
-                new Vector2(Padding, top + 250f),
+                new Vector2(Padding, top + 300f),
                 new Vector2(PanelSize.x - (Padding * 2f), 96f),
                 UiPalette.BodySize,
                 TextAlignmentOptions.TopLeft,
@@ -217,11 +228,14 @@ namespace RaidDemo.UI
 
             var overContinue = Mouse.current != null && m_ContinueButton.Contains(pointer);
             var overNewGame = m_HasSave && Mouse.current != null && m_NewGameButton.Contains(pointer);
+            var overCharacter = Mouse.current != null && m_CharacterButton.Contains(pointer);
 
             m_ContinueButton.SetHovered(overContinue);
             m_NewGameButton.SetHovered(overNewGame);
+            m_CharacterButton.SetHovered(overCharacter);
             m_ContinueButton.ApplyVisual(overContinue && isClicked);
             m_NewGameButton.ApplyVisual(overNewGame && isClicked);
+            m_CharacterButton.ApplyVisual(overCharacter && isClicked);
 
             var confirmed = keyboard != null && keyboard.enterKey.wasPressedThisFrame;
 
@@ -248,6 +262,13 @@ namespace RaidDemo.UI
             {
                 ResetNewGameConfirm();
                 m_OnContinue.Invoke();
+                return;
+            }
+
+            if (wasPressed && overCharacter)
+            {
+                ResetNewGameConfirm();
+                m_OnCharacterSelect?.Invoke();
                 return;
             }
 

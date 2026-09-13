@@ -48,3 +48,11 @@ MonoBehaviour:
   m_ExtractionTick: {fileID: 8300000, guid: 4c8c6afc23148df4381faa762ab61abe, type: 3}
   m_RaidSuccess: {fileID: 8300000, guid: 96a7adde75c774e4fb960d1b2fb456a3, type: 3}
   m_RaidFail: {fileID: 8300000, guid: d6a4c3732c65c0248826e9319ef2c26e, type: 3}
+  m_UiClick: {fileID: 8300000, guid: a8a83a5f7bc2f53489275f17582cfa32, type: 3}
+  m_UiPanelOpen: {fileID: 8300000, guid: defbb65681db69d46860a16a75147275, type: 3}
+  m_UiPanelClose: {fileID: 8300000, guid: 59c964953bed7e445a10ade946792238, type: 3}
+  m_UiTabSwitch: {fileID: 8300000, guid: 912fde5e53829ed41b1366a2c3ede76c, type: 3}
+  m_UiConfirm: {fileID: 8300000, guid: 79a365f756c1cea48b30c081555ec009, type: 3}
+  m_UiCancel: {fileID: 8300000, guid: 7ae14f604f7c70d4bbbe5c05e0e130f5, type: 3}
+  m_UiLocked: {fileID: 8300000, guid: 604e7a2ba0a56ca4ab7697537c3996b2, type: 3}
+  m_UiBuy: {fileID: 8300000, guid: bce10f2be21ad42428f89489f16c4f38, type: 3}

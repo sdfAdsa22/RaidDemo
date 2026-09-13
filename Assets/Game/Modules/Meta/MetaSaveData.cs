@@ -41,6 +41,15 @@ namespace RaidDemo.Meta
         /// <summary>当前追踪的任务 ID。</summary>
         public string trackedQuestId;
 
+        /// <summary>
+        /// 当前选择的玩家角色 ID。
+        /// </summary>
+        /// <remarks>
+        /// 旧存档没有这个字段时为空字符串，由 <c>MetaProgress</c> 回退到默认角色；
+        /// 因此这是向后兼容的增量字段，不递增 SchemaVersion。
+        /// </remarks>
+        public string selectedCharacterId;
+
         /// <summary>主背包网格宽度。背包决定容量，还原时必须先恢复尺寸。</summary>
         public int backpackWidth;
 
