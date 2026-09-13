@@ -76,7 +76,7 @@ namespace RaidDemo.Combat
             }
 
             m_EventBus.Publish(new WeaponFiredEvent(
-                m_PlayerId,
+                m_ShooterId,
                 origin,
                 endPoint,
                 didHit,
@@ -140,7 +140,7 @@ namespace RaidDemo.Combat
 
             var wasKilled = !combatant.IsAlive;
             m_EventBus.Publish(new DamageAppliedEvent(
-                m_PlayerId,
+                m_ShooterId,
                 targetId,
                 outcome.Damage,
                 outcome.ArmorDamage,
@@ -153,7 +153,7 @@ namespace RaidDemo.Combat
 
             if (wasKilled)
             {
-                m_EventBus.Publish(new TargetDestroyedEvent(targetId, m_PlayerId));
+                m_EventBus.Publish(new TargetDestroyedEvent(targetId, m_ShooterId));
             }
         }
     }

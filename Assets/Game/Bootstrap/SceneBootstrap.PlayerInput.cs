@@ -16,6 +16,53 @@ namespace RaidDemo.Bootstrap
     public sealed partial class SceneBootstrap
     {
         /// <summary>
+        /// 装配末尾的表现与输入接线。
+        /// </summary>
+        /// <param name="spawnFacing">出生朝向（单位向量）。</param>
+        /// <remarks>
+        /// <para>四件事，顺序有依赖：</para>
+        /// <list type="number">
+        /// <item><description><b>玩家载体复位。</b>表现层要在事件总线就绪之后重新订阅，
+        /// 否则 <c>OnEnable</c> 阶段拿不到服务；随后把角色吸附到出生点。</description></item>
+        /// <item><description><b>相机跟随与遮挡处理。</b>相机只认玩家载体，必须在复位之后绑定，
+        /// 否则首帧会停在原点。</description></item>
+        /// <item><description><b>准星与联机入口。</b>准星是纯表现元素，运行时创建；联机客户端在这之后接管输入。</description></item>
+        /// <item><description><b>锁定并隐藏光标。</b>进入游戏即由准星代替系统光标指示瞄准位置。</description></item>
+        /// </list>
+        ///
+        /// <para>抽成独立方法是为了让 <see cref="Initialize"/> 只保留"装配顺序"这条主线——
+        /// 那个方法的长度已经到过一次上限（工程规范：单文件 400 行）。</para>
+        /// </remarks>
+        private void FinishPlayerWiring(Vector2F spawnFacing)
+        {
+            // 表现层需要在事件总线就绪之后重新订阅，否则 OnEnable 阶段拿不到服务。
+            if (m_PlayerMotor != null)
+            {
+                m_PlayerMotor.Rebind(m_EventBus);
+                m_PlayerMotor.SnapTo(m_PlayerSpawnPosition, new Vector2(spawnFacing.X, spawnFacing.Y));
+            }
+
+            if (m_CameraController != null && m_PlayerMotor != null)
+            {
+                m_CameraController.SetTarget(m_PlayerMotor.transform, snap: true);
+                BindOcclusionPeephole();
+            }
+
+            EnsureCrosshair();
+
+            InitializeMultiplayerClientIfNeeded();
+
+            if (m_InputCollector == null)
+            {
+                Debug.LogWarning("[RaidDemo] 未指定输入采集组件，玩家将无法操作。", this);
+                return;
+            }
+
+            // 进入游戏即锁定并隐藏鼠标光标，由准星代替光标指示瞄准位置。
+            m_InputCollector.SetCursorLock(true);
+        }
+
+        /// <summary>
         /// 确保准星组件存在。
         /// </summary>
         /// <remarks>

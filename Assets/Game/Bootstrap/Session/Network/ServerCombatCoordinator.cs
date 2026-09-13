@@ -117,6 +117,13 @@ namespace RaidDemo.Bootstrap
 
             var loadout = BuildDefaultLoadout(weaponDefinition);
             var weapon = new PlayerWeapon(new DeterministicRandom((uint)(0x5EED0000 + playerId)));
+
+            // 战斗单位先建：控制器的事件里带的是**战斗单位编号**，
+            // 而它必须与 AI 的事件编号处在同一个空间里（否则玩家 1 的子弹会被记成敌人 0 开的火，
+            // 因为两者的战斗世界编号恰好都是 1）。
+            var combatantId = m_World.Create(DefaultMaxHealth);
+            m_CombatantToPlayer[combatantId] = playerId;
+
             var controller = new PlayerWeaponController(
                 weapon,
                 loadout,
@@ -127,10 +134,8 @@ namespace RaidDemo.Bootstrap
                 ammoPouchContainerId: 0,
                 playerId: playerId);
 
+            controller.BindCombatant(combatantId);
             controller.SyncEquippedWeapon(weaponDefinition.WeaponStats);
-
-            var combatantId = m_World.Create(DefaultMaxHealth);
-            m_CombatantToPlayer[combatantId] = playerId;
 
             m_Participants[playerId] = new Participant
             {
@@ -156,6 +161,18 @@ namespace RaidDemo.Bootstrap
             m_World.Remove(participant.CombatantId);
             m_Participants.Remove(playerId);
             return true;
+        }
+
+        /// <summary>
+        /// 某个战斗单位编号是否属于玩家。
+        /// </summary>
+        /// <remarks>
+        /// 不能用 <c>GetPlayerId(combatantId) != 0</c> 代替：玩家 0（第一个连接的客户端）是合法编号，
+        /// 那会把玩家 0 误判成"不认识这个单位"。联机时翻译编号的下游（敌人编号）依赖这条判断。
+        /// </remarks>
+        public bool IsPlayerCombatant(int combatantId)
+        {
+            return m_CombatantToPlayer.ContainsKey(combatantId);
         }
 
         /// <summary>

@@ -21,6 +21,10 @@ namespace RaidDemo.AI
     /// 就能得到与客户端一致的行为序列——这正是逻辑与表现分离换来的收益。</description></item>
     /// </list>
     ///
+    /// <para><b>目标由调度器分配：</b>候选目标（单机 1 个，联机 2~4 名玩家）存在调度器上，
+    /// 每个 AI 在 Tick 时各取距离最近的那一个——两名玩家分开行动时敌人因此会分头追击，
+    /// 而不是所有人一起扑向同一个方向。</para>
+    ///
     /// <para>本类同样不引用任何场景对象：它只知道平面坐标、事件与接口。</para>
     /// </remarks>
     public sealed class AiDirector : IDisposable
@@ -36,7 +40,16 @@ namespace RaidDemo.AI
         private readonly uint m_BaseSeed;
 
         private IDisposable m_DamageSubscription;
-        private AiTargetInfo m_Target = AiTargetInfo.None;
+
+        /// <summary>
+        /// 本帧的候选目标（联机时是 2~4 名玩家）。
+        /// </summary>
+        /// <remarks>
+        /// <para>存列表而不是单个目标：单机时列表只有一个元素，联机时每个 AI 各取最近的那一个。
+        /// 目标选择放在调度器而不是 Agent 里，是因为"谁更近"要看全局，
+        /// 而 Agent 只该关心"我盯上了谁"。</para>
+        /// </remarks>
+        private readonly List<AiTargetInfo> m_Targets = new List<AiTargetInfo>(4);
 
         /// <summary>
         /// 创建 AI 调度器。
@@ -186,10 +199,46 @@ namespace RaidDemo.AI
             return m_AgentsById.TryGetValue(combatantId, out agent);
         }
 
-        /// <summary>更新当前目标（玩家）的快照。每帧由启动层写入。</summary>
+        /// <summary>
+        /// 更新当前目标的快照（单目标情形：单机只有一名玩家）。
+        /// </summary>
+        /// <remarks>每帧由启动层写入。等价于"候选目标只有一个"的多目标版本。</remarks>
         public void SetTarget(in AiTargetInfo target)
         {
-            m_Target = target;
+            m_Targets.Clear();
+            m_Targets.Add(target);
+        }
+
+        /// <summary>
+        /// 更新候选目标列表（联机：2~4 名玩家）。
+        /// </summary>
+        /// <remarks>
+        /// <para>每个 AI 在 Tick 时各自取**距离最近**的存活目标，因此两名玩家分开行动时
+        /// 敌人会各追各的，而不是所有人一起扑向同一个人的方向。</para>
+        ///
+        /// <para>列表在调用时复制一份（数量上限是玩家数，复制成本可忽略），
+        /// 免得调用方复用同一个 List 导致 AI 读到下一帧的数据。</para>
+        /// </remarks>
+        /// <param name="targets">候选目标；null 或空列表等价于"没有目标"。</param>
+        public void SetTargets(IReadOnlyList<AiTargetInfo> targets)
+        {
+            m_Targets.Clear();
+
+            if (targets == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < targets.Count; i++)
+            {
+                m_Targets.Add(targets[i]);
+            }
+        }
+
+        /// <summary>当前候选目标数量。</summary>
+        public int TargetCount
+        {
+            get { return m_Targets.Count; }
         }
 
         /// <summary>
@@ -237,8 +286,59 @@ namespace RaidDemo.AI
 
             for (var i = 0; i < m_Agents.Count; i++)
             {
-                m_Agents[i].Tick(deltaTime, ElapsedSeconds, m_Target);
+                var agent = m_Agents[i];
+                agent.Tick(deltaTime, ElapsedSeconds, SelectTargetFor(agent));
             }
+        }
+
+        /// <summary>
+        /// 为某个 AI 选一个目标：候选里距离最近的那个存活目标。
+        /// </summary>
+        /// <remarks>
+        /// <para>按平面距离选，而不是"谁先进入视野"：距离是最稳定的判据——
+        /// 视野会被掩体反复打断，用视野选目标会让 AI 在两名玩家之间来回抽搐。</para>
+        ///
+        /// <para>没有候选目标时返回 <see cref="AiTargetInfo.None"/>，
+        /// AI 会清空记忆回到巡逻（与单机里"玩家阵亡"的行为一致）。</para>
+        /// </remarks>
+        private AiTargetInfo SelectTargetFor(AiAgent agent)
+        {
+            if (m_Targets.Count == 0)
+            {
+                return AiTargetInfo.None;
+            }
+
+            if (m_Targets.Count == 1)
+            {
+                return m_Targets[0];
+            }
+
+            var position = agent.Position;
+            var best = AiTargetInfo.None;
+            var bestSqrDistance = float.MaxValue;
+
+            for (var i = 0; i < m_Targets.Count; i++)
+            {
+                var candidate = m_Targets[i];
+                if (!candidate.Exists)
+                {
+                    continue;
+                }
+
+                var dx = candidate.Position.X - position.X;
+                var dy = candidate.Position.Y - position.Y;
+                var sqrDistance = (dx * dx) + (dy * dy);
+                if (sqrDistance >= bestSqrDistance)
+                {
+                    continue;
+                }
+
+                bestSqrDistance = sqrDistance;
+                best = candidate;
+            }
+
+            // 全部目标都不可用（阵亡 / 撤离）时也要把"没有目标"明确传下去。
+            return best;
         }
 
         /// <summary>释放订阅。</summary>
@@ -263,9 +363,24 @@ namespace RaidDemo.AI
                 return;
             }
 
-            // 伤害事件里没有攻击者的位置，只有标识。当前唯一的攻击者是玩家，
-            // 因此用目标快照的位置作为"子弹来自哪"的近似——对"转身查看"来说足够准确。
-            agent.NotifyDamaged(m_Target.Position, evt.AttackerId);
+            // 伤害事件里没有攻击者的位置，只有标识。攻击者一定是某名玩家（AI 彼此不开火），
+            // 因此从候选目标里按标识反查他的位置；查不到时退回第一个目标的位置。
+            // 对"转身查看"这个用途来说足够准确。
+            agent.NotifyDamaged(FindTargetPosition(evt.AttackerId), evt.AttackerId);
+        }
+
+        /// <summary>在候选目标里按战斗单位标识反查位置。</summary>
+        private Vector2F FindTargetPosition(int attackerId)
+        {
+            for (var i = 0; i < m_Targets.Count; i++)
+            {
+                if (m_Targets[i].CombatantId == attackerId)
+                {
+                    return m_Targets[i].Position;
+                }
+            }
+
+            return m_Targets.Count > 0 ? m_Targets[0].Position : Vector2F.Zero;
         }
     }
 }

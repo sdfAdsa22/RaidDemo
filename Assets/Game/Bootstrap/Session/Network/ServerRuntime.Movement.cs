@@ -91,6 +91,7 @@ namespace RaidDemo.Bootstrap
             m_PlayerColliders.Clear();
             m_PlayerGroundHeights.Clear();
             m_SnapshotBuffer.Clear();
+            ShutdownAi();
             ShutdownCombat();
             m_World = null;
         }

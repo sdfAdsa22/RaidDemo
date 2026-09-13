@@ -185,14 +185,20 @@ namespace RaidDemo.Bootstrap
             if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
             {
                 // 开火每秒钟可能十几次，只在详细日志下记录；伤害与击杀才是需要留痕的事件。
-                m_Session.Log.Verbose($"[服务器] 玩家 {evt.ShooterId} 开火（命中={evt.DidHit}，目标={evt.HitTargetId}）");
+                m_Session.Log.Verbose(
+                    $"[服务器] {DescribeEntity(ResolveEntityId(evt.ShooterId))}" +
+                    $"(战斗单位#{evt.ShooterId}) 开火" +
+                    $"（命中={evt.DidHit}，目标={ResolveEntityId(evt.HitTargetId)}）" +
+                    $" 起点=({evt.Origin.x:F1},{evt.Origin.y:F2},{evt.Origin.z:F1})" +
+                    $" 终点=({evt.EndPoint.x:F1},{evt.EndPoint.y:F2},{evt.EndPoint.z:F1})" +
+                    DescribeAiAim(evt.ShooterId));
             }
 
             BroadcastCombatEvent(new CombatEventMessage
             {
                 Kind = CombatEventMessage.KindFired,
-                SourceId = evt.ShooterId,
-                TargetId = evt.HitTargetId,
+                SourceId = ResolveEntityId(evt.ShooterId),
+                TargetId = ResolveEntityId(evt.HitTargetId),
                 Origin = evt.Origin,
                 EndPoint = evt.EndPoint,
                 DidHit = evt.DidHit,
@@ -206,10 +212,10 @@ namespace RaidDemo.Bootstrap
         {
             m_Combat?.OnDamageApplied(evt);
 
-            var attacker = ResolvePlayerId(evt.AttackerId);
-            var target = ResolvePlayerId(evt.TargetId);
+            var attacker = ResolveEntityId(evt.AttackerId);
+            var target = ResolveEntityId(evt.TargetId);
             m_Session?.Log.Info(
-                $"[服务器] 命中：玩家 {attacker} → 玩家 {target}，" +
+                $"[服务器] 命中：{DescribeEntity(attacker)} → {DescribeEntity(target)}，" +
                 $"伤害 {evt.Damage:F1}，剩余 {evt.RemainingHealth:F1}" +
                 (evt.WasKilled ? "（已阵亡）" : string.Empty));
 
@@ -227,11 +233,15 @@ namespace RaidDemo.Bootstrap
 
         private void OnCombatDestroyed(TargetDestroyedEvent evt)
         {
+            // 敌人阵亡后不再可被命中：留着碰撞体的话，子弹会打在"看不见的尸体"上，
+            // 表现为"明明没人了，开枪还是有命中反馈"。
+            DisableEnemyCollider(evt.TargetId);
+
             BroadcastCombatEvent(new CombatEventMessage
             {
                 Kind = CombatEventMessage.KindDestroyed,
-                SourceId = ResolvePlayerId(evt.KillerId),
-                TargetId = ResolvePlayerId(evt.TargetId),
+                SourceId = ResolveEntityId(evt.KillerId),
+                TargetId = ResolveEntityId(evt.TargetId),
             });
         }
 
@@ -240,7 +250,7 @@ namespace RaidDemo.Bootstrap
             BroadcastCombatEvent(new CombatEventMessage
             {
                 Kind = CombatEventMessage.KindReload,
-                SourceId = evt.OwnerId,
+                SourceId = ResolveEntityId(evt.OwnerId),
                 IsReloading = evt.IsReloading,
                 MagazineAmmo = evt.MagazineAmmo,
             });

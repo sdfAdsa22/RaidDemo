@@ -37,6 +37,7 @@ namespace RaidDemo.AI
         private Vector2F m_Position;
         private float m_FacingDegrees;
         private AiStateId m_LastReportedState = AiStateId.Patrol;
+        private AiTargetInfo m_Target = AiTargetInfo.None;
 
         private bool m_PendingNoise;
         private Vector2F m_PendingNoisePosition;
@@ -131,6 +132,19 @@ namespace RaidDemo.AI
         public AiPerceptionSnapshot Snapshot
         {
             get { return m_Snapshot; }
+        }
+
+        /// <summary>
+        /// 本帧使用的目标快照。
+        /// </summary>
+        /// <remarks>
+        /// 由调度器在 <c>Tick</c> 时注入（联机时每名 AI 各取最近的玩家）。
+        /// 暴露出来是为了让调试与验收能回答"它现在到底在打谁"——
+        /// 只看感知快照里的"是否看见"不足以区分"没看见"与"看见了别人"。
+        /// </remarks>
+        public AiTargetInfo Target
+        {
+            get { return m_Target; }
         }
 
         /// <summary>本帧的行为意图。</summary>
@@ -235,6 +249,10 @@ namespace RaidDemo.AI
             }
 
             UpdateSnapshot(now, target);
+
+            // 记下本帧用的是哪份目标快照：服务器侧的开火日志要能回答
+            // "这一枪是朝谁打的、他离我多远"，否则只能看到"打中了空气"。
+            m_Target = target;
 
             m_Intent.Clear();
             m_Machine.Tick(deltaTime);

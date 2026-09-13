@@ -85,6 +85,15 @@ namespace RaidDemo.Simulation
         /// <summary>已推进的仿真时间（秒）。它是快照时间戳的唯一来源。</summary>
         public double SimulationTime => m_SimulationTime;
 
+        /// <summary>
+        /// 本世界使用的移动参数。
+        /// </summary>
+        /// <remarks>
+        /// 服务器侧 AI 的脚步噪音判定要用它（奔跑阈值必须与玩家实际使用的阈值一致，
+        /// 否则"服务器认为他在走、客户端觉得他在跑"）。
+        /// </remarks>
+        public PlayerMovementProfile Profile => m_Profile;
+
         /// <summary>是否已有 20 Hz 的快照等待取走。</summary>
         public bool SnapshotDue => m_SnapshotDue;
 

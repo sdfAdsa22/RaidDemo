@@ -145,6 +145,7 @@ namespace RaidDemo.Bootstrap
             // 权威世界的推进独立于心跳：每帧都要走，心跳只是周期性日志。
             TickNavigation();
             TickMovement(Time.deltaTime);
+            TickAi(Time.deltaTime);
 
             if (Time.unscaledTime < m_NextHeartbeatTime)
             {

@@ -31,6 +31,19 @@ namespace RaidDemo.Combat
         private float m_AimDegrees;
         private bool m_TriggerHeld;
         private int m_PlayerId;
+
+        /// <summary>
+        /// 事件里代表"射手"的编号（战斗单位编号）。
+        /// </summary>
+        /// <remarks>
+        /// <para>默认等于玩家编号：单机只有一名玩家、编号恒为 0，两者没有区别。</para>
+        ///
+        /// <para><b>联机时必须绑定</b>（见 <see cref="BindCombatant"/>）：服务器上"玩家编号"与
+        /// "战斗单位编号"是两套编号，而 AI 发事件用的是战斗单位编号。混用会让同一场战斗里
+        /// 出现两个编号各自为政——本项目的实例是"玩家 1 的子弹被记成敌人 0 开的火"，
+        /// 因为玩家 1 与敌人 0 的战斗单位编号恰好都是 1。</para>
+        /// </remarks>
+        private int m_ShooterId;
         private uint m_Sequence;
 
         /// <summary>
@@ -72,6 +85,37 @@ namespace RaidDemo.Combat
             // 而"第一次换弹时才知道自己是谁"会让开火事件误报成玩家 0。
             // 单机碰巧看不出来（本地玩家编号就是 0），联机时表现为"枪声与动画不归任何人"。
             m_PlayerId = playerId;
+            m_ShooterId = playerId;
+        }
+
+        /// <summary>
+        /// 绑定持有者的战斗单位编号：绑定之后，开火 / 命中 / 换弹事件带上的是它。
+        /// </summary>
+        /// <remarks>
+        /// <para>由装配层在"战斗单位已经创建"之后调用（单机的注册发生在武器装配之后，
+        /// 服务器的注册发生在构造控制器之前，两条路径都能拿到编号）。</para>
+        ///
+        /// <para><b>只有服务器调用它。</b>客户端的事件编号继续用玩家编号，
+        /// 因为客户端的表现层是按"本地玩家编号"过滤的（例如枪声要区分自己的与别人的：
+        /// <c>GameAudioDirector</c> 比较的正是本地玩家编号）。服务器那边则相反——
+        /// 一个进程里同时存在玩家与 AI，必须统一到战斗单位编号才能翻译成实体编号。</para>
+        ///
+        /// <para>弹药挂的容器变更事件仍然使用玩家编号：那条事件的语义是"谁的界面该刷新"，
+        /// 与"谁是战斗单位"是两件事。</para>
+        /// </remarks>
+        /// <param name="combatantId">战斗单位编号；传 0 或负数时保持当前值。</param>
+        public void BindCombatant(int combatantId)
+        {
+            if (combatantId > 0)
+            {
+                m_ShooterId = combatantId;
+            }
+        }
+
+        /// <summary>事件里使用的射手编号（战斗单位编号）。</summary>
+        public int ShooterId
+        {
+            get { return m_ShooterId; }
         }
 
         /// <summary>手持武器状态。</summary>
@@ -229,7 +273,7 @@ namespace RaidDemo.Combat
 
             m_PlayerId = playerId;
             m_Sequence = sequence;
-            m_EventBus.Publish(new ReloadStateChangedEvent(playerId, true, runtime.MagazineAmmo));
+            m_EventBus.Publish(new ReloadStateChangedEvent(m_ShooterId, true, runtime.MagazineAmmo));
             return true;
         }
 
@@ -292,7 +336,7 @@ namespace RaidDemo.Combat
             }
 
             m_EventBus.Publish(new ReloadStateChangedEvent(
-                m_PlayerId,
+                m_ShooterId,
                 false,
                 runtime.MagazineAmmo,
                 loaded));

@@ -346,7 +346,15 @@ namespace RaidDemo.Bootstrap
 
             if (flow.State == RaidFlowController.FlowState.InRaid)
             {
-                InitializeAi();
+                // P2-2 起 AI 只在服务器上跑：联机客户端不再自己生成敌人。
+                // 否则同一张地图上会有两套互相独立的 AI —— 位置、状态与伤害判定都不一致，
+                // 而且客户端那套并不权威（打死了服务器也不认）。
+                // 客户端要做的只是把服务器给的结果画出来，那部分在 20.5 接入。
+                if (!ClientMode.IsActive)
+                {
+                    InitializeAi();
+                }
+
                 InitializeRaid();
                 m_RaidActive = true;
                 // 战局里右侧面板留给战利品，不自动显示仓库。
@@ -368,32 +376,9 @@ namespace RaidDemo.Bootstrap
                 flow.ShowMainMenu();
             }
 
-            // 表现层需要在事件总线就绪之后重新订阅，否则 OnEnable 阶段拿不到服务。
-            if (m_PlayerMotor != null)
-            {
-                m_PlayerMotor.Rebind(m_EventBus);
-                m_PlayerMotor.SnapTo(m_PlayerSpawnPosition, new Vector2(spawnFacing.X, spawnFacing.Y));
-            }
-
-            if (m_CameraController != null && m_PlayerMotor != null)
-            {
-                m_CameraController.SetTarget(m_PlayerMotor.transform, snap: true);
-                BindOcclusionPeephole();
-            }
-
-            EnsureCrosshair();
-
-            InitializeMultiplayerClientIfNeeded();
-
-            if (m_InputCollector == null)
-            {
-                Debug.LogWarning("[RaidDemo] 未指定输入采集组件，玩家将无法操作。", this);
-            }
-            else
-            {
-                // 进入游戏即锁定并隐藏鼠标光标，由准星代替光标指示瞄准位置。
-                m_InputCollector.SetCursorLock(true);
-            }
+            // 表现与输入的最后接线（玩家载体复位、相机跟随、准星、联机入口、光标锁定）。
+            // 单独成方法：让 Initialize 只保留"装配顺序"这条主线，顺序依赖仍一眼可数。
+            FinishPlayerWiring(spawnFacing);
         }
 
     }

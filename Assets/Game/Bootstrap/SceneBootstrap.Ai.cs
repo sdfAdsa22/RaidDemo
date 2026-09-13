@@ -25,74 +25,6 @@ namespace RaidDemo.Bootstrap
         /// <summary>玩家的生命上限。</summary>
         private const float PlayerMaxHealth = 100f;
 
-        /// <summary>敌人的生命上限。</summary>
-        private const float EnemyMaxHealth = 100f;
-
-        /// <summary>敌人的护甲等级与耐久。比玩家更容易被打穿，让 AI 不至于变成移动靶。</summary>
-        private const int EnemyArmorLevel = 2;
-        private const float EnemyArmorDurability = 45f;
-
-        /// <summary>敌人初始备弹（发）。约等于三个弹匣。</summary>
-        private const int EnemyReserveAmmo = 90;
-
-        /// <summary>
-        /// AI 活动范围半径（米）。
-        /// </summary>
-        /// <remarks>
-        /// <para>M7 批次 2 起地图是下沉盆地：谷底平地 ±28 米，四条通道通向外圈塬面，
-        /// 三个坡顶撤离点位于 ±34 米处。这里取 34，正好覆盖到场外的撤离点，
-        /// 因此玩家在坡顶读秒时敌人仍可能一路追上来——这是刻意的：撤离前的最后一段路必须有风险。</para>
-        ///
-        /// <para>该值只用于夹取 AI 的目标点（避免撤退方向落到地图外），
-        /// 不限制巡逻路线；巡逻点仍在谷底的四个分区内。</para>
-        /// </remarks>
-        private const float AiPlayAreaHalfExtent = 34f;
-
-        /// <summary>
-        /// 每个敌人的出生点与巡逻路线（M5 四分区地图版本）。
-        /// </summary>
-        /// <remarks>
-        /// <para>五个敌人分布在四个分区：堆场两个（南、北各一）、厂房一个、
-        /// 装卸平台一个、外围环道一个。数量按「玩家一路会遇到几次交火」来定：
-        /// 太少则搜刮毫无压力，太多则 8 分钟根本搜不完。</para>
-        ///
-        /// <para>巡逻点全部落在通道与空地上，不穿箱子也不穿墙。路线刻意经过容器附近，
-        /// 因此玩家搜刮时被撞见的概率是真实的——这是搜刮读条这个「成本」能成立的前提。</para>
-        /// </remarks>
-        private static readonly (Vector2F Spawn, Vector2F[] Route)[] s_EnemyLayouts =
-        {
-            // 堆场南侧：沿南入口向北推进，覆盖弹药箱与武器架之间的通道
-            (new Vector2F(5f, -3f), new[]
-            {
-                new Vector2F(5f, -3f), new Vector2F(12f, -8f), new Vector2F(20f, -8f),
-            }),
-
-            // 堆场北侧：绕堆场北端与东侧，守着价值最高的武器架
-            (new Vector2F(16f, 22f), new[]
-            {
-                new Vector2F(16f, 22f), new Vector2F(25f, 24f), new Vector2F(25f, 8f),
-            }),
-
-            // 厂房内部：穿过三个厅与两处门洞，是近战交火的主要来源
-            (new Vector2F(-24f, -8f), new[]
-            {
-                new Vector2F(-24f, -8f), new Vector2F(-24f, 2f),
-                new Vector2F(-20.5f, 8f), new Vector2F(-12f, 5.5f),
-            }),
-
-            // 装卸平台：在高台上巡逻，玩家爬坡时最容易遭遇
-            (new Vector2F(2f, -23f), new[]
-            {
-                new Vector2F(2f, -23f), new Vector2F(-6f, -24f), new Vector2F(8f, -24f),
-            }),
-
-            // 外围环道：南北向长距离巡逻，让撤离路线始终有变数
-            (new Vector2F(0f, 18f), new[]
-            {
-                new Vector2F(0f, 18f), new Vector2F(8f, 25f), new Vector2F(-6f, 24f),
-            }),
-        };
-
         private AiDirector m_AiDirector;
         private EnemyAgentView[] m_EnemyViews;
 
@@ -165,8 +97,8 @@ namespace RaidDemo.Bootstrap
                 groundHeight: new NavMeshGroundHeightProvider());
 
             m_AiDirector.Bounds = new PlayAreaBounds(
-                new Vector2F(-AiPlayAreaHalfExtent, -AiPlayAreaHalfExtent),
-                new Vector2F(AiPlayAreaHalfExtent, AiPlayAreaHalfExtent));
+                new Vector2F(-RaidEnemyLayout.PlayAreaHalfExtent, -RaidEnemyLayout.PlayAreaHalfExtent),
+                new Vector2F(RaidEnemyLayout.PlayAreaHalfExtent, RaidEnemyLayout.PlayAreaHalfExtent));
 
             RegisterPlayerCombatant();
             BuildDamageFeedback();
@@ -271,27 +203,31 @@ namespace RaidDemo.Bootstrap
             m_PlayerTargetView.Initialize(m_PlayerCombatantId, colorFeedback: false);
         }
 
-        /// <summary>按布局表生成敌人。</summary>
+        /// <summary>按共享布局生成敌人。</summary>
+        /// <remarks>
+        /// 出生点与巡逻路线来自 <see cref="RaidEnemyLayout"/>：P2-2 起服务器要用同一份布局生成权威 AI，
+        /// 两份数据一旦分叉，客户端摆出来的敌人就会和服务器算出来的位置对不上。
+        /// </remarks>
         private void SpawnEnemies()
         {
             var root = new GameObject("Enemies");
             root.transform.SetParent(transform, worldPositionStays: false);
 
-            var armor = new GreyboxArmorStats(EnemyArmorLevel, EnemyArmorDurability);
-            m_EnemyViews = new EnemyAgentView[s_EnemyLayouts.Length];
+            var armor = new GreyboxArmorStats(RaidEnemyLayout.ArmorLevel, RaidEnemyLayout.ArmorDurability);
+            m_EnemyViews = new EnemyAgentView[RaidEnemyLayout.Entries.Count];
 
-            for (var i = 0; i < s_EnemyLayouts.Length; i++)
+            for (var i = 0; i < RaidEnemyLayout.Entries.Count; i++)
             {
-                var layout = s_EnemyLayouts[i];
+                var layout = RaidEnemyLayout.Entries[i];
                 var route = new PatrolRoute(layout.Route);
                 var agent = m_AiDirector.SpawnAgent(
                     layout.Spawn,
-                    spawnFacingDegrees: 180f,
-                    health: EnemyMaxHealth,
+                    spawnFacingDegrees: RaidEnemyLayout.SpawnFacingDegrees,
+                    health: RaidEnemyLayout.MaxHealth,
                     armor: armor,
                     route: route,
                     weapon: AiWeaponProfile.CreateGreyboxRifle(),
-                    reserveAmmo: EnemyReserveAmmo);
+                    reserveAmmo: RaidEnemyLayout.ReserveAmmo);
 
                 var host = new GameObject($"Enemy_{agent.CombatantId:D2}");
                 host.transform.SetParent(root.transform, worldPositionStays: false);

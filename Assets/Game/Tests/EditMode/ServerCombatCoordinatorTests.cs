@@ -96,8 +96,15 @@ namespace RaidDemo.Tests.EditMode
             Assert.Less(after, before, "持续扣扳机应当消耗弹药。");
 
             // 开火事件必须带上真实的射击者：客户端靠它区分"谁在开枪"（音效、动画、击杀归属）。
+            // 编号空间是**战斗单位编号**——AI 的事件用的也是它，两者统一之后
+            // 服务器才能把"射手"一致地翻译成玩家编号或敌人编号。
             Assert.Greater(fired.Count, 0, "应当产生开火事件。");
-            Assert.AreEqual(ShooterId, fired[0].ShooterId, "开火事件的射击者应当是本人，而不是 0。");
+            var expectedCombatantId = m_Coordinator.GetCombatantId(ShooterId);
+            Assert.AreNotEqual(0, expectedCombatantId, "参战之后应当拿到战斗单位编号。");
+            Assert.AreEqual(
+                expectedCombatantId,
+                fired[0].ShooterId,
+                "开火事件的射击者应当是本人的战斗单位编号（没有绑定时会退化成玩家编号或 0）。");
         }
 
         /// <summary>命中另一名玩家时，服务器结算伤害并广播事件。</summary>
