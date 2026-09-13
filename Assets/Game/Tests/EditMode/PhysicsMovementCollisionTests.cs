@@ -179,7 +179,7 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
-        public void 去穿透只把人推离棱边不会让人钻进高台()
+        public void 重叠时朝棱边挤不会钻进高台()
         {
             var owner = CreateOwner(new Vector3(0f, 0f, 0.1f));
             CreateBox(new Vector3(0f, 0.6f, -1f), new Vector3(4f, 1.2f, 2f));
@@ -187,8 +187,8 @@ namespace RaidDemo.Tests.EditMode
 
             var service = new PhysicsMovementCollisionService(owner.transform, 1.8f, 0.02f);
 
-            // 连续三帧朝高台方向推：去穿透应该先把人推出来，再被侧棱正常挡住，
-            // 最终胶囊后沿不能进到台体里面。
+            // 连续三帧朝高台方向推：重叠放松只在"离开"时生效，
+            // 朝里走必须始终被挡住，位置不能往里挪。
             var position = new Vector2F(0f, 0.1f);
             for (var frame = 0; frame < 3; frame++)
             {
@@ -196,7 +196,29 @@ namespace RaidDemo.Tests.EditMode
                 position = new Vector2F(position.X + resolved.X, position.Y + resolved.Y);
             }
 
-            Assert.GreaterOrEqual(position.Y - 0.4f, -0.05f, "去穿透之后仍然不能钻进高台侧面。");
+            Assert.GreaterOrEqual(position.Y, 0.08f, "重叠放松只应该放行「离开」方向，朝里走不能被放行。");
+        }
+
+        [Test]
+        public void 贴着几何移动不会产生额外位移()
+        {
+            // U-69 第二次修复的回归：第一版「推人」式去穿透会额外改位置
+            // （实测在地形网格上一帧最多多推 1 米，表现为瞬移）。
+            // 这里用网格碰撞体复刻地形那一类几何，要求返回的位移就是请求的位移，一点都不能多。
+            var owner = CreateOwner(new Vector3(0f, 0f, 0.1f));
+            CreateMeshBox(new Vector3(0f, 0.6f, -1f), new Vector3(4f, 1.2f, 2f));
+            Physics.SyncTransforms();
+
+            var service = new PhysicsMovementCollisionService(owner.transform, 1.8f, 0.02f);
+
+            service.TryResolveMove(
+                new Vector2F(0f, 0.1f),
+                new Vector2F(0f, 0.35f),
+                0.4f,
+                out var resolved);
+
+            Assert.AreEqual(0.35f, resolved.Y, 0.01f, "移动解析不应该在请求位移之外额外改动位置。");
+            Assert.AreEqual(0.0f, resolved.X, 0.01f, "移动解析不应该在请求位移之外额外改动位置。");
         }
 
         private GameObject CreateOwner(Vector3 position)
@@ -230,6 +252,18 @@ namespace RaidDemo.Tests.EditMode
             box.name = "TestBox";
             box.transform.position = center;
             box.transform.localScale = size;
+            m_Created.Add(box);
+        }
+
+        /// <summary>创建一个用网格碰撞体的方块——复刻地形那种大网格几何。</summary>
+        private void CreateMeshBox(Vector3 center, Vector3 size)
+        {
+            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            box.name = "TestMeshBox";
+            box.transform.position = center;
+            box.transform.localScale = size;
+            Object.DestroyImmediate(box.GetComponent<Collider>());
+            box.AddComponent<MeshCollider>();
             m_Created.Add(box);
         }
 

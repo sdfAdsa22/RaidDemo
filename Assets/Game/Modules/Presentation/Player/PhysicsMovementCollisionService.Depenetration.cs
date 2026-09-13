@@ -4,121 +4,84 @@ using UnityEngine;
 namespace RaidDemo.Presentation
 {
     /// <summary>
-    /// 移动碰撞服务的「去穿透」部分（U-69）：把已经嵌进阻挡几何的角色横向推出来。
+    /// 移动碰撞服务的「重叠放松」部分（U-69）：起点已经嵌进阻挡几何时，
+    /// 只放松"正在离开"方向上的阻挡，**不修改角色位置**。
     /// </summary>
     /// <remarks>
     /// <para><b>为什么单独拆一个文件</b>：本类主体已经接近工程规定的单文件行数上限，
-    /// 去穿透是一块独立、可单独阅读的能力（只服务"起点已经重叠"这一种情况），
-    /// 因此按项目惯例拆成 partial——与 <c>PlayerWeaponController.Firing</c> 同样的做法。</para>
+    /// 这块能力独立、可单独阅读（只服务"起点已经重叠"这一种情况），因此按项目惯例拆成 partial——
+    /// 与 <c>PlayerWeaponController.Firing</c> 同样的做法。</para>
     ///
-    /// <para><b>典型触发场景</b>：角色走下平台 / 坡道的侧面——脚底已被地面吸附降到下层地面，
+    /// <para><b>要解决的问题（U-69）</b>：角色走下平台 / 坡道的侧面时，脚底已被地面吸附降到下层地面，
     /// 但胶囊半径（0.4 米）还压在侧棱里（每帧水平只前进约 0.05 米，跨过边缘必然留下这段重叠）。
-    /// 此时 PhysX 对**已经重叠**的碰撞体在每个方向都返回 0 距离命中（实测四个方向都是 d=0.000），
+    /// 此时 PhysX 对**已经重叠**的碰撞体在**每个方向**都返回 0 距离命中（实测四个方向都是 d=0.000），
     /// 位移被压成 0，角色被永久钉死在棱边。</para>
+    ///
+    /// <para><b>两次踩过的坑（务必保留）</b>：</para>
+    /// <list type="number">
+    /// <item><description><b>不能"把角色推出去"</b>：第一版实现真的改位置（每次最多推 1 米），
+    /// 结果在地形附近大面积误触发——胶囊边缘会吃进起伏地形，而"离开方向"又算错，
+    /// 角色一帧被弹飞最多 1 米（全区扫描实测 71 个异常点），表现为"走两步就瞬移"。</description></item>
+    /// <item><description><b>不能用 <c>ClosestPoint</c> 求方向</b>：非凸网格碰撞体（地形、山体这类大网格）
+    /// 的 <c>ClosestPoint</c> 会把输入点原样返回（实测），于是每条记录都退化成"没方向"，
+    /// 只能退到包围盒中心——地形的包围盒中心在地图正中，方向就变成了"沿地图半径向外"。</description></item>
+    /// </list>
+    ///
+    /// <para><b>现在的做法（与碰撞体类型无关）</b>：把胶囊沿**本帧移动方向**试探性地挪一小步
+    /// （<see cref="OverlapProbeDistance"/> 米），重新做一次重叠查询：
+    /// 原来压着的几何在试探位置**不再重叠**的，说明这个方向就是在离开它——这一批 0 距离命中被放松；
+    /// 仍然重叠的（朝里走、贴着蹭）保持阻挡。整个过程只读不写，位置永远只由位移决定。</para>
     /// </remarks>
     public sealed partial class PhysicsMovementCollisionService
     {
-        /// <summary>去穿透的最大迭代次数。每次推出 <see cref="DepenetrationStep"/> 米，合计上限 1 米。</summary>
-        /// <remarks>
-        /// 必须**在同一帧内完全脱离**重叠：只要还剩哪怕 0.1 米重叠，
-        /// 扫掠仍会返回 0 距离命中、位移依旧被压成 0（回归测试实测到这一点）。
-        /// 上限 1 米用于兜底"被传送进几何内部"这类极端情况，避免无限推。
-        /// </remarks>
-        private const int MaxDepenetrationIterations = 20;
-
-        /// <summary>单次去穿透迭代推出的水平距离（米）。</summary>
-        /// <remarks>
-        /// 取 0.05 而不是一次推足，是为了让每一小步都用一次重叠查询验证——
-        /// 推出方向随位置变化（例如在拐角处），一次推足容易推过头。
-        /// </remarks>
-        private const float DepenetrationStep = 0.05f;
-
         /// <summary>
-        /// 判定「最近点在正下方（地板 / 斜面）」的比例阈值。
+        /// 试探步长（米）：沿移动方向把胶囊挪这么远，重新看重叠是否解除。
         /// </summary>
         /// <remarks>
-        /// 水平分量小于竖直分量的这个比例时，视为脚下地面：脚底高度由地面吸附负责，
-        /// 去穿透不参与。侧棱给出的水平分量远大于竖直分量，因此不会被误伤。
+        /// 取"半径 + 0.05"：胶囊半径就是最深的横向重叠，再留 0.05 米余量，
+        /// 保证"完全压在棱边里"这种最坏情况也能在试探位置脱开；
+        /// 而"朝里走"的试探位置只会更深地压在几何里，因此不会被误判为离开。
         /// </remarks>
-        private const float FloorSkipRatio = 0.5f;
+        private const float OverlapProbeMargin = 0.05f;
 
-        /// <summary>判定「最近点退化」的阈值（水平距离平方）。</summary>
-        /// <remarks>
-        /// 球心落进碰撞体内部（或正好压在表面上）时，ClosestPoint 会原样返回球心自身，
-        /// 水平距离算出来是 0——平台边缘实测到这一种，需要走兜底方向。
-        /// </remarks>
-        private const float DegenerateEscapeEpsilon = 1e-8f;
-
-        /// <summary>
-        /// 去穿透结束后要留出的余隙（米）。
-        /// </summary>
-        /// <remarks>
-        /// 必须比扫掠用的安全间隙（0.02 米）大一点：如果只推到"正好贴面"，
-        /// 扫掠从相切位置出发仍然会返回 0 距离命中、位移照样是 0
-        /// （回归测试实测到 resolved 停在 0.3 米不再前进）。
-        /// </remarks>
-        private const float EscapeMargin = 0.03f;
-
-        /// <summary>去穿透用的重叠查询缓冲，避免每帧分配。</summary>
+        /// <summary>重叠查询的复用缓冲（当前位置），避免每帧分配。</summary>
         private readonly Collider[] m_Overlaps = new Collider[8];
 
+        /// <summary>重叠查询的复用缓冲（试探位置），避免每帧分配。</summary>
+        private readonly Collider[] m_ProbeOverlaps = new Collider[8];
+
+        /// <summary>本帧可放松的碰撞体数量（<see cref="m_Overlaps"/> 前这么多项有效）。</summary>
+        private int m_OverlapCount;
+
+        /// <summary>本帧是否启用重叠放松。</summary>
+        private bool m_RelaxationActive;
+
         /// <summary>
-        /// 去穿透：把角色从已经嵌进去的阻挡几何里横向推出来（U-69）。
+        /// 刷新本帧的重叠放松集合：找出"当前位置压着、但沿移动方向挪一步就不再压着"的碰撞体。
         /// </summary>
         /// <param name="position">角色当前水平位置。</param>
+        /// <param name="moveDirection">本帧移动方向（单位向量）。</param>
         /// <param name="radius">胶囊半径。</param>
-        /// <returns>需要额外施加的水平位移（可能为零）。</returns>
-        /// <remarks>
-        /// <para>为什么不是"忽略 0 距离命中"：那种写法在贴着薄墙时会允许角色直接穿过去。
-        /// 去穿透保证角色先被推到几何外面，再交给正常的扫掠判定——
-        /// 朝墙走的结果仍然是"被挡住"，只是不再被钉死。</para>
-        ///
-        /// <para>推出方向只取**水平分量**：脚下的地板 / 斜面虽然也可能与胶囊重叠，
-        /// 但它们给出的方向是竖直的，会被自动忽略——脚底高度由地面吸附负责，
-        /// 这里不会把角色从坡道上顶飞。</para>
-        /// </remarks>
-        private Vector2F ResolvePenetration(Vector2F position, float radius)
+        /// <returns>存在可放松的碰撞体时返回 true。</returns>
+        private bool RefreshOverlapRelaxation(Vector2F position, Vector2F moveDirection, float radius)
         {
-            var escaped = Vector2F.Zero;
-            for (var iteration = 0; iteration < MaxDepenetrationIterations; iteration++)
-            {
-                var probe = new Vector2F(position.X + escaped.X, position.Y + escaped.Y);
-                if (!TryFindPenetration(probe, radius, out var direction))
-                {
-                    break;
-                }
+            m_OverlapCount = 0;
+            m_RelaxationActive = false;
 
-                escaped += direction * DepenetrationStep;
+            var ownerY = m_Owner.position.y;
+            var count = OverlapAt(position, ownerY, radius, m_Overlaps);
+            if (count == 0)
+            {
+                return false;
             }
 
-            return escaped;
-        }
+            var probeDistance = radius + OverlapProbeMargin;
+            var probePosition = new Vector2F(
+                position.X + (moveDirection.X * probeDistance),
+                position.Y + (moveDirection.Y * probeDistance));
+            var probeCount = OverlapAt(probePosition, ownerY, radius, m_ProbeOverlaps);
 
-        /// <summary>
-        /// 找出一条把胶囊推出重叠的水平方向。
-        /// </summary>
-        /// <param name="position">待检查的水平位置。</param>
-        /// <param name="radius">胶囊半径。</param>
-        /// <param name="direction">输出：水平推出方向（单位向量）。</param>
-        /// <returns>存在重叠且能给出方向时返回 true。</returns>
-        private bool TryFindPenetration(Vector2F position, float radius, out Vector2F direction)
-        {
-            direction = Vector2F.Zero;
-            var ownerY = m_Owner.position.y;
-            var bottom = new Vector3(position.X, ownerY + 0.5f, position.Y);
-            var top = new Vector3(position.X, ownerY + m_BodyHeight - 0.4f, position.Y);
-
-            var count = Physics.OverlapCapsuleNonAlloc(
-                bottom,
-                top,
-                radius,
-                m_Overlaps,
-                PhysicsLayers.MovementBlockingMask,
-                QueryTriggerInteraction.Ignore);
-
-            var bestPenetration = 0f;
-            var bestX = 0f;
-            var bestZ = 0f;
+            var relaxed = 0;
             for (var i = 0; i < count; i++)
             {
                 var candidate = m_Overlaps[i];
@@ -127,83 +90,67 @@ namespace RaidDemo.Presentation
                     continue;
                 }
 
-                // 上下两个球心各求一次最近点：取水平分量更大的那个方向。
-                // 侧棱给出的方向是水平的（会被采用），地板给出的方向是竖直的（被 FloorSkipRatio 过滤）。
-                EvaluateEscape(candidate, bottom, radius, ref bestPenetration, ref bestX, ref bestZ);
-                EvaluateEscape(candidate, top, radius, ref bestPenetration, ref bestX, ref bestZ);
+                // 试探位置仍然压着它 → 这个方向不是在离开它（朝里走 / 贴着蹭），保持阻挡。
+                if (ContainsOverlap(m_ProbeOverlaps, probeCount, candidate))
+                {
+                    continue;
+                }
+
+                m_Overlaps[relaxed] = candidate;
+                relaxed++;
             }
 
-            if (bestPenetration <= 0f)
+            m_OverlapCount = relaxed;
+            m_RelaxationActive = relaxed > 0;
+            return m_RelaxationActive;
+        }
+
+        /// <summary>
+        /// 判断某个 0 距离命中是否应当被放松（忽略）。
+        /// </summary>
+        /// <param name="collider">命中到的碰撞体。</param>
+        /// <returns>应当忽略该命中时返回 true。</returns>
+        /// <remarks>只有"本帧被判定为正在离开"的那批碰撞体才会被放松，其它照旧阻挡。</remarks>
+        private bool ShouldRelaxContact(Collider collider)
+        {
+            if (!m_RelaxationActive)
             {
                 return false;
             }
 
-            var length = Mathf.Sqrt((bestX * bestX) + (bestZ * bestZ));
-            direction = new Vector2F(bestX / length, bestZ / length);
-            return true;
+            return ContainsOverlap(m_Overlaps, m_OverlapCount, collider);
         }
 
-        /// <summary>求一个球心到碰撞体的推出方向与穿透深度，保留穿透最深的一条。</summary>
-        /// <param name="collider">参与判定的碰撞体。</param>
-        /// <param name="sphereCenter">胶囊某一端的球心。</param>
+        /// <summary>做一次胶囊重叠查询，把结果写进指定缓冲并返回数量。</summary>
+        /// <param name="position">水平位置。</param>
+        /// <param name="ownerY">角色脚底高度（胶囊两端跟着它走）。</param>
         /// <param name="radius">胶囊半径。</param>
-        /// <param name="bestPenetration">当前最大的穿透深度（引用更新）。</param>
-        /// <param name="bestX">当前最优方向 X 分量（未归一化，引用更新）。</param>
-        /// <param name="bestZ">当前最优方向 Z 分量（未归一化，引用更新）。</param>
-        private static void EvaluateEscape(
-            Collider collider,
-            Vector3 sphereCenter,
-            float radius,
-            ref float bestPenetration,
-            ref float bestX,
-            ref float bestZ)
+        /// <param name="buffer">写入的缓冲。</param>
+        private int OverlapAt(Vector2F position, float ownerY, float radius, Collider[] buffer)
         {
-            var closest = collider.ClosestPoint(sphereCenter);
-            var dx = sphereCenter.x - closest.x;
-            var dz = sphereCenter.z - closest.z;
-            var horizontal = Mathf.Sqrt((dx * dx) + (dz * dz));
-            float penetration;
+            var bottom = new Vector3(position.X, ownerY + 0.5f, position.Y);
+            var top = new Vector3(position.X, ownerY + m_BodyHeight - 0.4f, position.Y);
+            return Physics.OverlapCapsuleNonAlloc(
+                bottom,
+                top,
+                radius,
+                buffer,
+                PhysicsLayers.MovementBlockingMask,
+                QueryTriggerInteraction.Ignore);
+        }
 
-            if (horizontal <= DegenerateEscapeEpsilon)
+        /// <summary>判断某个碰撞体是否出现在重叠缓冲的前 N 项里。</summary>
+        private static bool ContainsOverlap(Collider[] buffer, int count, Collider collider)
+        {
+            for (var i = 0; i < count; i++)
             {
-                // 退化情形：球心已经落在碰撞体内部（或正好压在表面上）。
-                // 兜底方向改用「碰撞体包围盒中心 → 球心」的水平分量；
-                var boundsCenter = collider.bounds.center;
-                dx = sphereCenter.x - boundsCenter.x;
-                dz = sphereCenter.z - boundsCenter.z;
-                horizontal = Mathf.Sqrt((dx * dx) + (dz * dz));
-                if (horizontal <= DegenerateEscapeEpsilon)
+                if (buffer[i] == collider)
                 {
-                    // 连方向都定不出来（球心正好是包围盒中心）：放弃这一条。
-                    return;
+                    return true;
                 }
-
-                // 球心在内部，按整半径 + 余隙推出。
-                penetration = radius + EscapeMargin;
-            }
-            else
-            {
-                // 地板 / 斜面：最近点在正下方，水平分量远小于竖直分量 → 交给地面吸附。
-                var vertical = Mathf.Abs(sphereCenter.y - closest.y);
-                if (horizontal <= FloorSkipRatio * vertical)
-                {
-                    return;
-                }
-
-                // 侧棱：需要推出的距离 = 半径 - 球心到侧面的水平距离。
-                // 注意不能要求这个距离足够大——平台边缘实测球心只差 0.00027 米就压在面上，
-                // 方向完全正确，若按"最小距离"过滤会把这种情形整个丢掉（U-69 第一次修复的坑）。
-                penetration = radius + EscapeMargin - horizontal;
             }
 
-            if (penetration <= bestPenetration)
-            {
-                return;
-            }
-
-            bestPenetration = penetration;
-            bestX = dx;
-            bestZ = dz;
+            return false;
         }
     }
 }

@@ -22,12 +22,16 @@ namespace RaidDemo.Presentation
     /// 修复前的症状是敌人贴身时把玩家完全挡住、两个模型卡在一起；
     /// 子弹射线不受影响——战斗查询用的是全层遮罩，照常命中单位。</para>
     ///
-    /// <para><b>为什么需要去穿透（U-69）：</b>角色走下平台 / 坡道的侧面时，脚底已经被地面吸附
+    /// <para><b>为什么需要「重叠放松」（U-69）：</b>角色走下平台 / 坡道的侧面时，脚底已经被地面吸附
     /// 降到下层地面，但胶囊半径（0.4 米）还压在侧棱里——每帧水平只前进约 0.05 米，
     /// 跨过边缘后必然留下这段重叠。此时 PhysX 对**已经重叠**的碰撞体在每个方向都返回
     /// 0 距离命中（实测四个方向都是 `d=0.000`），移动被压成 0，角色被永久钉死在棱边。
-    /// 这里在解析位移之前先做一次去穿透：沿水平最小方向把角色推出重叠，
-    /// 再照常扫掠——朝墙走时先被推出、再被挡住，不会像"忽略 0 距离命中"那样允许穿墙。</para>
+    /// 解析位移前先做一次重叠试探（见 <c>PhysicsMovementCollisionService.Depenetration.cs</c>）：
+    /// 沿移动方向把胶囊挪一小步，**原来压着、挪一步后不再压着**的几何才放松——
+    /// 只忽略它的 0 距离命中，角色按自己的速度走出来；朝里走、贴着蹭照旧被挡住；
+    /// **全程不修改位置**——第一版"把角色推出去"曾在地形上误触发，一帧把角色弹飞最多 1 米
+    /// （全区扫描实测 71 个异常点），第二版改用 <c>ClosestPoint</c> 求方向，又踩了
+    /// "非凸网格碰撞体会原样返回输入点"的坑。</para>
     /// </remarks>
     public sealed partial class PhysicsMovementCollisionService : IMovementCollisionWorld
     {
@@ -84,20 +88,18 @@ namespace RaidDemo.Presentation
                 return false;
             }
 
-            // U-69：先去穿透，再解析位移。顺序不能反——
-            // 去穿透必须排在「位移太小就早退」之前：贴着棱边时哪怕只有很小的输入，
-            // 也应该先把角色推出来，否则它会停在重叠状态里动弹不得。
-            var escape = ResolvePenetration(from, radius);
-            var origin = new Vector2F(from.X + escape.X, from.Y + escape.Y);
-
             var distance = delta.Magnitude;
             if (distance <= PositionEpsilon)
             {
-                resolved = escape;
-                return !escape.IsNearlyZero;
+                return false;
             }
 
             var direction = delta.Normalized;
+
+            // U-69：先刷新本帧的"重叠放松"集合，再解析位移。
+            // 它只决定"哪些 0 距离命中被忽略"，不修改角色位置——位置永远只由下面的位移决定。
+            RefreshOverlapRelaxation(from, direction, radius);
+
             var travelled = Vector2F.Zero;
             var remaining = distance;
             var blocked = false;
@@ -109,7 +111,7 @@ namespace RaidDemo.Presentation
                     break;
                 }
 
-                var start = new Vector2F(origin.X + travelled.X, origin.Y + travelled.Y);
+                var start = new Vector2F(from.X + travelled.X, from.Y + travelled.Y);
                 if (!Cast(start, direction, radius, remaining, out var hit))
                 {
                     travelled += direction * remaining;
@@ -160,9 +162,7 @@ namespace RaidDemo.Presentation
                 remaining = slide.magnitude;
             }
 
-            // 返回值是"去穿透 + 实际位移"的合成量：调用方（移动模拟）直接把它加到位移上，
-            // 因此角色在同一帧里既脱困、又完成本帧该走的那一段。
-            resolved = new Vector2F(escape.X + travelled.X, escape.Y + travelled.Y);
+            resolved = travelled;
             return blocked;
         }
 
@@ -253,6 +253,14 @@ namespace RaidDemo.Presentation
 
                 // 可行走斜面不是障碍：坡道高度交由 PlayerMotor 的地面吸附处理。
                 if (Vector3.Angle(candidate.normal, Vector3.up) <= WalkableSlopeAngle)
+                {
+                    continue;
+                }
+
+                // U-69：起点已经与这个碰撞体重叠、且正在离开它时，忽略这条 0 距离命中。
+                // 少了这一步，角色被棱边卡住后每个方向都会被 d=0 命中挡住、永远走不出来。
+                if (candidate.distance <= PositionEpsilon
+                    && ShouldRelaxContact(candidate.collider))
                 {
                     continue;
                 }
