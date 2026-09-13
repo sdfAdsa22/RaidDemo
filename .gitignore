@@ -94,3 +94,6 @@ desktop.ini
 # 好处：Unity 能正常导入预览，同时 Git 里永远不会出现"试用后淘汰"的素材及其历史。
 [Aa]ssets/Game/Content/External/_Inbox/
 [Aa]ssets/Game/Content/External/_Inbox.meta
+
+# 本机部署备忘（含云主机地址等接入信息，不入库）
+[Dd]ocs/Local/
