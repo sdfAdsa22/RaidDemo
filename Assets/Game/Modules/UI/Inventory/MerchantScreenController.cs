@@ -29,31 +29,18 @@ namespace RaidDemo.UI
     [DisallowMultipleComponent]
     public sealed partial class MerchantScreenController : MonoBehaviour
     {
-        /// <summary>界面参考分辨率。</summary>
-        private const float ReferenceWidth = 1920f;
-        private const float ReferenceHeight = 1080f;
-
-        /// <summary>面板尺寸与位置。</summary>
+        /// <summary>面板尺寸（参考像素）。与背包界面同一套尺寸语言。</summary>
         private const float PanelWidth = 1500f;
-        private const float PanelHeight = 820f;
+
+        private const float PanelHeight = 780f;
 
         /// <summary>超过这个金额的出售需要二次确认，避免手滑卖掉金表。</summary>
         private const int HighValueSellThreshold = 10000;
 
-        private static readonly Color PanelColor = new Color(0.08f, 0.08f, 0.10f, 0.97f);
-        private static readonly Color TabColor = new Color(0.22f, 0.23f, 0.27f);
-        private static readonly Color TabActiveColor = new Color(0.18f, 0.46f, 0.80f);
-        private static readonly Color TabHoverColor = new Color(0.30f, 0.32f, 0.38f);
-        private static readonly Color RowColor = new Color(0.14f, 0.15f, 0.18f, 0.95f);
-        private static readonly Color ButtonColor = new Color(0.18f, 0.46f, 0.80f);
-        private static readonly Color ButtonHoverColor = new Color(0.26f, 0.58f, 0.94f);
-        private static readonly Color DisabledColor = new Color(0.26f, 0.27f, 0.30f);
-        private static readonly Color TextColor = new Color(0.94f, 0.94f, 0.96f);
-        private static readonly Color DimColor = new Color(0.66f, 0.67f, 0.72f);
-        private static readonly Color MoneyColor = new Color(0.95f, 0.82f, 0.35f);
-        private static readonly Color SuccessColor = new Color(0.40f, 0.90f, 0.55f);
-        private static readonly Color FailureColor = new Color(0.95f, 0.45f, 0.40f);
-        private static readonly Color ConfirmPanelColor = new Color(0.10f, 0.10f, 0.13f, 0.99f);
+        /// <summary>底部提示条的成功 / 失败配色。</summary>
+        private static readonly Color SuccessColor = UiPalette.Ok;
+
+        private static readonly Color FailureColor = UiPalette.Bad;
 
         /// <summary>底部提示条同时承担"最近一次操作结果"，几秒后清空。</summary>
         private const float StatusSeconds = 3f;
@@ -69,9 +56,9 @@ namespace RaidDemo.UI
 
         private GameObject m_Root;
         private InventoryGridView m_StashView;
-        private Text m_MoneyLabel;
-        private Text m_StashValueLabel;
-        private Text m_StatusLabel;
+        private TMPro.TextMeshProUGUI m_MoneyLabel;
+        private TMPro.TextMeshProUGUI m_StashValueLabel;
+        private TMPro.TextMeshProUGUI m_StatusLabel;
         private float m_StatusRemaining;
 
         /// <summary>是否处于批量出售模式。</summary>

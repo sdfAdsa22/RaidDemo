@@ -37,9 +37,9 @@ namespace RaidDemo.UI
 
         private readonly Image m_Background;
         private readonly TextMeshProUGUI m_Label;
-        private readonly Sprite m_NormalSprite;
-        private readonly Sprite m_PressedSprite;
-        private readonly Color m_LabelColor;
+        private Sprite m_NormalSprite;
+        private Sprite m_PressedSprite;
+        private Color m_LabelColor;
         private readonly Vector2 m_BasePosition;
         private readonly Vector2 m_LabelBasePosition;
         private bool m_Hovered;
@@ -70,6 +70,9 @@ namespace RaidDemo.UI
         /// <summary>按钮文字。</summary>
         public TextMeshProUGUI Label => m_Label;
 
+        /// <summary>按钮底图。少数界面（页签、出售确认）需要按状态直接改底图或染色。</summary>
+        public Image Background => m_Background;
+
         /// <summary>是否可交互。禁用时点击无效且文字变灰。</summary>
         public bool Interactable { get; set; } = true;
 
@@ -84,6 +87,31 @@ namespace RaidDemo.UI
         public void SetHovered(bool hovered)
         {
             m_Hovered = hovered && Interactable;
+
+            // 立即刷新一次外观：调用方通常只关心"鼠标在不在上面"，
+            // 让它们每次还要额外调一次 ApplyVisual 才看得到反馈，是一处很容易漏的约定。
+            ApplyVisual(m_Pressed);
+        }
+
+        /// <summary>
+        /// 切换按钮的视觉等级（次要 ↔ 主要）。
+        /// </summary>
+        /// <param name="kind">目标等级。</param>
+        /// <remarks>页签用它表达"当前选中"：选中的页签用主按钮的青绿底，
+        /// 未选中的用白底。这样"选中态"与"悬停态"是两套不同的信号，不会互相冒充。</remarks>
+        public void SetVariant(UiButtonKind kind)
+        {
+            var isPrimary = kind == UiButtonKind.Primary;
+            m_NormalSprite = isPrimary ? UiSprites.ButtonPrimary : UiSprites.Button;
+            m_PressedSprite = isPrimary ? UiSprites.ButtonPrimaryPressed : UiSprites.ButtonPressed;
+            m_LabelColor = isPrimary ? Color.white : UiPalette.Ink;
+
+            if (!m_Hovered)
+            {
+                m_Background.sprite = m_NormalSprite;
+            }
+
+            ApplyVisual(m_Pressed);
         }
 
         /// <summary>

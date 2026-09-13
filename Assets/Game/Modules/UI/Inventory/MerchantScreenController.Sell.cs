@@ -83,9 +83,9 @@ namespace RaidDemo.UI
 
             var hovered = m_SellToggleButton.Contains(pointer);
             var highlighted = m_SellMode && m_SellSelection.Count > 0;
-            m_SellToggleButton.Background.color = hovered
-                ? ButtonHoverColor
-                : highlighted ? new Color(0.24f, 0.66f, 0.40f) : ButtonColor;
+            // 批量出售模式下已经选了东西时，主按钮切成青绿实心（主题里的"已激活"语言）。
+            m_SellToggleButton.SetVariant(highlighted ? UiButtonKind.Primary : UiButtonKind.Normal);
+            m_SellToggleButton.SetHovered(hovered);
 
             if (hovered && Mouse.current.leftButton.wasPressedThisFrame)
             {

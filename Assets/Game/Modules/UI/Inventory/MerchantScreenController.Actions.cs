@@ -133,9 +133,10 @@ namespace RaidDemo.UI
             {
                 var tab = m_TabWidgets[i];
                 var hovered = tab.Button.Contains(pointer);
-                tab.Button.Background.color = hovered
-                    ? TabHoverColor
-                    : tab.Tab == m_ActiveTab ? TabActiveColor : TabColor;
+                // 当前页签用主按钮的青绿底，其它页签用白底：
+                // "选中"与"悬停"因此是两种不同的信号，不会互相冒充。
+                tab.Button.SetVariant(tab.Tab == m_ActiveTab ? UiButtonKind.Primary : UiButtonKind.Normal);
+                tab.Button.SetHovered(hovered);
 
                 if (!hovered || !Mouse.current.leftButton.wasPressedThisFrame)
                 {

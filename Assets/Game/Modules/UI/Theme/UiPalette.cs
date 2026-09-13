@@ -59,6 +59,9 @@ namespace RaidDemo.UI
         /// <summary>高亮黄：预算提示、稀有度之外的重点标记。</summary>
         public static readonly Color Yellow = FromHex("#F5C542");
 
+        /// <summary>金币与金额文字（纸面上的深金，比高亮黄更压得住）。</summary>
+        public static readonly Color Money = FromHex("#B07C12");
+
         /// <summary>成功（撤离成功、正向收益）。</summary>
         public static readonly Color Ok = FromHex("#3FA85C");
 
