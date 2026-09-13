@@ -19,6 +19,31 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否以服务器模式启动。</summary>
         public static bool IsActive { get; private set; }
 
+        /// <summary>
+        /// 场景里的物品目录。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>服务器为什么需要它：</b>权威逻辑要用真实内容——武器参数、弹药口径、
+        /// 备弹数量都来自物品定义。而服务器不装配客户端世界，那些序列化引用会随客户端装配根一起消失。</para>
+        ///
+        /// <para>做法：客户端装配根在服务器模式下销毁自己之前，先把目录交到这里。
+        /// 场景只加载一次、交接只发生一次，因此用静态引用是安全的；
+        /// 真正的所有权在会话（<see cref="ServerRuntime.Session"/>）手里。</para>
+        /// </remarks>
+        public static RaidDemo.Data.ItemCatalog SceneItemCatalog { get; private set; }
+
+        /// <summary>场景里的表现层目录（武器模型、音效等）。服务器用不到，保留给调试工具。</summary>
+        public static RaidDemo.Presentation.PresentationCatalog ScenePresentationCatalog { get; private set; }
+
+        /// <summary>由客户端装配根在服务器模式下交接场景内容。</summary>
+        internal static void AcceptSceneContent(
+            RaidDemo.Data.ItemCatalog itemCatalog,
+            RaidDemo.Presentation.PresentationCatalog presentationCatalog)
+        {
+            SceneItemCatalog = itemCatalog;
+            ScenePresentationCatalog = presentationCatalog;
+        }
+
         /// <summary>启动参数。仅当 <see cref="IsActive"/> 为 true 时有效。</summary>
         public static LaunchOptions Options { get; private set; }
 

@@ -128,6 +128,9 @@ namespace RaidDemo.Bootstrap
             // 服务器自己的会话由 ServerEntryPoint 建立（见 Session/ServerRuntime.cs）。
             if (ServerMode.IsActive)
             {
+                // 但服务器需要场景里的内容目录（物品定义等）来构建权威逻辑，
+                // 因此销毁自己之前先把它交出去。
+                ServerMode.AcceptSceneContent(m_ItemCatalog, m_PresentationCatalog);
                 Destroy(gameObject);
                 return;
             }
