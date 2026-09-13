@@ -56,6 +56,15 @@ namespace RaidDemo.Kernel
         private int m_ErrorCount;
 
         /// <summary>
+        /// 最低记录级别。
+        /// </summary>
+        /// <remarks>
+        /// 只读暴露给服务器运行时与状态页：服务器以 <c>-logLevel</c> 启动后，
+        /// 运维侧应当能从进程内查到「当前到底记到哪一级」，而不是靠猜。
+        /// </remarks>
+        public LogLevel MinimumLevel => m_MinimumLevel;
+
+        /// <summary>
         /// 创建日志服务。
         /// </summary>
         /// <param name="minimumLevel">最低记录级别。低于该级别的调用会被直接丢弃。</param>

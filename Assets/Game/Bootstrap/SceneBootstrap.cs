@@ -70,8 +70,12 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         [SerializeField] private float m_CarryCapacityKg = 50f;
 
+        /// <summary>
+        /// 会话作用域：事件总线、服务定位器与命令路由的持有者（M9 · P0 起由场景内直接创建改为会话化）。
+        /// </summary>
+        private SessionScope m_Session;
+
         private EventBus m_EventBus;
-        private ServiceLocator m_Services;
         private CommandRouter m_CommandRouter;
         private PlayerMovementProfile m_MovementProfile;
         private PlayerMoveCommandHandler m_MoveHandler;
@@ -120,6 +124,14 @@ namespace RaidDemo.Bootstrap
         /// </summary>
         private void Awake()
         {
+            // 服务器进程不需要客户端装配：相机、输入、界面、玩家表现都属于客户端。
+            // 服务器自己的会话由 ServerEntryPoint 建立（见 Session/ServerRuntime.cs）。
+            if (ServerMode.IsActive)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             Initialize();
         }
 
@@ -150,8 +162,8 @@ namespace RaidDemo.Bootstrap
             m_CodexMarker?.Dispose();
             m_CodexMarker = null;
             m_AiDirector?.Dispose();
-            ServiceLocatorHolder.Clear();
-            m_Services?.Clear();
+            m_Session?.Dispose();
+            m_Session = null;
         }
 
         /// <summary>
@@ -288,14 +300,11 @@ namespace RaidDemo.Bootstrap
             // 显式要求后台继续运行，把这个坑堵在源头。
             Application.runInBackground = true;
 
-            m_Services = new ServiceLocator();
-            m_EventBus = new EventBus();
-            m_CommandRouter = new CommandRouter();
-
-            m_Services.Register(m_EventBus);
-            m_Services.Register(m_CommandRouter);
-            m_Services.Register(new LogService(LogLevel.Info));
-            ServiceLocatorHolder.Set(m_Services);
+            // 会话作用域负责创建与释放会话级服务，并把它们注册为当前场景的静态入口。
+            // 单机走的是「本机内嵌服务器」形态：权威逻辑与客户端同进程，但边界已经按服务器设计。
+            m_Session = SessionScope.CreateLocal();
+            m_EventBus = m_Session.Events;
+            m_CommandRouter = m_Session.Commands;
 
             m_MovementProfile = new PlayerMovementProfile();
             var profileError = m_MovementProfile.Validate();

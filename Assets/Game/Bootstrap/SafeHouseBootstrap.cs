@@ -31,8 +31,9 @@ namespace RaidDemo.Bootstrap
         [SerializeField] private PlayerInputCollector m_InputCollector;
         [SerializeField] private TopDownCameraController m_CameraController;
         [SerializeField] private ItemCatalog m_ItemCatalog;
+        /// <summary>会话作用域：会话级服务的创建与释放由它统一管理（M9 · P0）。</summary>
+        private SessionScope m_Session;
         private EventBus m_EventBus;
-        private ServiceLocator m_Services;
         private CommandRouter m_CommandRouter;
         private PlayerMovementProfile m_MovementProfile;
         private PlayerMoveCommandHandler m_MoveHandler;
@@ -53,15 +54,19 @@ namespace RaidDemo.Bootstrap
         /// <summary>初始化顺序与战局一致：服务 → 命令 → 界面 → 表现。</summary>
         private void Awake()
         {
+            // 服务器进程不装配客户端世界：安全屋是纯客户端场景（相机、界面、设施交互）。
+            if (ServerMode.IsActive)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             Application.runInBackground = true;
 
-            m_Services = new ServiceLocator();
-            m_EventBus = new EventBus();
-            m_CommandRouter = new CommandRouter();
-            m_Services.Register(m_EventBus);
-            m_Services.Register(m_CommandRouter);
-            m_Services.Register(new LogService(LogLevel.Info));
-            ServiceLocatorHolder.Set(m_Services);
+            // 与战局一致：会话作用域负责服务，场景只负责装配内容。
+            m_Session = SessionScope.CreateLocal();
+            m_EventBus = m_Session.Events;
+            m_CommandRouter = m_Session.Commands;
 
             m_MovementProfile = new PlayerMovementProfile();
             var facing = Vector2F.FromDegrees(0f);
@@ -151,8 +156,8 @@ namespace RaidDemo.Bootstrap
             m_ChangedSubscription = null;
             m_CodexMarker?.Dispose();
             m_CodexMarker = null;
-            ServiceLocatorHolder.Clear();
-            m_Services?.Clear();
+            m_Session?.Dispose();
+            m_Session = null;
         }
 
         /// <summary>把最新余额写进安全屋右上角。</summary>

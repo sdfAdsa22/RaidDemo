@@ -97,3 +97,7 @@ desktop.ini
 
 # 本机部署备忘（含云主机地址等接入信息，不入库）
 [Dd]ocs/Local/
+
+# 测试框架在构建时写入的性能采样产物（本工程资源一律放 Assets/Game/Content）
+[Aa]ssets/[Rr]esources/
+[Aa]ssets/[Rr]esources.meta
