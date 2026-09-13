@@ -122,6 +122,15 @@ namespace RaidDemo.Bootstrap
                         message.WasKilled,
                         timestamp: 0d,
                         sequence: message.Sequence));
+
+                    // 挨打的是我：用服务器给的剩余生命刷新 HUD。
+                    // 联机模式下本地没有生命模拟（那是服务器的权威），
+                    // 少这一步玩家会发现自己掉血、界面却一直显示满血。
+                    if (message.TargetId == m_LocalPlayerId)
+                    {
+                        ApplyLocalHealthFromServer(message.RemainingHealth, !message.WasKilled);
+                    }
+
                     break;
 
                 case CombatEventMessage.KindReload:
@@ -142,6 +151,29 @@ namespace RaidDemo.Bootstrap
             {
                 m_Session.Log.Verbose($"[联机] 收到战斗事件：种类 {message.Kind}（来源 {message.SourceId}）");
             }
+        }
+
+        /// <summary>
+        /// 用服务器的权威结果刷新本机玩家的血量显示。
+        /// </summary>
+        /// <param name="remainingHealth">服务器结算后的剩余生命。</param>
+        /// <param name="isAlive">是否仍存活。</param>
+        /// <remarks>
+        /// <para>联机模式下本地没有生命模拟：血量、护甲、死亡时刻全部由服务器说了算，
+        /// 客户端只负责显示。单机那条路走的是 <c>UpdateAi</c> 里每帧从战斗世界拉取，两者不冲突
+        /// （联机客户端不装配本地 AI）。</para>
+        ///
+        /// <para>护甲暂不同步：服务器还没有把护甲耐久下行（等 P3 的装备同步一起做），
+        /// 因此联机里护甲条保持初始值。</para>
+        /// </remarks>
+        private void ApplyLocalHealthFromServer(float remainingHealth, bool isAlive)
+        {
+            var max = ServerCombatCoordinator.DefaultMaxHealth;
+            m_CombatHud?.SetHealth(remainingHealth, max, isAlive);
+
+            // 留一条可见痕迹：联机里"我的血条是不是服务器说了算"没法从画面上验证（无头验收没有画面），
+            // 而这正是最容易悄悄退化成"本地自己算"的地方。
+            m_Session?.Log.Verbose($"[联机] 本机生命（服务器权威）：{remainingHealth:F0}/{max:F0}，存活={isAlive}");
         }
     }
 }

@@ -63,8 +63,11 @@ namespace RaidDemo.Bootstrap
         /// 自动行走的输入：沿圆周匀速转向，同时改变朝向。
         /// </summary>
         /// <remarks>
-        /// 刻意让朝向与移动方向一起转：远端视图的朝向、走路动画与播放倍率都会被验证到，
-        /// 只朝一个方向走的话，朝向同步出了问题也看不出来。
+        /// <para>刻意让朝向与移动方向一起转：远端视图的朝向、走路动画与播放倍率都会被验证到，
+        /// 只朝一个方向走的话，朝向同步出了问题也看不出来。</para>
+        ///
+        /// <para><b>优先瞄敌人：</b>验收必须走到"玩家打死敌人"这条分支，而瞄队友永远走不到——
+        /// 上一轮验收里敌人一枪没挨，就是因为这个。</para>
         /// </remarks>
         private void UpdateAutoWalkInput()
         {
@@ -77,10 +80,12 @@ namespace RaidDemo.Bootstrap
             var x = (float)Math.Cos(angle);
             var y = (float)Math.Sin(angle);
 
-            // 走的方向是绕圈，但**朝向**要盯着最近的队友：
-            // 只有真的打中，才会走到"伤害结算 → 广播 → 客户端扣血"这条路径上，
-            // 否则验收只能证明"枪响了"，证明不了"打中了"。
-            var aim = ResolveAutoAimDirection(new Vector2F(x, y));
+            // 先找射程内最近的敌人；找不到再退回"盯着最近的队友"。
+            // 打中谁不重要，重要的是"打中"这件事必须真的发生：只有命中了，
+            // 才会走到"伤害结算 → 广播 → 客户端更新"这条链路上。
+            var aim = TryResolveEnemyAim(out var enemyAim)
+                ? enemyAim
+                : ResolveAutoAimDirection(new Vector2F(x, y));
             m_InputCollector.ScriptedLookDirection = aim;
 
             // 有队友时朝他走过去，而不是各绕各的圈：
@@ -89,6 +94,56 @@ namespace RaidDemo.Bootstrap
             m_InputCollector.ScriptedMoveDirection = hasTarget
                 ? new Vector2(aim.X, aim.Y)
                 : new Vector2(x, y);
+        }
+
+        /// <summary>验收模式下瞄准的最大距离（米）。比步枪射程略小，留一点余量。</summary>
+        private const float AutoAimEnemyRangeMeters = 11f;
+
+        /// <summary>
+        /// 找射程内最近的远端敌人作为瞄准方向。
+        /// </summary>
+        /// <remarks>
+        /// 只认还没阵亡的敌人：尸体不可被命中（服务器已经关掉了它的碰撞体），
+        /// 继续朝它开枪会让验收一直停在"开了枪但没命中"。
+        /// </remarks>
+        /// <param name="aim">找到的瞄准方向。</param>
+        /// <returns>射程内存在存活敌人时返回 true。</returns>
+        private bool TryResolveEnemyAim(out Vector2F aim)
+        {
+            aim = Vector2F.Zero;
+
+            if (m_RemoteEnemyViews.Count == 0 || m_PlayerMotor == null)
+            {
+                return false;
+            }
+
+            var self = m_PlayerMotor.SimulatedPosition;
+            var bestSqrDistance = AutoAimEnemyRangeMeters * AutoAimEnemyRangeMeters;
+            var found = false;
+
+            foreach (var pair in m_RemoteEnemyViews)
+            {
+                var view = pair.Value;
+                if (view == null || view.IsDestroyed)
+                {
+                    continue;
+                }
+
+                var position = view.transform.position;
+                var dx = position.x - self.x;
+                var dz = position.z - self.y;
+                var sqrDistance = (dx * dx) + (dz * dz);
+                if (sqrDistance >= bestSqrDistance || sqrDistance < 0.01f)
+                {
+                    continue;
+                }
+
+                bestSqrDistance = sqrDistance;
+                aim = new Vector2F(dx, dz).Normalized;
+                found = true;
+            }
+
+            return found;
         }
 
         /// <summary>验收模式下把朝向对准最近的远端玩家；没有目标时保持原方向。</summary>

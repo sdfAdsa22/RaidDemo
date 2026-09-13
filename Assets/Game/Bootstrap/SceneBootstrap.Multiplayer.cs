@@ -125,6 +125,10 @@ namespace RaidDemo.Bootstrap
 
             RegisterCombatChannel();
             RegisterEnemyChannel();
+
+            // 联机里血量由服务器说了算，因此连上就先按满血显示一次：
+            // 否则在挨第一枪之前，界面上的血量是"本地战斗世界"的默认值（联机里根本没建）。
+            ApplyLocalHealthFromServer(ServerCombatCoordinator.DefaultMaxHealth, true);
         }
 
         /// <summary>连接断开：清理远端视图，避免留下不会动的假队友。</summary>
