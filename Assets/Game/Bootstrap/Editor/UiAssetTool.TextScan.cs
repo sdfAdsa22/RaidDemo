@@ -17,7 +17,7 @@ namespace RaidDemo.Bootstrap.Editor
             for (var i = 0; i < text.Length; i++)
             {
                 // Unity 的 .unity / .asset YAML 会把中文写成 \uXXXX 转义；
-                // 只按字面扫描会把“衣柜”这类场景内文案漏掉，正是 U-63 的根因。
+                // 只按字面扫描会把“衣柜”这类场景内文案漏掉，也是 U-59 / M7-P-28 的一部分。
                 if (TryReadUnicodeEscape(text, i, out var escaped))
                 {
                     AddIfUiCharacter(characters, escaped);

@@ -16,7 +16,7 @@
 > **当前开发状态**：`M7 打磨与美术替换` **进行中**——批次 0（素材收口）、批次 1（角色与动画）、
 > 批次 2（下沉盆地地形 + 场景道具）、批次 3（音效与 VFX）、**批次 4（界面美化）已完成**：
 > 主题层与全部主要界面已按「卡通扁平」风格改版，补上结算 / 暂停 / 安全屋、
-> 五类物品图标、界面音效与**游戏内 12 角色选择**（2026-09-13，398 项测试全绿）。
+> 五类物品图标素材、界面音效与**游戏内 12 角色选择**（2026-09-13，398 项测试全绿）。
 > `M6 局外系统` 已全部完成（批次 1~4）。
 > 现在的完整循环是：**启动 → 主菜单（继续 / 新游戏）→ 安全屋（准备装备 / 买装备 / 接任务 / 试枪 / 选地图）→ 战局 → 撤离或阵亡 → 结算 → 回安全屋**。
 > 局外部分已经能存东西、也能真的丢东西：**撤离把战利品存进仓库，阵亡、超时或中途强退则连身上带的一起丢**；
@@ -94,7 +94,7 @@
 | M4 | AI 系统（含开发者模式） | **已完成**（2026-09-11 验收通过，当前 312 项测试全绿） |
 | M5 | 战局闭环（首个垂直切片） | **已完成**（2026-09-11，326 项测试全绿） |
 | M6 | 局外系统与经济循环 | **全部完成**（2026-09-12，345 项测试全绿）：仓库跨战局存活、撤离入库、阵亡真的丢装备、安全屋、商人买卖与 75% 收购价、五个固定任务、JSON 本地存档与「强退视同阵亡」。见 [`Docs/Modules/06_Meta.md`](Docs/Modules/06_Meta.md) |
-| M7 | 打磨与美术替换 | **进行中**（2026-09-13，398 项测试全绿）：批次 0 素材收口 + Git LFS ✅；批次 1 角色与动画（玩家 Kenney 角色、敌人 Toon Shooter 三型）✅；批次 2 场景与道具 ✅——战局地图改为**下沉盆地**（谷底 -6 米、四通道、四个撤离点）、纯草地 + 橙黏土土墙 + 远景山脊，集装箱 / 木箱 / 纸箱 / 铁丝网 / 沙袋全部替换为正式素材，**遮挡改用自研「透视孔」着色器**（相机不再拉近，遮挡物上以角色为中心开圆孔）；**批次 3 音效与 VFX** ✅；**批次 4 界面美化** ✅——主题层、全部主要界面、五类物品图标、界面音效与 **12 角色选择（实时 3D 预览 + 存档持久化）**；批次 5 性能、批次 6 验收待做 |
+| M7 | 打磨与美术替换 | **进行中**（2026-09-13，398 项测试全绿）：批次 0 素材收口 + Git LFS ✅；批次 1 角色与动画（玩家 Kenney 角色、敌人 Toon Shooter 三型）✅；批次 2 场景与道具 ✅——战局地图改为**下沉盆地**（谷底 -6 米、四通道、四个撤离点）、纯草地 + 橙黏土土墙 + 远景山脊，集装箱 / 木箱 / 纸箱 / 铁丝网 / 沙袋全部替换为正式素材，**遮挡改用自研「透视孔」着色器**（相机不再拉近，遮挡物上以角色为中心开圆孔）；**批次 3 音效与 VFX** ✅；**批次 4 界面美化** ✅——主题层、全部主要界面、五类物品图标素材（当前按反馈只显示稀有度色块）、界面音效与 **12 角色选择（实时 3D 预览 + 存档持久化）**；批次 5 性能、批次 6 验收待做 |
 | M8 | 交付物 | 未开始 |
 | M9 | 联机（专用服务器 + PVE 合作） | 未开始 |
 | M10 | 热更新（资源 + 代码） | 未开始 |
@@ -386,10 +386,10 @@
 | [Fertile Soil Modular Terrain](https://itch.io/) | 草地色板与模块化造型参考 | CC0 | itch.io |
 | [The Free Firearm Sound Library](https://opengameart.org/) | 步枪 / 手枪枪声（自动剪裁成单发后入库） | CC0 | opengameart.org |
 | [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds) | 命中、换弹、脚步（草地 / 水泥） | CC0 | kenney.nl |
-| [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) | 搜刮、拾取、撤离与结算提示音 | CC0 | kenney.nl |
+| [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) | 搜刮、拾取、撤离、结算与界面交互音（点击 / 开关 / 确认 / 取消 / 锁定 / 购买） | CC0 | kenney.nl |
 | [Kenney Particle Pack](https://kenney.nl/assets/particle-pack) | 枪口火焰、命中火花、血雾的贴图 | CC0 | kenney.nl |
 | [Noto Sans SC](https://github.com/notofonts/noto-cjk) | 界面中文字体（TMP 静态子集字体资产） | **SIL OFL 1.1** | notofonts/noto-cjk |
-| [Kenney UI Pack](https://kenney.nl/assets/ui-pack) | 界面音效（点击 / 切换 / 确认） | CC0 | kenney.nl |
+| [Kenney UI Pack](https://kenney.nl/assets/ui-pack) | **未采用**：界面音效最终使用与批次 3 同源的 Kenney Interface Sounds；UI Pack 贴图与主色不符 | CC0 | kenney.nl |
 | [Kenney Game Icons](https://kenney.nl/assets/game-icons) + [Crosshair Pack](https://kenney.nl/assets/crosshair-pack) | 五类物品图标素材与准星（图标素材已归档；当前物品格 / 商人 / 结算按反馈只显示稀有度色块，分类图标暂不显示） | CC0 | kenney.nl |
 
 > **关于 Broken Vector**：该包的原始文件里**没有任何 license / readme**，早期按 itch 资源页与惯例推断的
