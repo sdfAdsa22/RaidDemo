@@ -45,8 +45,15 @@ namespace RaidDemo.Presentation
         /// <summary>孔心相对角色根节点的向上偏移（米）。取胸口高度，避免孔偏到脚下。</summary>
         [SerializeField] private float m_TargetHeightOffset = 0.9f;
 
-        /// <summary>功能开关。关掉后立即收孔，便于对照排查。</summary>
-        [SerializeField] private bool m_Enabled = true;
+        /// <summary>
+        /// 功能开关：是否启用透视孔效果。关掉后立即收孔，便于对照排查。
+        /// </summary>
+        /// <remarks>
+        /// 字段名不能叫 <c>m_Enabled</c>：那与 <see cref="UnityEngine.MonoBehaviour"/> 内部的
+        /// 启用标记同名，序列化时会产生 "The same field name is serialized multiple times"
+        /// 错误，并且该错误会随 Windows 构建一起带进日志。
+        /// </remarks>
+        [SerializeField] private bool m_PeepholeEnabled = true;
 
         /// <summary>
         /// 闸门采样点相对角色根节点的高度（米）：头、胸、膝。
@@ -84,7 +91,7 @@ namespace RaidDemo.Presentation
 
         private void LateUpdate()
         {
-            if (!m_Enabled)
+            if (!m_PeepholeEnabled)
             {
                 IsOccluded = false;
                 ClearPeephole();

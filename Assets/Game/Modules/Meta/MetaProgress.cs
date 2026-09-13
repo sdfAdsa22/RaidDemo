@@ -77,6 +77,15 @@ namespace RaidDemo.Meta
         public QuestSystem Quests { get; }
 
         /// <summary>
+        /// 收集图鉴。与仓库共享同一份存档生命周期。
+        /// </summary>
+        /// <remarks>
+        /// 它只记"曾经拿到过"的物品种类，不参与任何数值计算；
+        /// 点亮由 <see cref="RefreshCodex"/> 与场景装配里的 <c>CodexMarker</c> 共同驱动。
+        /// </remarks>
+        public MetaCodex Codex { get; } = new MetaCodex();
+
+        /// <summary>
         /// 当前选择的玩家角色 ID。
         /// </summary>
         /// <remarks>Meta 层不校验角色目录——那属于表现层；这里只保存稳定 ID。</remarks>
@@ -156,6 +165,75 @@ namespace RaidDemo.Meta
             SelectedCharacterId = string.IsNullOrEmpty(characterId)
                 ? DefaultCharacterId
                 : characterId;
+        }
+
+        /// <summary>
+        /// 扫描玩家当前持有的全部物品，把尚未点亮的种类补进图鉴。
+        /// </summary>
+        /// <returns>本次新点亮的条目数。</returns>
+        /// <remarks>
+        /// <para><b>为什么是"扫描持有物"而不是在每个获得路径上打点：</b>物品进入玩家手里有六条路径
+        /// （战局搜刮、商人购买、任务奖励、撤离入库、手动拖拽、拆分合并），逐条打点意味着
+        /// 以后每加一条新路径都要记得再补一次；漏掉一条的症状是"某些东西永远点不亮"，
+        /// 而图鉴不亮不会引发任何报错，只会在很久以后才被发现。</para>
+        ///
+        /// <para>本方法是幂等的：重复调用只是空转一圈。发现新条目时会广播一次
+        /// <see cref="Changed"/>，让自动存档与界面刷新走既有链路，不需要额外的通知机制。</para>
+        /// </remarks>
+        public int RefreshCodex()
+        {
+            var discovered = 0;
+            discovered += Codex.MarkAll(EnumerateItemIds(Stash));
+            discovered += Codex.MarkAll(EnumerateItemIds(Loadout.Backpack));
+            discovered += Codex.MarkAll(EnumerateItemIds(Loadout.AmmoPouch));
+            discovered += Codex.MarkAll(EnumerateEquipmentItemIds());
+
+            if (discovered > 0)
+            {
+                NotifyChanged();
+            }
+
+            return discovered;
+        }
+
+        /// <summary>遍历一个网格里每件物品的稳定 ID。</summary>
+        private static IEnumerable<string> EnumerateItemIds(InventoryGrid grid)
+        {
+            if (grid == null)
+            {
+                yield break;
+            }
+
+            var items = grid.Items;
+            for (var i = 0; i < items.Count; i++)
+            {
+                yield return items[i].Definition.Id;
+            }
+        }
+
+        /// <summary>遍历装备槽里每件物品的稳定 ID。槽位顺序与 <c>DepositLoadoutToStash</c> 一致。</summary>
+        private IEnumerable<string> EnumerateEquipmentItemIds()
+        {
+            var equipment = Loadout.Equipment;
+            if (equipment == null)
+            {
+                yield break;
+            }
+
+            var slots = new[]
+            {
+                EquipmentSlot.PrimaryWeapon, EquipmentSlot.SecondaryWeapon,
+                EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Backpack,
+            };
+
+            for (var i = 0; i < slots.Length; i++)
+            {
+                var item = equipment.Get(slots[i]);
+                if (item != null)
+                {
+                    yield return item.Definition.Id;
+                }
+            }
         }
 
         /// <summary>

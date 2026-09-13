@@ -30,6 +30,9 @@ namespace RaidDemo.Presentation
 
             /// <summary>更衣镜：打开角色选择界面。</summary>
             Wardrobe = 4,
+
+            /// <summary>图鉴展示板：打开收集图鉴界面（M8 批次 1）。</summary>
+            CodexBoard = 5,
         }
 
         /// <summary>设施类型。</summary>

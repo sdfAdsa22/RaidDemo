@@ -147,6 +147,8 @@ namespace RaidDemo.Bootstrap
             m_ArmorSubscription = null;
             m_BackpackSubscription?.Dispose();
             m_BackpackSubscription = null;
+            m_CodexMarker?.Dispose();
+            m_CodexMarker = null;
             m_AiDirector?.Dispose();
             ServiceLocatorHolder.Clear();
             m_Services?.Clear();

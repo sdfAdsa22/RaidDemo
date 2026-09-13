@@ -70,6 +70,16 @@ namespace RaidDemo.Meta
 
         /// <summary>任务状态。</summary>
         public QuestSaveRecord[] quests;
+
+        /// <summary>
+        /// 已点亮的收集图鉴条目（物品稳定 ID 列表）。
+        /// </summary>
+        /// <remarks>
+        /// 向后兼容的增量字段：旧存档没有它时为 null，按「一条都没点亮」处理，
+        /// 首次进安全屋时会被"扫描持有物"补上当前仓库里的物品；
+        /// 因此这里不递增 SchemaVersion，与 selectedCharacterId 的处理方式一致。
+        /// </remarks>
+        public string[] discoveredItemIds;
     }
 
     /// <summary>容器里一堆物品的存档记录。</summary>

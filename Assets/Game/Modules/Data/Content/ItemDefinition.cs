@@ -72,6 +72,15 @@ namespace RaidDemo.Data
         /// </remarks>
         [SerializeField] private Sprite m_Icon;
 
+        /// <summary>
+        /// 图鉴与详情面板里的一句说明。
+        /// </summary>
+        /// <remarks>
+        /// <para>与 <see cref="Icon"/> 一样只给界面读取，<see cref="IItemDefinition"/> 里没有它：
+        /// 规则层不关心物品的文案。允许为空，界面在空文案时把"说明"一节整个隐藏。</para>
+        /// </remarks>
+        [SerializeField] private string m_Description;
+
         /// <inheritdoc />
         public string Id
         {
@@ -148,6 +157,12 @@ namespace RaidDemo.Data
         public Sprite Icon
         {
             get { return m_Icon; }
+        }
+
+        /// <summary>图鉴说明文字；没有配置时返回空字符串。</summary>
+        public string Description
+        {
+            get { return string.IsNullOrEmpty(m_Description) ? string.Empty : m_Description; }
         }
 
         /// <inheritdoc />

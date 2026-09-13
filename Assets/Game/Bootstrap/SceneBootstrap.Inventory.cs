@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using RaidDemo.Data;
 using RaidDemo.Inventory;
+using RaidDemo.Meta;
 using RaidDemo.Shared;
 using RaidDemo.UI;
 using UnityEngine;
@@ -17,6 +18,11 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public sealed partial class SceneBootstrap
     {
+        /// <summary>
+        /// 收集图鉴的增量点亮器。场景卸载时必须释放（见主文件的 OnDestroy）。
+        /// </summary>
+        private CodexMarker m_CodexMarker;
+
         private void InitializeInventory()
         {
             m_ContainerRegistry = new ContainerRegistry();
@@ -78,6 +84,11 @@ namespace RaidDemo.Bootstrap
             m_ArmorSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshPlayerArmor());
             m_BackpackSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshBackpackCapacity());
             RefreshBackpackCapacity();
+
+            // 收集图鉴：先全量扫一遍当前持有物（覆盖旧存档与出击准备），
+            // 之后由 CodexMarker 在每次玩家容器变化时增量补记——战局里捡到又丢掉的东西也算数。
+            m_CodexMarker = new CodexMarker(progress, m_ContainerRegistry, m_EventBus);
+            progress.RefreshCodex();
         }
 
         /// <summary>

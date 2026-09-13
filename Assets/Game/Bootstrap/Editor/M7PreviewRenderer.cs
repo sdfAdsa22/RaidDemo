@@ -141,6 +141,9 @@ namespace RaidDemo.Bootstrap.Editor
 
             // 衣柜：柜体与镜面（柜体朝东，因此相机从西侧看过去）
             new Shot("15_安全屋_衣柜", new Vector3(-11.2f, 1f, -1.5f), 45f, 90f, 7.5f, 55f),
+
+            // 图鉴展示板（M8 批次 1）：出口东侧的木牌，检查牌面比例、文字与三张装饰卡。
+            new Shot("16_安全屋_图鉴板", new Vector3(9.3f, 1.7f, 5.2f), 45f, 0f, 7.5f, 55f),
         };
 
         /// <summary>菜单入口：渲染战局预览图。</summary>

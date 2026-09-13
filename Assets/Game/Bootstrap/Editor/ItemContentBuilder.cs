@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using RaidDemo.Data;
 using UnityEditor;
 using UnityEngine;
@@ -29,108 +29,6 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>正式采用的 Kenney Game Icons 图标目录（CC0）。</summary>
         private const string IconFolder =
             "Assets/Game/Content/External/Kenney/GameIcons";
-
-        /// <summary>一条物品定义的数据。</summary>
-        private readonly struct ItemSpec
-        {
-            public ItemSpec(
-                string id,
-                string displayName,
-                ItemCategory category,
-                RarityTier rarity,
-                int width,
-                int height,
-                float weightKg,
-                int baseValue,
-                int maxStack,
-                bool canRotate,
-                int containerWidth = 0,
-                int containerHeight = 0)
-            {
-                Id = id;
-                DisplayName = displayName;
-                Category = category;
-                Rarity = rarity;
-                Width = width;
-                Height = height;
-                WeightKg = weightKg;
-                BaseValue = baseValue;
-                MaxStack = maxStack;
-                CanRotate = canRotate;
-                ContainerWidth = containerWidth;
-                ContainerHeight = containerHeight;
-            }
-
-            public string Id { get; }
-
-            public string DisplayName { get; }
-
-            public ItemCategory Category { get; }
-
-            public RarityTier Rarity { get; }
-
-            public int Width { get; }
-
-            public int Height { get; }
-
-            public float WeightKg { get; }
-
-            public int BaseValue { get; }
-
-            public int MaxStack { get; }
-
-            public bool CanRotate { get; }
-
-            public int ContainerWidth { get; }
-
-            public int ContainerHeight { get; }
-
-            /// <summary>是否是一个容器。</summary>
-            public bool IsContainer
-            {
-                get { return ContainerWidth > 0 && ContainerHeight > 0; }
-            }
-        }
-
-        /// <summary>
-        /// 初始物品表。
-        /// </summary>
-        /// <remarks>
-        /// <para>覆盖每个分类至少一件，目的是让背包系统的每条分支都能在灰盒里被走到：
-        /// 可堆叠的弹药与材料、不可堆叠的装备、占多格并可旋转的长条武器、
-        /// 带内部空间但不可堆叠的背包。</para>
-        /// <para>重量刻意定得偏高，让灰盒里的物品全捡一遍就能进入重装乃至超重状态，
-        /// 否则负重系统在演示时永远看不出效果。</para>
-        /// </remarks>
-        private static readonly ItemSpec[] s_Specs =
-        {
-            new ItemSpec("ammo.9x19.standard", "9x19 标准弹", ItemCategory.Ammo, RarityTier.Common,
-                1, 1, 0.012f, 8, 120, canRotate: false),
-            new ItemSpec("ammo.5.45.standard", "5.45 标准弹", ItemCategory.Ammo, RarityTier.Uncommon,
-                1, 1, 0.014f, 25, 90, canRotate: false),
-            new ItemSpec("medical.bandage.small", "小绷带", ItemCategory.Medical, RarityTier.Common,
-                1, 1, 0.1f, 400, 5, canRotate: false),
-            new ItemSpec("medical.kit.field", "野战医疗包", ItemCategory.Medical, RarityTier.Rare,
-                1, 2, 0.6f, 9000, 1, canRotate: true),
-            new ItemSpec("weapon.pistol.pm", "PM 手枪", ItemCategory.Weapon, RarityTier.Common,
-                2, 1, 0.7f, 1800, 1, canRotate: true),
-            new ItemSpec("weapon.rifle.ak74", "AK-74 步枪", ItemCategory.Weapon, RarityTier.Uncommon,
-                3, 1, 3.2f, 7200, 1, canRotate: true),
-            new ItemSpec("armor.helmet.steel", "钢盔", ItemCategory.Helmet, RarityTier.Uncommon,
-                2, 2, 1.2f, 4500, 1, canRotate: false),
-            new ItemSpec("armor.vest.plate", "防弹背心", ItemCategory.BodyArmor, RarityTier.Rare,
-                2, 3, 5.0f, 15000, 1, canRotate: true),
-            new ItemSpec("backpack.small", "小型背包", ItemCategory.Backpack, RarityTier.Common,
-                3, 3, 1.0f, 1200, 1, canRotate: false, containerWidth: 6, containerHeight: 6),
-            new ItemSpec("backpack.raider", "突击背包", ItemCategory.Backpack, RarityTier.Rare,
-                4, 4, 2.5f, 12000, 1, canRotate: false, containerWidth: 7, containerHeight: 7),
-            new ItemSpec("loot.bolt.copper", "铜螺栓", ItemCategory.Loot, RarityTier.Common,
-                1, 1, 0.02f, 600, 20, canRotate: false),
-            new ItemSpec("loot.canister.fuel", "燃料罐", ItemCategory.Loot, RarityTier.Rare,
-                1, 2, 2.4f, 11000, 1, canRotate: true),
-            new ItemSpec("loot.watch.gold", "金表", ItemCategory.Loot, RarityTier.Epic,
-                1, 1, 0.05f, 32000, 1, canRotate: false),
-        };
 
         /// <summary>
         /// 生成（或覆盖）全部物品资产与物品目录。
@@ -327,6 +225,7 @@ namespace RaidDemo.Bootstrap.Editor
             serialized.FindProperty("m_MaxStack").intValue = spec.MaxStack;
             serialized.FindProperty("m_CanRotate").boolValue = spec.CanRotate;
             serialized.FindProperty("m_IsContainer").boolValue = spec.IsContainer;
+            serialized.FindProperty("m_Description").stringValue = spec.Description ?? string.Empty;
 
             if (spec.IsContainer)
             {

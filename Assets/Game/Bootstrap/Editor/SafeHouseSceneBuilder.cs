@@ -73,7 +73,8 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>相机与启动对象。</summary>
-        private static void CreateBootstrap()
+        /// <param name="codexBoard">图鉴展示板上的进度组件，写入启动对象的序列化引用。</param>
+        private static void CreateBootstrap(RaidDemo.UI.CodexBoardView codexBoard)
         {
             var cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
@@ -111,6 +112,10 @@ namespace RaidDemo.Bootstrap.Editor
             bootstrapSerialized.FindProperty("m_ItemCatalog").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<RaidDemo.Data.ItemCatalog>(
                     "Assets/Game/Content/Items/ItemCatalog.asset");
+
+            // 图鉴展示板上的进度：运行时由启动对象在局外变化时刷新。
+            bootstrapSerialized.FindProperty("m_CodexBoard").objectReferenceValue =
+                codexBoard;
 
             // 表现层资产目录（音效 / 武器模型 / 战斗特效）：安全屋也要能试枪，
             // 缺少它时靶场会变成"打出去没有声音、没有枪口火焰"。
@@ -152,12 +157,12 @@ namespace RaidDemo.Bootstrap.Editor
 
             CreateLighting();
             CreateRoom();
-            CreateFacilities();
+            var codexBoard = CreateFacilities();
             CreateTargets();
             // 玩家必须早于说明牌创建：说明牌要把玩家对象写进自己的序列化引用。
             var player = CreatePlayer();
             CreateSignBoard(player);
-            CreateBootstrap();
+            CreateBootstrap(codexBoard);
 
             EnsureFolder("Assets/Game/Content");
             EnsureFolder("Assets/Game/Content/Scenes");

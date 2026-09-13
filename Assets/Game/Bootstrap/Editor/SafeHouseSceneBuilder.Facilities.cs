@@ -73,8 +73,9 @@ namespace RaidDemo.Bootstrap.Editor
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        /// <summary>设施：仓库（西）、商人（中）、出口（东）沿北墙排开，更衣镜在西墙边。</summary>
-        private static void CreateFacilities()
+        /// <summary>设施：仓库（西）、商人（中）、出口（东）、图鉴板（东侧）沿北墙排开，更衣镜在西墙边。</summary>
+        /// <returns>图鉴展示板的进度组件，供启动对象在运行时刷新。</returns>
+        private static RaidDemo.UI.CodexBoardView CreateFacilities()
         {
             var root = new GameObject("Facilities").transform;
 
@@ -82,6 +83,7 @@ namespace RaidDemo.Bootstrap.Editor
             CreateMerchantStall(root, new Vector3(-2f, 0f, 5f));
             CreateExitGate(root, new Vector3(5f, 0f, 5f));
             CreateWardrobe(root, new Vector3(-11.2f, 0f, -1.5f));
+            return CreateCodexBoard(root, new Vector3(9.3f, 0f, 5.2f));
         }
 
         /// <summary>

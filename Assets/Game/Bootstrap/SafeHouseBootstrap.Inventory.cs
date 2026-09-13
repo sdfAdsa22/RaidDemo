@@ -25,6 +25,11 @@ namespace RaidDemo.Bootstrap
         private TraderCatalog m_TraderCatalog;
         private MerchantScreenController m_MerchantScreen;
 
+        /// <summary>
+        /// 收集图鉴的增量点亮器。安全屋卸载时必须释放（见 <c>SafeHouseBootstrap.OnDestroy</c>）。
+        /// </summary>
+        private CodexMarker m_CodexMarker;
+
         private void InitializeInventory()
         {
             m_Registry = new ContainerRegistry();
@@ -99,6 +104,11 @@ namespace RaidDemo.Bootstrap
             // 在安全屋里换背包也要立刻改格子数——否则玩家会以为背包没用。
             m_ChangedSubscription = m_EventBus.Subscribe<InventoryChangedEvent>(_ => RefreshBackpackCapacity());
             RefreshBackpackCapacity();
+
+            // 收集图鉴：先全量扫一遍当前持有物（覆盖旧存档与本次开场的入库物品），
+            // 之后由 CodexMarker 在每次玩家容器变化时增量补记。
+            m_CodexMarker = new CodexMarker(m_Progress, m_Registry, m_EventBus);
+            m_Progress.RefreshCodex();
         }
 
         /// <summary>按当前装备的背包重算随身容量（与战局里同一条规则）。</summary>

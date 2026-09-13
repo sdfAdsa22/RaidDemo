@@ -49,6 +49,9 @@ namespace RaidDemo.Meta
                 ammoPouch = CaptureGrid(progress.Loadout.AmmoPouch),
                 equipment = CaptureEquipment(progress.Loadout.Equipment),
                 quests = progress.Quests.CaptureState(),
+                discoveredItemIds = progress.Codex != null
+                    ? progress.Codex.ToSortedArray()
+                    : new string[0],
             };
         }
 
@@ -101,6 +104,7 @@ namespace RaidDemo.Meta
             RestoreGrid(progress.Loadout.Backpack, data.backpack, catalog, problems, "主背包");
             RestoreGrid(progress.Stash, data.stash, catalog, problems, "仓库");
             progress.Quests.RestoreState(data.quests, data.trackedQuestId, problems);
+            progress.Codex.Restore(data.discoveredItemIds);
             return progress;
         }
 
