@@ -52,7 +52,7 @@ namespace RaidDemo.UI
             UiFactory.CreateLabel(
                 parent,
                 "装备",
-                new Vector2(LeftColumnX + 4f, ContentTop - 26f),
+                new Vector2(m_ContentLeftX + 4f, m_ContentTopY - 26f),
                 new Vector2(LeftColumnWidth, 22f),
                 UiPalette.SmallSize,
                 TextAlignmentOptions.Left,
@@ -65,7 +65,7 @@ namespace RaidDemo.UI
                     $"Slot_{slots[i]}",
                     new Vector2(SlotWidth, SlotHeight),
                     UiSprites.Slot,
-                    new Vector2(LeftColumnX, ContentTop + (i * (SlotHeight + SlotGap))));
+                    new Vector2(m_ContentLeftX, m_ContentTopY + (i * (SlotHeight + SlotGap))));
 
                 var image = rect.GetComponent<Image>();
                 var label = CreateLabel(
@@ -90,19 +90,19 @@ namespace RaidDemo.UI
         /// <summary>创建负重条与价值显示。</summary>
         private void BuildWeightBar(RectTransform parent)
         {
-            var top = ContentTop + (5f * (SlotHeight + SlotGap)) + 22f;
+            var top = m_ContentTopY + (5f * (SlotHeight + SlotGap)) + 22f;
 
             m_BarLabel = CreateLabel(
                 parent,
                 string.Empty,
-                new Vector2(LeftColumnX, top),
+                new Vector2(m_ContentLeftX, top),
                 LeftColumnWidth,
                 24f,
                 (int)UiPalette.SmallSize);
 
             UiFactory.CreateBar(
                 parent,
-                new Vector2(LeftColumnX, top + 28f),
+                new Vector2(m_ContentLeftX, top + 28f),
                 new Vector2(BarWidth, BarHeight),
                 UiPalette.Ok,
                 out m_BarFill);
@@ -110,7 +110,7 @@ namespace RaidDemo.UI
             m_ValueLabel = CreateLabel(
                 parent,
                 string.Empty,
-                new Vector2(LeftColumnX, top + 60f),
+                new Vector2(m_ContentLeftX, top + 60f),
                 LeftColumnWidth + 60f,
                 46f,
                 (int)UiPalette.SmallSize);
