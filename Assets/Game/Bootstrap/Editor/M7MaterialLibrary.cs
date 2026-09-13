@@ -97,9 +97,16 @@ namespace RaidDemo.Bootstrap.Editor
                 return false;
             }
 
+            // 用相对容差而不是逐位相等：颜色经过 Unity 的序列化往返会掉最后一位
+            // （0.41332123 与 0.41332126），逐位比较会判定为"变了"从而每次都重写，
+            // 于是材质文件在两次构建之间反复横跳。容差比较既避免了无意义写入，
+            // 也仍然能捕捉到"真的改了颜色"。
             var current = material.GetColor(property);
-            if (current.r == color.r && current.g == color.g &&
-                current.b == color.b && current.a == color.a)
+            var tolerance = 1e-4f;
+            if (Mathf.Abs(current.r - color.r) < tolerance &&
+                Mathf.Abs(current.g - color.g) < tolerance &&
+                Mathf.Abs(current.b - color.b) < tolerance &&
+                Mathf.Abs(current.a - color.a) < tolerance)
             {
                 return false;
             }

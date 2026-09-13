@@ -14,7 +14,8 @@
         "RaidDemo.Inventory",
         "RaidDemo.UI",
         "Unity.InputSystem",
-        "Unity.AI.Navigation"
+        "Unity.AI.Navigation",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"

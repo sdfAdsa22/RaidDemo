@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -6,32 +7,33 @@ using UnityEngine.UI;
 namespace RaidDemo.UI
 {
     /// <summary>
-    /// 极简主菜单：继续 / 新游戏 / 退出，加上一页操作说明。
+    /// 主菜单：继续 / 新游戏 / 退出，加上一页操作说明。
     /// </summary>
     /// <remarks>
-    /// <para><b>为什么要放操作说明：</b>这个 Demo 会被不认识它的人打开（面试官、同学）。
+    /// <para><b>为什么要有操作说明：</b>这个 Demo 会被不认识它的人打开（面试官、同学）。
     /// 没有说明时，他们大概率会按 WASD 走两步、开两枪就关掉，
     /// 而搜刮（E）与撤离（站在绿圈里）这两个真正体现设计的地方根本不会被看到。</para>
     ///
-    /// <para>菜单只是遮罩，背后的战局场景保持可见：这让界面看起来像游戏的一部分，
-    /// 而不是一张孤零零的图片。战局逻辑在菜单状态下完全不推进（由装配层控制）。</para>
+    /// <para><b>这是一块不透明独立界面</b>（负责人 2026-09-13 决定）：它不叠在战局场景上，
+    /// 而是一整块深绿松底色 + 居中奶油面板。理由是这样主菜单给人的第一印象是"一个成品"，
+    /// 而不是"一局游戏暂停了"；战局场景在菜单状态下不推进，也就没有必要露出来。</para>
     /// </remarks>
     [DisallowMultipleComponent]
     public sealed class MainMenuScreen : MonoBehaviour
     {
-        private static readonly Color OverlayColor = new Color(0.04f, 0.05f, 0.07f, 0.93f);
-        private static readonly Color PanelColor = new Color(0.10f, 0.11f, 0.13f, 0.97f);
-        private static readonly Color TitleColor = new Color(0.96f, 0.94f, 0.88f);
-        private static readonly Color BodyColor = new Color(0.80f, 0.81f, 0.86f);
-        private static readonly Color HintColor = new Color(0.62f, 0.63f, 0.68f);
-        private static readonly Color ButtonColor = new Color(0.18f, 0.46f, 0.80f);
-        private static readonly Color ButtonHoverColor = new Color(0.26f, 0.58f, 0.94f);
+        /// <summary>面板尺寸（参考像素）。</summary>
+        private static readonly Vector2 PanelSize = new Vector2(900f, 660f);
 
+        /// <summary>面板内边距。</summary>
+        private const float Padding = 40f;
+
+        /// <summary>标题条高度。</summary>
+        private const float TitleBarHeight = 100f;
 
         private RectTransform m_Root;
-        private RaidButtonWidget m_ContinueButton;
-        private RaidButtonWidget m_NewGameButton;
-        private Text m_NoticeLabel;
+        private UiButton m_ContinueButton;
+        private UiButton m_NewGameButton;
+        private TextMeshProUGUI m_NoticeLabel;
         private Action m_OnContinue;
         private Action m_OnNewGame;
         private bool m_IsVisible;
@@ -47,61 +49,106 @@ namespace RaidDemo.UI
             m_OnContinue = onContinue;
             m_OnNewGame = onNewGame;
 
-            m_Root = RaidScreenFactory.CreateCanvas(transform, "MainMenuCanvas", 300);
-            RaidScreenFactory.CreatePanel(
-                m_Root,
-                "Overlay",
-                new Vector2(RaidScreenFactory.ReferenceWidth, RaidScreenFactory.ReferenceHeight),
-                OverlayColor);
+            m_Root = UiFactory.CreateCanvas(transform, "MainMenuCanvas", 300);
 
-            var panel = RaidScreenFactory.CreatePanel(m_Root, "Panel", new Vector2(800f, 560f), PanelColor);
+            // 不透明底：主菜单是独立界面，背后没有游戏画面。
+            UiFactory.CreateBackdrop(m_Root, "Backdrop", UiPalette.MenuBackdrop);
 
-            RaidScreenFactory.CreateLabel(
-                panel, "RAID DEMO", new Vector2(48f, 36f), new Vector2(700f, 60f),
-                46, TextAnchor.MiddleLeft, TitleColor);
-            RaidScreenFactory.CreateLabel(
-                panel, "3D 斜俯视搜打撤 · 灰盒演示 · M5 战局闭环",
-                new Vector2(48f, 100f), new Vector2(700f, 30f),
-                19, TextAnchor.MiddleLeft, HintColor);
+            // 面板投影：同一张九宫格贴图压暗后向下偏移，做出"厚卡片浮在底上"的层次。
+            var shadow = UiFactory.CreateCenteredPanel(m_Root, "PanelShadow", PanelSize, UiSprites.Card);
+            shadow.anchoredPosition = new Vector2(0f, -12f);
+            shadow.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.28f);
 
-            m_ContinueButton = RaidScreenFactory.CreateButton(
+            var panel = UiFactory.CreateCenteredPanel(m_Root, "Panel", PanelSize, UiSprites.Card);
+
+            BuildTitleBar(panel);
+            BuildBody(panel);
+            SetVisible(false);
+        }
+
+        /// <summary>标题条：略深的一条纸 + 标题 + 版本号。</summary>
+        private static void BuildTitleBar(RectTransform panel)
+        {
+            UiFactory.CreatePanel(panel, "TitleBar", new Vector2(PanelSize.x, TitleBarHeight), UiSprites.CardDim, Vector2.zero);
+
+            // 标题阴影：卡通风格里最省的立体感做法——同一句话用半透明墨色错开 3 像素再画一遍。
+            UiFactory.CreateLabel(
+                panel, "RAID DEMO", new Vector2(Padding + 3f, 22f + 3f), new Vector2(600f, 64f),
+                UiPalette.TitleSize, TextAlignmentOptions.Left, new Color(UiPalette.Outline.r, UiPalette.Outline.g, UiPalette.Outline.b, 0.22f));
+            UiFactory.CreateLabel(
+                panel, "RAID DEMO", new Vector2(Padding, 22f), new Vector2(600f, 64f),
+                UiPalette.TitleSize, TextAlignmentOptions.Left, UiPalette.Ink);
+
+            UiFactory.CreateLabel(
+                panel, "M7 · Windows", new Vector2(PanelSize.x - 300f, 38f), new Vector2(260f, 34f),
+                UiPalette.SmallSize, TextAlignmentOptions.Right, UiPalette.InkSoft);
+        }
+
+        /// <summary>说明文字、按钮与提示。</summary>
+        private void BuildBody(RectTransform panel)
+        {
+            var top = TitleBarHeight;
+
+            UiFactory.CreateLabel(
+                panel,
+                "3D 斜俯视搜打撤 · 卡通低多边形",
+                new Vector2(Padding, top + 26f),
+                new Vector2(PanelSize.x - (Padding * 2f), 34f),
+                UiPalette.SubtitleSize,
+                TextAlignmentOptions.Left,
+                UiPalette.InkSoft);
+
+            m_ContinueButton = UiFactory.CreateButton(
                 panel,
                 "开始游戏（Enter）",
-                new Vector2(48f, 170f),
-                new Vector2(300f, 68f),
-                ButtonColor,
-                ButtonHoverColor);
+                new Vector2(Padding, top + 88f),
+                new Vector2(420f, 88f),
+                UiButtonKind.Primary);
 
-            m_NewGameButton = RaidScreenFactory.CreateButton(
+            m_NewGameButton = UiFactory.CreateButton(
                 panel,
                 "新游戏",
-                new Vector2(368f, 170f),
-                new Vector2(240f, 68f),
-                new Color(0.28f, 0.29f, 0.33f),
-                new Color(0.36f, 0.37f, 0.42f));
+                new Vector2(Padding + 440f, top + 88f),
+                new Vector2(320f, 88f));
 
-            m_NoticeLabel = RaidScreenFactory.CreateLabel(
+            m_NoticeLabel = UiFactory.CreateLabel(
                 panel,
                 string.Empty,
-                new Vector2(48f, 248f), new Vector2(700f, 44f),
-                16, TextAnchor.UpperLeft,
-                new Color(0.95f, 0.72f, 0.35f));
+                new Vector2(Padding, top + 200f),
+                new Vector2(PanelSize.x - (Padding * 2f), 40f),
+                UiPalette.BodySize,
+                TextAlignmentOptions.Left,
+                UiPalette.Warn);
             m_NoticeLabel.gameObject.SetActive(false);
 
-            RaidScreenFactory.CreateLabel(
+            UiFactory.CreateLabel(
                 panel,
                 "在一块不大的安全屋里，你可以整理仓库、试枪、从出口选地图出击。\n"
                 + "操作说明写在安全屋的墙上；出击前的准备也都在那里完成。",
-                new Vector2(48f, 300f), new Vector2(700f, 80f),
-                17, TextAnchor.UpperLeft, BodyColor);
+                new Vector2(Padding, top + 250f),
+                new Vector2(PanelSize.x - (Padding * 2f), 96f),
+                UiPalette.BodySize,
+                TextAlignmentOptions.TopLeft,
+                UiPalette.Ink,
+                wrap: true);
 
-            RaidScreenFactory.CreateLabel(
+            UiFactory.CreateLabel(
                 panel,
-                "单人 · Windows · 一局 8 分钟　｜　Esc 退出游戏",
-                new Vector2(48f, 500f), new Vector2(700f, 26f),
-                15, TextAnchor.MiddleLeft, HintColor);
+                "WASD 移动 · Shift 奔跑 · 左键射击 · R 换弹 · Tab 背包 · F1 调试",
+                new Vector2(Padding, PanelSize.y - 96f),
+                new Vector2(PanelSize.x - (Padding * 2f), 30f),
+                UiPalette.SmallSize,
+                TextAlignmentOptions.Left,
+                UiPalette.InkSoft);
 
-            SetVisible(false);
+            UiFactory.CreateLabel(
+                panel,
+                "单人 · 一局 8 分钟　｜　Esc 退出游戏",
+                new Vector2(Padding, PanelSize.y - 58f),
+                new Vector2(PanelSize.x - (Padding * 2f), 30f),
+                UiPalette.SmallSize,
+                TextAlignmentOptions.Left,
+                UiPalette.InkDisabled);
         }
 
         /// <summary>告诉菜单是否存在存档，据此切换主按钮文字与「新游戏」是否显示。</summary>
@@ -165,14 +212,17 @@ namespace RaidDemo.UI
 
             var keyboard = Keyboard.current;
             var pointer = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
+            var isClicked = Mouse.current != null && Mouse.current.leftButton.isPressed;
+            var wasPressed = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+
             var overContinue = Mouse.current != null && m_ContinueButton.Contains(pointer);
-            var overNewGame = m_HasSave
-                && Mouse.current != null
-                && m_NewGameButton.Contains(pointer);
+            var overNewGame = m_HasSave && Mouse.current != null && m_NewGameButton.Contains(pointer);
+
             m_ContinueButton.SetHovered(overContinue);
             m_NewGameButton.SetHovered(overNewGame);
+            m_ContinueButton.ApplyVisual(overContinue && isClicked);
+            m_NewGameButton.ApplyVisual(overNewGame && isClicked);
 
-            var clicked = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
             var confirmed = keyboard != null && keyboard.enterKey.wasPressedThisFrame;
 
             // Esc 退出游戏。编辑器里退出播放模式，构建里真正退出——
@@ -194,14 +244,14 @@ namespace RaidDemo.UI
                 return;
             }
 
-            if ((clicked && overContinue) || confirmed)
+            if ((wasPressed && overContinue) || confirmed)
             {
                 ResetNewGameConfirm();
                 m_OnContinue.Invoke();
                 return;
             }
 
-            if (clicked && overNewGame)
+            if (wasPressed && overNewGame)
             {
                 if (!m_ConfirmNewGame)
                 {

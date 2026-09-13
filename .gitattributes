@@ -41,8 +41,8 @@
 # -----------------------------------------------------------------------------
 # 二进制资源：禁止行尾符转换与 diff（未纳入 LFS 的小体积文件）
 # -----------------------------------------------------------------------------
-*.ttf     binary
-*.otf     binary
+# 字体单独说明：字体文件从 M7 批次 4 起改走 LFS（见下方 LFS 段），
+# 中文字体动辄 8~16 MB，直接写进 Git 历史会永久占用仓库体积。
 *.dll     binary
 *.so      binary
 *.dylib   binary
@@ -91,3 +91,9 @@
 
 # Unity 资源包（导入后即可删除，保留归档以免重复下载）
 *.unitypackage filter=lfs diff=lfs merge=lfs -text
+
+# 字体（M7 批次 4 起）
+# 为什么要走 LFS：中文界面需要一份可随仓库分发的中文字体（Noto Sans SC，SIL OFL 1.1），
+# 单文件约 8 MB；若直接写进 Git 历史，之后每一次克隆都要拉这 8 MB 且无法回收。
+*.otf       filter=lfs diff=lfs merge=lfs -text
+*.ttf       filter=lfs diff=lfs merge=lfs -text
