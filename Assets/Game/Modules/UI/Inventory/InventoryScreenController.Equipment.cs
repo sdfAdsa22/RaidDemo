@@ -146,7 +146,7 @@ namespace RaidDemo.UI
             var capacity = m_EncumbranceProfile != null ? m_EncumbranceProfile.CapacityKg : 0f;
             var ratio = capacity > 0f ? weight / capacity : 0f;
 
-            m_BarFill.rectTransform.sizeDelta = new Vector2(BarWidth * Mathf.Clamp01(ratio), 0f);
+            UiFactory.SetBarProgress(m_BarFill, BarWidth, ratio);
             m_BarFill.color = ratio > 1f ? UiPalette.Bad : ratio >= 0.7f ? UiPalette.Warn : UiPalette.Ok;
             m_BarLabel.text = $"负重 {weight:F1} / {capacity:F0} kg";
         }

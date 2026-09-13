@@ -181,7 +181,7 @@ namespace RaidDemo.UI
             }
 
             var ratio = Mathf.Clamp01(progress01);
-            m_UseFill.rectTransform.sizeDelta = new Vector2(UseBarWidth * ratio, 0f);
+            UiFactory.SetBarProgress(m_UseFill, UseBarWidth, ratio);
             m_UseLabel.text = string.IsNullOrEmpty(label) ? "使用中…" : label;
         }
 
@@ -266,7 +266,7 @@ namespace RaidDemo.UI
             }
 
             var ratio = Mathf.Clamp01(progress01);
-            m_SearchFill.rectTransform.sizeDelta = new Vector2(SearchBarWidth * ratio, 0f);
+            UiFactory.SetBarProgress(m_SearchFill, SearchBarWidth, ratio);
             m_SearchLabel.text = string.IsNullOrEmpty(label) ? "搜刮中…" : label;
         }
 
@@ -285,7 +285,7 @@ namespace RaidDemo.UI
             }
 
             var ratio = Mathf.Clamp01(progress01);
-            m_ExtractionFill.rectTransform.sizeDelta = new Vector2(ExtractionBarWidth * ratio, 0f);
+            UiFactory.SetBarProgress(m_ExtractionFill, ExtractionBarWidth, ratio);
             m_ExtractionLabel.text = $"正在撤离 {zoneName}";
         }
 

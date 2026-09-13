@@ -201,12 +201,12 @@ namespace RaidDemo.UI
                 labelColor);
         }
 
-        /// <summary>创建一个进度条，返回填充部分（调用方按比例设置其宽度）。</summary>
+        /// <summary>创建一个进度条，返回底槽矩形与填充图像。</summary>
         /// <param name="parent">父节点。</param>
         /// <param name="topLeft">相对父节点的左上偏移。</param>
         /// <param name="size">整体尺寸。</param>
         /// <param name="fillColor">填充颜色。</param>
-        /// <param name="fill">填充部分的矩形，供调用方调整宽度。</param>
+        /// <param name="fill">填充图像，供调用方用 <see cref="SetBarProgress"/> 调整进度。</param>
         public static RectTransform CreateBar(
             RectTransform parent,
             Vector2 topLeft,
@@ -217,10 +217,16 @@ namespace RaidDemo.UI
             var track = CreatePanel(parent, "Bar", size, UiSprites.Track, topLeft);
 
             var fillRect = CreateRect(track, "Fill");
-            Stretch(fillRect);
-            fillRect.offsetMin = new Vector2(UiPalette.OutlineWidth, UiPalette.OutlineWidth);
-            fillRect.offsetMax = new Vector2(-UiPalette.OutlineWidth, -UiPalette.OutlineWidth);
+            // 填充必须是"左对齐、按比例变宽"的矩形：
+            // 水平方向锚定在底槽左边缘，轴心也在左边，改 sizeDelta.x 时只会向右生长；
+            // 纵向锚点铺满底槽，再用 sizeDelta.y 内缩，保证填充不会盖住底槽的描边。
+            // 曾经用 Stretch 后再改 anchorMax，导致 sizeDelta 变成负宽度，填充从左边缘向外溢出——
+            // 也就是负责人截图里的"橙色条跑出去了"。
+            fillRect.anchorMin = new Vector2(0f, 0f);
             fillRect.anchorMax = new Vector2(0f, 1f);
+            fillRect.pivot = new Vector2(0f, 0.5f);
+            fillRect.anchoredPosition = new Vector2(UiPalette.OutlineWidth, 0f);
+            fillRect.sizeDelta = new Vector2(0f, -UiPalette.OutlineWidth * 2f);
 
             fill = fillRect.gameObject.AddComponent<Image>();
             fill.sprite = UiSprites.Fill;
@@ -229,6 +235,30 @@ namespace RaidDemo.UI
             fill.color = fillColor;
             fill.raycastTarget = false;
             return track;
+        }
+
+        /// <summary>
+        /// 设置进度条填充的宽度。
+        /// </summary>
+        /// <param name="fill">由 <see cref="CreateBar"/> 创建的填充图像。</param>
+        /// <param name="trackWidth">底槽总宽度。</param>
+        /// <param name="progress01">进度（0~1）。</param>
+        /// <remarks>
+        /// 底槽本身有 3px 描边，填充必须从描边内侧开始、最大宽度也要减去两侧描边，
+        /// 否则进度到 100% 时会从右侧捅出去。调用方只关心"底槽多宽、进度多少"，
+        /// 内缩计算集中在这里，避免每个进度条各算一套。
+        /// </remarks>
+        public static void SetBarProgress(Image fill, float trackWidth, float progress01)
+        {
+            if (fill == null)
+            {
+                return;
+            }
+
+            var width = Mathf.Max(0f, trackWidth - (UiPalette.OutlineWidth * 2f));
+            var size = fill.rectTransform.sizeDelta;
+            size.x = width * Mathf.Clamp01(progress01);
+            fill.rectTransform.sizeDelta = size;
         }
 
         /// <summary>

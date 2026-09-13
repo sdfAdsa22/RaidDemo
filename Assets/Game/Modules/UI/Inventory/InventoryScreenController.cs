@@ -85,6 +85,9 @@ namespace RaidDemo.UI
         /// <summary>战利品面板的左上角锚点（像素）。由背包与弹药挂的实际高度算出来。</summary>
         private Vector2 m_LootAnchorTopLeft;
 
+        /// <summary>当前右栏容器的标题。它区分"战利品：武器架"与"仓库"，重建时不能丢。</summary>
+        private string m_RightContainerTitle;
+
         private Image m_BarFill;
         private TMPro.TextMeshProUGUI m_BarLabel;
 
@@ -231,6 +234,19 @@ namespace RaidDemo.UI
                 return;
             }
 
+            // 右栏宽度参与三栏整体居中：容器列数变化时必须重建整块布局，
+            // 只替换右侧网格会让内容仍按旧宽度预留，右侧空出一大块。
+            if (m_RightContainerColumns != grid.Width)
+            {
+                RebuildLayout(
+                    m_Loadout.Backpack,
+                    m_BackpackContainerId,
+                    containerId,
+                    title,
+                    show: true);
+                return;
+            }
+
             if (m_LootContainerId != containerId)
             {
                 DestroyLootView();
@@ -242,6 +258,8 @@ namespace RaidDemo.UI
                     title,
                     m_LootAnchorTopLeft);
             }
+
+            m_RightContainerTitle = title;
 
             // 每次打开都主动重画一次：商人买卖只改变了仓库数据，
             // 若界面恰好没收到对应事件，旧视图会显示过期内容。
@@ -260,6 +278,7 @@ namespace RaidDemo.UI
         {
             DestroyLootView();
             m_LootContainerId = 0;
+            m_RightContainerTitle = null;
         }
 
         /// <summary>销毁战利品视图。没有视图时不做任何事。</summary>
@@ -280,7 +299,24 @@ namespace RaidDemo.UI
         /// <summary>切换界面开关。</summary>
         public void Toggle()
         {
-            SetVisible(!m_IsOpen);
+            if (m_IsOpen)
+            {
+                SetVisible(false);
+                return;
+            }
+            // 打开界面时优先走"明确指定容器"的路径：准备界面用仓库，战局中没有容器可看时
+            // 恢复成只有左栏 + 背包的居中版式；直接调 SetVisible(true) 不会重算右栏宽度。
+            if (m_PrepStashContainerId > 0 && m_Registry != null && m_Registry.TryGetGrid(m_PrepStashContainerId, out _))
+            {
+                OpenStash(m_PrepStashContainerId);
+                return;
+            }
+            if (m_RightContainerColumns > 0)
+            {
+                RebuildLayout(m_Loadout.Backpack, m_BackpackContainerId, 0, null, show: true);
+                return;
+            }
+            SetVisible(true);
         }
 
         private void Update()

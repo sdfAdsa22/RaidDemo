@@ -51,9 +51,6 @@ namespace RaidDemo.UI
         /// <summary>内容区起始高度（标题条之下）。</summary>
         private const float MinContentTop = 84f;
 
-        /// <summary>右栏最多按几列预留（仓库是 10 列，是最宽的一种容器）。</summary>
-        private const float MaxContainerColumns = 10f;
-
         /// <summary>右栏最多按几行预留（仓库是 8 行）。</summary>
         private const float MaxContainerRows = 8f;
 
@@ -68,6 +65,10 @@ namespace RaidDemo.UI
 
         /// <summary>本帧算出的内容区顶部。纵向居中后它不是常量，由 BuildLayout 写入。</summary>
         private float m_ContentTopY = MinContentTop;
+        /// <summary>本次布局右栏实际使用的列数；0 表示当前没有右栏。</summary>
+        /// <remarks>右栏宽度参与"三栏整体居中"，不能永远按 10 列仓库预留；武器架只有 4 列，
+        /// 按 10 列留位置会让右侧空出一大块。实际列数由构建布局前的当前容器决定。</remarks>
+        private int m_RightContainerColumns;
 
         /// <summary>
         /// 屏幕根：遮罩 + 面板的统一显隐开关。
@@ -83,17 +84,43 @@ namespace RaidDemo.UI
         /// <param name="containerId">背包的容器 ID。</param>
         /// <remarks>
         /// <para>换包会改变网格尺寸，而弹药挂与右栏的位置是按背包尺寸推算出来的，
-        /// 因此不能只替换一个视图——必须整块重建，否则面板会互相压住。</para>
-        /// <para>重建只销毁自己创建的画布，玩家数据（网格与装备）完全不动。</para>
+        /// 因此不能只替换一个视图——必须整块重建，否则面板会互相压住。重建只销毁自己创建的画布，玩家数据完全不动。</para>
         /// </remarks>
         public void RebuildLayout(InventoryGrid backpack, int containerId)
         {
-            // 先记住当前打开的战利品容器，并把状态清成"没有打开"。
-            // 重建会销毁它的视图；若状态还留着这个 ID，OpenLootContainer 会以为
-            // "这个容器已经展示过了"而跳过重建——表现就是面板消失、重搜同一个箱子也不回来。
-            var openLootId = m_LootContainerId;
-            m_LootContainerId = 0;
+            // 当前打开的右栏容器（仓库或战利品）及其标题要一起恢复：
+            // 右栏宽度决定三栏怎么居中，而"战利品："与"仓库"的标题语义只有打开它的调用点知道，
+            // 不能靠网格标签重新猜一次。
+            var rightContainerId = m_LootContainerId;
+            var rightTitle = m_RightContainerTitle;
+            if (rightContainerId == 0 && m_IsOpen && m_PrepStashContainerId > 0)
+            {
+                // 准备界面在打开且没有指定容器时默认显示仓库；直接在这里写入目标，
+                // 避免 SetVisible(true) 先按"没有右栏"建一次、发现仓库后又重建第二次。
+                rightContainerId = m_PrepStashContainerId;
+                rightTitle = "仓库";
+            }
 
+            RebuildLayout(backpack, containerId, rightContainerId, rightTitle, m_IsOpen);
+        }
+
+        /// <summary>
+        /// 重建整套界面，并指定右栏要显示哪个容器。
+        /// </summary>
+        /// <param name="backpack">新的背包网格。</param>
+        /// <param name="containerId">背包的容器 ID。</param>
+        /// <param name="rightContainerId">右栏容器 ID；0 表示没有右栏。</param>
+        /// <param name="rightTitle">右栏标题；没有右栏时可以为 null。</param>
+        /// <param name="show">重建后是否显示界面。</param>
+        /// <remarks>右栏宽度影响三栏整体居中，因此"换容器且宽度不同"与"换背包"都必须走整块重建；
+        /// 只替换网格视图会让内容按旧宽度预留，出现右侧一大块空白。</remarks>
+        private void RebuildLayout(
+            InventoryGrid backpack,
+            int containerId,
+            int rightContainerId,
+            string rightTitle,
+            bool show)
+        {
             if (m_CanvasHost != null)
             {
                 Destroy(m_CanvasHost);
@@ -112,17 +139,29 @@ namespace RaidDemo.UI
             m_BackpackContainerId = containerId;
             m_Loadout.ReplaceBackpack(backpack);
 
-            var wasOpen = m_IsOpen;
+            // 先确定右栏宽度，再构建布局：ComputeContentOrigin 要靠它决定三栏整体是否居中。
+            InventoryGrid rightGrid = null;
+            var hasRightGrid = rightContainerId > 0 && m_Registry.TryGetGrid(rightContainerId, out rightGrid);
+            m_LootContainerId = rightContainerId;
+            m_RightContainerTitle = rightTitle;
+            m_RightContainerColumns = hasRightGrid ? rightGrid.Width : 0;
+
             BuildLayout();
             RefreshAll();
-            SetVisible(wasOpen);
-
-            // 把打开着的战利品面板按原样恢复。标题用网格自己的标签，
-            // 它就是创建容器时写进网格的显示名，不必再去问容器定义。
-            if (wasOpen && openLootId > 0 && m_Registry.TryGetGrid(openLootId, out var loot))
+            // 右栏视图必须在 BuildLayout 算出 m_LootAnchorTopLeft 之后创建。
+            // 此时 m_LootContainerId 已经指向目标容器，SetVisible 不会再自动改开仓库。
+            if (show && hasRightGrid)
             {
-                OpenLootContainer(openLootId, loot.Label);
+                m_LootView = CreateGridView(
+                    (RectTransform)m_Root.transform,
+                    rightGrid,
+                    rightContainerId,
+                    string.IsNullOrEmpty(rightTitle) ? "战利品" : rightTitle,
+                    m_LootAnchorTopLeft);
             }
+
+            RefreshAll();
+            SetVisible(show);
         }
 
         /// <summary>构建整套界面。</summary>
@@ -181,15 +220,21 @@ namespace RaidDemo.UI
         /// 这两者都是"内容与面板尺寸不匹配"的不同表现。居中是唯一让两者都不发生的做法。</para>
         /// <para>纵向同理：右栏按 8 行仓库预留，背包装得少时下方会空。
         /// 把内容在标题条以下居中，空出来的量上下均分。</para>
+        /// <para><b>右栏宽度按当前容器实际列数计算</b>：仓库是 10 列，武器架可能只有 4 列。
+        /// 如果永远按 10 列预留，搜刮武器架时内容会被挤到左边，右侧空出一大块
+        /// （负责人 2026-09-13 反馈的"搜索物品时背包界面没有居中"）。</para>
         /// </remarks>
         private void ComputeContentOrigin(InventoryGrid backpack)
         {
             var backpackWidth = (backpack.Width * InventoryGridView.CellSize) + GridFrame;
             var backpackHeight = (backpack.Height * InventoryGridView.CellSize) + GridTitle;
-            var maxContainerWidth = (MaxContainerColumns * InventoryGridView.CellSize) + GridFrame;
+            var rightWidth = m_RightContainerColumns > 0
+                ? (m_RightContainerColumns * InventoryGridView.CellSize) + GridFrame
+                : 0f;
+            var rightGap = rightWidth > 0f ? 24f : 0f;
 
             // ---- 水平：三栏 + 两个间距 ----
-            var contentWidth = LeftColumnWidth + ColumnGap + backpackWidth + 24f + maxContainerWidth;
+            var contentWidth = LeftColumnWidth + ColumnGap + backpackWidth + rightGap + rightWidth;
             m_ContentLeftX = Mathf.Max(OuterMargin, (PanelWidth - contentWidth) * 0.5f);
 
             // ---- 纵向：取三栏里最高的那一栏 ----
@@ -197,7 +242,9 @@ namespace RaidDemo.UI
             var middleHeight = backpackHeight + 16f + pouchHeight;
             // 左栏高度：5 个装备槽 + 槽间距 + 负重标签与条 + 两行价值文字（见 Equipment 部分的排布）。
             var leftHeight = (5f * (58f + 14f)) + 22f + 106f;
-            var rightHeight = (MaxContainerRows * InventoryGridView.CellSize) + GridTitle;
+            var rightHeight = rightWidth > 0f
+                ? (MaxContainerRows * InventoryGridView.CellSize) + GridTitle
+                : 0f;
             var contentHeight = Mathf.Max(middleHeight, Mathf.Max(leftHeight, rightHeight));
 
             var available = PanelHeight - TitleBarHeight;

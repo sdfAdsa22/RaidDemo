@@ -36,8 +36,15 @@ namespace RaidDemo.UI
         /// </remarks>
         private const float Margin = 56f;
 
-        /// <summary>底板宽度与高度（像素）。</summary>
-        private const float PanelWidth = 340f;
+        /// <summary>
+        /// 底板宽度与高度（像素）。
+        /// </summary>
+        /// <remarks>
+        /// 宽度按最长的一行信息（护甲 / 头盔）加左右内边距反推为 240。
+        /// 原先的 340 在只有一把 AK-74 时右侧会空出接近一半，视觉上不像一块信息卡，
+        /// 更像一个没画完的方框。
+        /// </remarks>
+        private const float PanelWidth = 240f;
 
         private const float PanelHeight = 176f;
 
@@ -229,9 +236,10 @@ namespace RaidDemo.UI
                 return;
             }
 
-            m_ReloadBarFill.rectTransform.sizeDelta = new Vector2(
-                m_ReloadBarRoot.sizeDelta.x * Mathf.Clamp01(runtime.ReloadProgress01),
-                0f);
+            UiFactory.SetBarProgress(
+                m_ReloadBarFill,
+                m_ReloadBarRoot.sizeDelta.x,
+                runtime.ReloadProgress01);
         }
 
         /// <summary>显示或隐藏换弹进度条。</summary>
