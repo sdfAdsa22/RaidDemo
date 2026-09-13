@@ -21,8 +21,15 @@ namespace RaidDemo.Presentation
     /// （见 <see cref="PhysicsLayers"/>），这里统一改用排除单位层的遮罩。
     /// 修复前的症状是敌人贴身时把玩家完全挡住、两个模型卡在一起；
     /// 子弹射线不受影响——战斗查询用的是全层遮罩，照常命中单位。</para>
+    ///
+    /// <para><b>为什么需要去穿透（U-69）：</b>角色走下平台 / 坡道的侧面时，脚底已经被地面吸附
+    /// 降到下层地面，但胶囊半径（0.4 米）还压在侧棱里——每帧水平只前进约 0.05 米，
+    /// 跨过边缘后必然留下这段重叠。此时 PhysX 对**已经重叠**的碰撞体在每个方向都返回
+    /// 0 距离命中（实测四个方向都是 `d=0.000`），移动被压成 0，角色被永久钉死在棱边。
+    /// 这里在解析位移之前先做一次去穿透：沿水平最小方向把角色推出重叠，
+    /// 再照常扫掠——朝墙走时先被推出、再被挡住，不会像"忽略 0 距离命中"那样允许穿墙。</para>
     /// </remarks>
-    public sealed class PhysicsMovementCollisionService : IMovementCollisionWorld
+    public sealed partial class PhysicsMovementCollisionService : IMovementCollisionWorld
     {
         /// <summary>最大迭代次数。两次足够处理「撞墙后沿墙滑行」这种最常见的情况。</summary>
         private const int MaxIterations = 2;
@@ -77,10 +84,17 @@ namespace RaidDemo.Presentation
                 return false;
             }
 
+            // U-69：先去穿透，再解析位移。顺序不能反——
+            // 去穿透必须排在「位移太小就早退」之前：贴着棱边时哪怕只有很小的输入，
+            // 也应该先把角色推出来，否则它会停在重叠状态里动弹不得。
+            var escape = ResolvePenetration(from, radius);
+            var origin = new Vector2F(from.X + escape.X, from.Y + escape.Y);
+
             var distance = delta.Magnitude;
             if (distance <= PositionEpsilon)
             {
-                return false;
+                resolved = escape;
+                return !escape.IsNearlyZero;
             }
 
             var direction = delta.Normalized;
@@ -95,7 +109,7 @@ namespace RaidDemo.Presentation
                     break;
                 }
 
-                var start = new Vector2F(from.X + travelled.X, from.Y + travelled.Y);
+                var start = new Vector2F(origin.X + travelled.X, origin.Y + travelled.Y);
                 if (!Cast(start, direction, radius, remaining, out var hit))
                 {
                     travelled += direction * remaining;
@@ -146,7 +160,9 @@ namespace RaidDemo.Presentation
                 remaining = slide.magnitude;
             }
 
-            resolved = travelled;
+            // 返回值是"去穿透 + 实际位移"的合成量：调用方（移动模拟）直接把它加到位移上，
+            // 因此角色在同一帧里既脱困、又完成本帧该走的那一段。
+            resolved = new Vector2F(escape.X + travelled.X, escape.Y + travelled.Y);
             return blocked;
         }
 
