@@ -151,7 +151,9 @@ namespace RaidDemo.Bootstrap
                     PlayFlatCue(catalog.UiConfirm, 0.5f);
                     break;
                 case UiCue.PanelClose:
-                    PlayFlatCue(catalog.UiPanelClose, 0.45f);
+                    // 关闭面板也复用同一个交互确认音：
+                    // 负责人反馈“关闭仓库时还是旧音效”，开/关两套声音会显得仓库前后不是同一个交互。
+                    PlayFlatCue(catalog.UiConfirm, 0.45f);
                     break;
                 case UiCue.TabSwitch:
                     PlayFlatCue(catalog.UiTabSwitch, 0.5f);
