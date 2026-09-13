@@ -25,6 +25,9 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>战局场景路径。命令行渲染入口先打开它，再按固定机位出图。</summary>
         private const string RaidScenePath = "Assets/Game/Content/Scenes/GreyboxRaid.unity";
 
+        /// <summary>安全屋场景路径（M8 开篇的设施验收机位使用）。</summary>
+        private const string SafeHouseScenePath = "Assets/Game/Content/Scenes/SafeHouse.unity";
+
         private const int ImageWidth = 1600;
 
         private const int ImageHeight = 900;
@@ -115,11 +118,44 @@ namespace RaidDemo.Bootstrap.Editor
             new Shot("10_堆场工业车辆", new Vector3(18f, 1f, 6f), 52f, 0f, 20f, 60f),
         };
 
-        /// <summary>菜单入口。</summary>
+        /// <summary>
+        /// 安全屋专用机位（M8 开篇的设施美化验收）。
+        /// </summary>
+        /// <remarks>
+        /// 战局机位拍的是 72×72 的盆地，安全屋是室内小场景，焦距与距离完全不同，
+        /// 因此单独一组；编号从 11 开始，避免与战局预览图重名。
+        /// </remarks>
+        private static readonly Shot[] s_SafeHouseShots =
+        {
+            // 全景：从南侧俯视整个安全屋，检查四个设施与靶场的相对位置
+            new Shot("11_安全屋全景", new Vector3(0f, 1f, 2f), 58f, 0f, 20f, 55f),
+
+            // 仓库：货架、柜体、木箱 / 油桶 / 宝箱组成的仓储角
+            new Shot("12_安全屋_仓库", new Vector3(-8f, 1f, 4.2f), 46f, 0f, 9f, 55f),
+
+            // 商人摊位：两张柜台、地毯与站在柜台后的商人 NPC
+            new Shot("13_安全屋_商人", new Vector3(-2f, 1.1f, 5.2f), 42f, 0f, 8.5f, 55f),
+
+            // 出口：绿色地垫与金属门框
+            new Shot("14_安全屋_出口", new Vector3(5f, 1f, 5f), 45f, 0f, 8f, 55f),
+
+            // 衣柜：柜体与镜面（柜体朝东，因此相机从西侧看过去）
+            new Shot("15_安全屋_衣柜", new Vector3(-11.2f, 1f, -1.5f), 45f, 90f, 7.5f, 55f),
+        };
+
+        /// <summary>菜单入口：渲染战局预览图。</summary>
         [MenuItem("RaidDemo/M7/渲染场景预览图")]
         public static void RenderFromMenu()
         {
             Debug.Log(RenderAll());
+        }
+
+        /// <summary>菜单入口：打开安全屋场景并渲染设施验收图（M8 开篇）。</summary>
+        [MenuItem("RaidDemo/M7/渲染安全屋预览图")]
+        public static void RenderSafeHouseFromMenu()
+        {
+            OpenSafeHouseScene();
+            Debug.Log(RenderSafeHouse());
         }
 
         /// <summary>
@@ -134,18 +170,53 @@ namespace RaidDemo.Bootstrap.Editor
         /// </remarks>
         public static void OpenRaidSceneAndRender()
         {
-            EditorSceneManager.OpenScene(RaidScenePath, OpenSceneMode.Single);
+            OpenRaidScene();
             Debug.Log(RenderAll());
         }
 
-        /// <summary>按固定机位渲染全部预览图，返回输出目录。</summary>
+        /// <summary>
+        /// 打开安全屋场景并渲染设施验收图，供命令行使用。
+        /// </summary>
+        /// <remarks>
+        /// 命令行用法与战局版本一致，把 <c>-executeMethod</c> 换成
+        /// <c>RaidDemo.Bootstrap.Editor.M7PreviewRenderer.OpenSafeHouseAndRender</c> 即可。
+        /// </remarks>
+        public static void OpenSafeHouseAndRender()
+        {
+            OpenSafeHouseScene();
+            Debug.Log(RenderSafeHouse());
+        }
+
+        private static void OpenRaidScene()
+        {
+            EditorSceneManager.OpenScene(RaidScenePath, OpenSceneMode.Single);
+        }
+
+        private static void OpenSafeHouseScene()
+        {
+            EditorSceneManager.OpenScene(SafeHouseScenePath, OpenSceneMode.Single);
+        }
+
+        /// <summary>按固定机位渲染战局预览图，返回输出目录摘要。</summary>
         public static string RenderAll()
+        {
+            return RenderShots(s_Shots);
+        }
+
+        /// <summary>渲染安全屋专用机位，返回输出目录摘要。</summary>
+        public static string RenderSafeHouse()
+        {
+            return RenderShots(s_SafeHouseShots);
+        }
+
+        /// <summary>按给定机位渲染并输出，战局与安全屋两个入口共用。</summary>
+        private static string RenderShots(Shot[] shots)
         {
             var folder = System.IO.Path.GetFullPath(OutputFolder);
             System.IO.Directory.CreateDirectory(folder);
 
             var summary = new StringBuilder("[RaidDemo] 预览图已输出：");
-            foreach (var shot in s_Shots)
+            foreach (var shot in shots)
             {
                 var path = $"{OutputFolder}/{shot.FileName}.png";
                 if (RenderShot(shot, path))

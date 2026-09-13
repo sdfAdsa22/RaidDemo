@@ -109,6 +109,10 @@ namespace RaidDemo.Bootstrap.Editor
                     return M7SceneAssetResolver.LoadFactoryProp(sourceName);
                 case SourceKind.CarKit:
                     return M7SceneAssetResolver.LoadVehicleProp(sourceName);
+                case SourceKind.Furniture:
+                    return M7SceneAssetResolver.LoadFurnitureProp(sourceName);
+                case SourceKind.Survival:
+                    return M7SceneAssetResolver.LoadSurvivalProp(sourceName);
                 default:
                     return M7SceneAssetResolver.LoadToonShooterProp(sourceName);
             }

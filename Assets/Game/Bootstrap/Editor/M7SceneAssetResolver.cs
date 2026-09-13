@@ -56,6 +56,20 @@ namespace RaidDemo.Bootstrap.Editor
             InboxRoot + "/KenneyCarKit/Models/FBX format"
         };
 
+        /// <summary>肯尼家具套件：正式目录与暂存目录（M8 开篇的安全屋陈设）。</summary>
+        private static readonly string[] FurnitureKitFolders =
+        {
+            ExternalRoot + "/Kenney/FurnitureKit/FBX",
+            InboxRoot + "/KenneyFurnitureKit/Models/FBX format"
+        };
+
+        /// <summary>肯尼生存套件：正式目录与暂存目录（M8 开篇的仓储杂物与门框）。</summary>
+        private static readonly string[] SurvivalKitFolders =
+        {
+            ExternalRoot + "/Kenney/SurvivalKit/FBX",
+            InboxRoot + "/KenneySurvivalKit/Models/FBX format"
+        };
+
         /// <summary>Quaternius Toon Shooter 的场景道具目录。</summary>
         private static readonly string[] ToonShooterFolders =
         {
@@ -200,6 +214,18 @@ namespace RaidDemo.Bootstrap.Editor
         public static GameObject LoadVehicleProp(string fileName)
         {
             return LoadModel(CarKitFolders, fileName);
+        }
+
+        /// <summary>载入肯尼家具套件里的一个模型（安全屋的货架、柜台与陈设）。</summary>
+        public static GameObject LoadFurnitureProp(string fileName)
+        {
+            return LoadModel(FurnitureKitFolders, fileName);
+        }
+
+        /// <summary>载入肯尼生存套件里的一个模型（木箱、油桶、工作台与金属门框）。</summary>
+        public static GameObject LoadSurvivalProp(string fileName)
+        {
+            return LoadModel(SurvivalKitFolders, fileName);
         }
 
         /// <summary>载入 Quaternius Toon Shooter 的场景道具。</summary>

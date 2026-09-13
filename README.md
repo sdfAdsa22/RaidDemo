@@ -18,6 +18,8 @@
 > **批次 5（性能）**（移动动画按速度缩放播放倍率；敌人模型重复剪辑清理）、
 > **批次 6（验收交付）**（清除开发期测试箱；Kenney Factory / Car Kit 为工业区加厚；
 > 正式素材入库与 README 授权收口）均已完成（2026-09-13，**407 项 EditMode 测试全绿**）。
+> **M8 已开篇**：安全屋设施美化完成——仓库改为货架 / 柜体 / 木箱与油桶组成的仓储角，
+> 商人摊位加入正式柜台与**商人 NPC**，出口换金属门框、衣柜换柜体 + 镜面。
 > `M6 局外系统` 已全部完成（批次 1~4）。
 > 现在的完整循环是：**启动 → 主菜单（继续 / 新游戏）→ 安全屋（准备装备 / 买装备 / 接任务 / 试枪 / 选地图）→ 战局 → 撤离或阵亡 → 结算 → 回安全屋**。
 > 局外部分已经能存东西、也能真的丢东西：**撤离把战利品存进仓库，阵亡、超时或中途强退则连身上带的一起丢**；
@@ -96,7 +98,7 @@
 | M5 | 战局闭环（首个垂直切片） | **已完成**（2026-09-11，326 项测试全绿） |
 | M6 | 局外系统与经济循环 | **全部完成**（2026-09-12，345 项测试全绿）：仓库跨战局存活、撤离入库、阵亡真的丢装备、安全屋、商人买卖与 75% 收购价、五个固定任务、JSON 本地存档与「强退视同阵亡」。见 [`Docs/Modules/06_Meta.md`](Docs/Modules/06_Meta.md) |
 | M7 | 打磨与美术替换 | ✅ **已完成**（2026-09-13，407 项测试全绿）：批次 0 素材收口 + Git LFS ✅；批次 1 角色与动画（玩家 Kenney 角色、敌人 Toon Shooter 三型）✅；批次 2 场景与道具 ✅——战局地图改为**下沉盆地**（谷底 -6 米、四通道、四个撤离点）、纯草地 + 橙黏土土墙 + 远景山脊，集装箱 / 木箱 / 纸箱 / 铁丝网 / 沙袋全部替换为正式素材，**遮挡改用自研「透视孔」着色器**；批次 3 音效与 VFX ✅；批次 4 界面美化 ✅——主题层、全部主要界面、五类物品图标素材、界面音效与 **12 角色选择**；批次 5 性能 ✅——移动动画按速度缩放播放倍率、敌人模型重复剪辑清理；批次 6 验收交付 ✅——清除开发期测试箱、Factory / Car Kit 工业区加厚、正式素材全部入库、README 授权收口 |
-| M8 | 交付物 | 未开始：收集图鉴、4 级甲与更多武器、演示视频与发布准备 |
+| M8 | 交付物 | 进行中：安全屋设施美化 ✅（仓库 / 商人 NPC / 出口 / 衣柜）；待做收集图鉴、4 级甲与更多武器、演示视频与发布准备 |
 | M9 | 联机（专用服务器 + PVE 合作） | 未开始 |
 | M10 | 热更新（资源 + 代码） | 未开始 |
 
@@ -375,6 +377,7 @@
 
 **当前状态**：M7 批次 1~6 引入并归档全部正式素材；批次 6 把 **City Kit (Industrial)、Nature Kit、
 Factory Kit、Car Kit** 四套实际使用的 Kenney 素材移入 `External/Kenney/` 并连同 License 提交，
+**M8 开篇**又补入 **Furniture Kit 与 Survival Kit** 用于安全屋陈设；
 安装 Git LFS 后克隆仓库即可直接运行。完整台账见
 [`Docs/Assets/M7_素材使用与归档清单.md`](Docs/Assets/M7_素材使用与归档清单.md)。
 
@@ -386,6 +389,8 @@ Factory Kit、Car Kit** 四套实际使用的 Kenney 素材移入 `External/Kenn
 | [Kenney Nature Kit](https://kenney.nl/assets/nature-kit) | 地图外圈远景山脊（cliff / rock 模块） | CC0 | kenney.nl |
 | [Kenney Factory Kit](https://kenney.nl/assets/factory-kit) | 厂房机器 / 料斗 / 机器人臂 / 传送带 / 管线 / 地面标识（批次 6 工业区加厚） | CC0 | kenney.nl |
 | [Kenney Car Kit](https://kenney.nl/assets/car-kit) | 卡车 / 平板车 / 厢式车 / 挖掘装载机 / 轿车（批次 6 工业区车辆点缀） | CC0 | kenney.nl |
+| [Kenney Furniture Kit](https://kenney.nl/assets/furniture-kit) | 安全屋的货架、柜体、柜台、边桌、地毯与盆栽（M8 开篇设施美化） | CC0 | kenney.nl |
+| [Kenney Survival Kit](https://kenney.nl/assets/survival-kit) | 安全屋的木箱、油桶、宝箱、工作台与金属门框（M8 开篇设施美化） | CC0 | kenney.nl |
 | [Broken Vector Low Poly Cliff Pack](https://brokenvector.itch.io/low-poly-cliff-pack) | 盆地主墙的悬崖装饰瓦片 | 免费商用；**作者在官方群说明允许分发**（包内无授权文件，说明见包内 `AUTHORIZATION.md`） | brokenvector.itch.io |
 | [Fertile Soil Modular Terrain](https://itch.io/) | 草地色板与模块化造型参考 | CC0 | itch.io |
 | [The Free Firearm Sound Library](https://opengameart.org/) | 步枪 / 手枪枪声（自动剪裁成单发后入库） | CC0 | opengameart.org |

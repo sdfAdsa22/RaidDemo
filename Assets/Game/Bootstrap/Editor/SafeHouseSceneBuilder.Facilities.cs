@@ -85,46 +85,41 @@ namespace RaidDemo.Bootstrap.Editor
         }
 
         /// <summary>
-        /// 更衣镜：站在它前面按 E 进入角色选择（M7 批次 4 的局外入口）。
+        /// 实例化一个项目层道具预制体，作为安全屋设施的陈设。
         /// </summary>
+        /// <returns>实例；预制体缺失时返回 null，由调用方回退到原来的灰盒几何。</returns>
         /// <remarks>
-        /// <para>位置选在西墙边、离开三个设施与靶场：角色选择是一条**可选**支路，
-        /// 找它的人会走过去，不找它的人不会被它挡住出击动线。</para>
-        ///
-        /// <para>交互复用标准 <c>SafeHouseInteractable</c> 的「最近设施 + 按 E」分发；
-        /// <c>SafeHouseBootstrap</c> 收到 <c>Wardrobe</c> 类型后转调角色选择界面。
-        /// 生成器只负责把它挂在一个一眼能认出来的物件上。</para>
+        /// 与战局生成器的 <c>InstantiateProp</c> 职责相同，但安全屋没有「谷底为 0」的坐标换算，
+        /// 因此这里直接使用世界坐标。回退是硬要求：素材缺失时安全屋仍然必须完整可用，
+        /// 这与战局地图的"缺素材也不缺地图"是同一条工程规则。
         /// </remarks>
-        private static void CreateWardrobe(Transform parent, Vector3 position)
+        private static GameObject InstantiateFacilityProp(
+            string prefabName,
+            Vector3 position,
+            float yawDegrees,
+            Transform parent)
         {
-            var host = new GameObject("Facility_Wardrobe");
-            host.transform.SetParent(parent, worldPositionStays: false);
-            host.transform.position = position;
+            var prefab = M7PropPrefabBuilder.LoadPrefab(prefabName);
+            if (prefab == null)
+            {
+                return null;
+            }
 
-            var frame = CreateBox(
-                "Frame",
-                position + new Vector3(0f, 1.1f, 0f),
-                new Vector3(0.4f, 2.2f, 3f),
-                host.transform);
-            SetColor(frame, new Color(0.26f, 0.22f, 0.18f));
-
-            // 镜面比镜框薄、朝房间一侧偏出 2 厘米：与镜框共面会闪面（Z-fighting），
-            // 而"一面会闪的镜子"看起来像穿模，不像镜子。
-            var mirror = CreateBox(
-                "Mirror",
-                position + new Vector3(0.21f, 1.15f, 0f),
-                new Vector3(0.04f, 1.9f, 2.6f),
-                host.transform);
-            SetColor(mirror, new Color(0.62f, 0.72f, 0.76f));
-
-            AddInteractable(
-                host,
-                RaidDemo.Presentation.SafeHouseInteractable.Kind.Wardrobe,
-                "衣柜",
-                position);
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            instance.name = prefabName;
+            instance.transform.position = position;
+            instance.transform.rotation = Quaternion.Euler(0f, yawDegrees, 0f);
+            return instance;
         }
 
-        /// <summary>仓库箱：一个带交互标记的箱子。</summary>
+        /// <summary>
+        /// 仓库设施：货架 + 柜体 + 木箱 / 油桶 / 宝箱组成的仓储角（M8 开篇替换灰盒）。
+        /// </summary>
+        /// <remarks>
+        /// 交互标记仍在原来的 <paramref name="position"/>：玩家走近最外侧的木箱就能按 E 开仓库。
+        /// 货架与柜体贴着北墙摆、木箱组挡在交互点前方，碰撞体由道具预制体自带，
+        /// 不再依赖旧灰盒方块——但仍保持"玩家不会穿过设施"这一条手感。
+        /// </remarks>
         private static void CreateStashBox(Transform parent, Vector3 position)
         {
             var host = new GameObject("Facility_Stash");
@@ -134,41 +129,99 @@ namespace RaidDemo.Bootstrap.Editor
             // 而交互标记位置正确、提示照常出现，很难看出是哪一步错了。
             host.transform.position = position;
 
-            var box = CreateBox(
-                "StashBox",
-                position + new Vector3(0f, 0.7f, 0f),
-                new Vector3(2f, 1.4f, 1.2f),
-                host.transform);
-            SetColor(box, new Color(0.30f, 0.42f, 0.34f));
+            var shelf = InstantiateFacilityProp("Prop_Shelf", position + new Vector3(-1.4f, 0f, 0.6f), 0f, host.transform);
+            var cabinet = InstantiateFacilityProp("Prop_Cabinet", position + new Vector3(1.5f, 0f, 0.6f), 0f, host.transform);
+            var crate = InstantiateFacilityProp("Prop_SurvivalBox", position + new Vector3(-0.2f, 0f, -1.0f), 20f, host.transform);
+            var barrel = InstantiateFacilityProp("Prop_Barrel", position + new Vector3(-1.5f, 0f, -0.9f), 0f, host.transform);
+            var chest = InstantiateFacilityProp("Prop_Chest", position + new Vector3(1.0f, 0f, -1.1f), 15f, host.transform);
+
+            // 素材缺失回退：保留原来的绿色储物箱，保证设施仍可见、可交互。
+            if (shelf == null && cabinet == null && crate == null && barrel == null && chest == null)
+            {
+                var box = CreateBox(
+                    "StashBox",
+                    position + new Vector3(0f, 0.7f, 0f),
+                    new Vector3(2f, 1.4f, 1.2f),
+                    host.transform);
+                SetColor(box, new Color(0.30f, 0.42f, 0.34f));
+            }
 
             AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.Stash, "仓库", position);
         }
 
-        /// <summary>商人摊位：一张柜台 + 一个「人」的占位块。</summary>
+        /// <summary>
+        /// 商人摊位：两张柜台 + 商人 NPC + 地毯与盆栽（M8 开篇替换灰盒）。
+        /// </summary>
+        /// <remarks>
+        /// 商人 NPC 直接复用玩家角色预制体里的一个未使用角色（Kenney Mini Characters 同一套骨架与动画），
+        /// 站在柜台后方、面向房间，默认播放 Idle。这样不需要单独维护 NPC 模型与动画控制器；
+        /// 角色缺失时回退为原来的黄色占位块。
+        /// </remarks>
         private static void CreateMerchantStall(Transform parent, Vector3 position)
         {
             var host = new GameObject("Facility_Merchant");
             host.transform.SetParent(parent, worldPositionStays: false);
             host.transform.position = position;
 
-            var counter = CreateBox(
-                "Counter",
-                position + new Vector3(0f, 0.55f, 0f),
-                new Vector3(2.4f, 1.1f, 1f),
-                host.transform);
-            SetColor(counter, new Color(0.52f, 0.42f, 0.28f));
+            var counterLeft = InstantiateFacilityProp("Prop_Counter", position + new Vector3(-1.1f, 0f, 0.4f), 0f, host.transform);
+            var counterRight = InstantiateFacilityProp("Prop_Counter", position + new Vector3(1.1f, 0f, 0.4f), 0f, host.transform);
+            var rug = InstantiateFacilityProp("Prop_Rug", position + new Vector3(0f, 0.02f, -1.6f), 0f, host.transform);
+            var sideTable = InstantiateFacilityProp("Prop_SideTable", position + new Vector3(-2.7f, 0f, 0.5f), 0f, host.transform);
+            var plant = InstantiateFacilityProp("Prop_Plant", position + new Vector3(2.8f, 0f, 0.7f), 0f, host.transform);
 
-            var keeper = CreateBox(
-                "Keeper",
-                position + new Vector3(0f, 1.7f, -0.8f),
-                new Vector3(0.6f, 1.8f, 0.6f),
-                host.transform);
-            SetColor(keeper, new Color(0.85f, 0.72f, 0.2f));
+            if (counterLeft == null && counterRight == null)
+            {
+                // 素材缺失回退：旧柜台。
+                var counter = CreateBox(
+                    "Counter",
+                    position + new Vector3(0f, 0.55f, 0f),
+                    new Vector3(2.4f, 1.1f, 1f),
+                    host.transform);
+                SetColor(counter, new Color(0.52f, 0.42f, 0.28f));
+            }
+
+            CreateMerchantKeeper(host.transform, position + new Vector3(0f, 0f, 1.7f));
 
             AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.Merchant, "商人", position);
         }
 
-        /// <summary>出口：一道门框，走近选地图。</summary>
+        /// <summary>
+        /// 商人 NPC：复用玩家角色预制体里的女队员 C，站在柜台后方面向房间。
+        /// </summary>
+        /// <remarks>
+        /// 角色预制体只包含模型、Animator 与移动动画绑定，不含任何玩家逻辑，
+        /// 因此作为静态 NPC 使用不会获得输入、移动或战斗行为；缺失时回退为黄色占位块。
+        /// </remarks>
+        private static void CreateMerchantKeeper(Transform parent, Vector3 position)
+        {
+            const string characterPath =
+                "Assets/Game/Content/Art/Characters/Player/PlayerCharacter_female_c.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(characterPath);
+            if (prefab != null)
+            {
+                var keeper = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+                keeper.name = "MerchantKeeper";
+                keeper.transform.position = position;
+                // 玩家从南侧（z 更小）走过来，NPC 面向 -Z 才能与玩家对视。
+                keeper.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+                return;
+            }
+
+            var fallback = CreateBox(
+                "Keeper",
+                position + new Vector3(0f, 0.9f, 0f),
+                new Vector3(0.6f, 1.8f, 0.6f),
+                parent);
+            SetColor(fallback, new Color(0.85f, 0.72f, 0.2f));
+        }
+
+        /// <summary>
+        /// 出口：绿色地垫 + 金属门框（M8 开篇替换两根灰色立柱）。
+        /// </summary>
+        /// <remarks>
+        /// 门框不给碰撞体：玩家要能走进门洞并按 E 选地图；原来的立柱有碰撞体，
+        /// 换成门框后"穿过门框"才是符合直觉的行为。
+        /// </remarks>
         private static void CreateExitGate(Transform parent, Vector3 position)
         {
             var host = new GameObject("Facility_Exit");
@@ -182,20 +235,65 @@ namespace RaidDemo.Bootstrap.Editor
                 host.transform);
             SetColor(pad, new Color(0.18f, 0.62f, 0.38f));
 
-            var left = CreateBox(
-                "Post_L",
-                position + new Vector3(-1.5f, 1.4f, 0f),
-                new Vector3(0.25f, 2.8f, 0.25f),
-                host.transform);
-            var right = CreateBox(
-                "Post_R",
-                position + new Vector3(1.5f, 1.4f, 0f),
-                new Vector3(0.25f, 2.8f, 0.25f),
-                host.transform);
-            SetColor(left, new Color(0.16f, 0.18f, 0.20f));
-            SetColor(right, new Color(0.16f, 0.18f, 0.20f));
+            var doorway = InstantiateFacilityProp("Prop_MetalDoorway", position, 0f, host.transform);
+            if (doorway == null)
+            {
+                // 素材缺失回退：旧立柱。
+                var left = CreateBox(
+                    "Post_L",
+                    position + new Vector3(-1.5f, 1.4f, 0f),
+                    new Vector3(0.25f, 2.8f, 0.25f),
+                    host.transform);
+                var right = CreateBox(
+                    "Post_R",
+                    position + new Vector3(1.5f, 1.4f, 0f),
+                    new Vector3(0.25f, 2.8f, 0.25f),
+                    host.transform);
+                SetColor(left, new Color(0.16f, 0.18f, 0.20f));
+                SetColor(right, new Color(0.16f, 0.18f, 0.20f));
+            }
 
             AddInteractable(host, RaidDemo.Presentation.SafeHouseInteractable.Kind.Exit, "出口", position);
+        }
+
+        /// <summary>
+        /// 衣柜：柜体 + 镜面（M8 开篇替换深色方块镜框）。
+        /// </summary>
+        /// <remarks>
+        /// 柜体朝东（面向房间），镜面比柜体前表面再偏出 2 厘米，避免共面闪面；
+        /// 柜体缺失时保留原来的深色镜框。
+        /// </remarks>
+        private static void CreateWardrobe(Transform parent, Vector3 position)
+        {
+            var host = new GameObject("Facility_Wardrobe");
+            host.transform.SetParent(parent, worldPositionStays: false);
+            host.transform.position = position;
+
+            // 柜体旋转 90 度：模型正面朝向 +X，正好面向房间中央。
+            var cabinet = InstantiateFacilityProp("Prop_Cabinet", position, 90f, host.transform);
+            if (cabinet == null)
+            {
+                var frame = CreateBox(
+                    "Frame",
+                    position + new Vector3(0f, 1.1f, 0f),
+                    new Vector3(0.4f, 2.2f, 3f),
+                    host.transform);
+                SetColor(frame, new Color(0.26f, 0.22f, 0.18f));
+            }
+
+            // 镜面比柜体前表面（约 +0.3 米）再偏出 2 厘米，避免与柜门共面闪面。
+            var mirror = CreateBox(
+                "Mirror",
+                position + new Vector3(0.33f, 1.1f, 0f),
+                new Vector3(0.04f, 1.4f, 0.9f),
+                host.transform);
+            SetColor(mirror, new Color(0.62f, 0.72f, 0.76f));
+
+            AddInteractable(
+                host,
+                RaidDemo.Presentation.SafeHouseInteractable.Kind.Wardrobe,
+                "衣柜",
+                position);
         }
     }
 }

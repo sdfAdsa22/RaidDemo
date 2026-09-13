@@ -28,6 +28,12 @@ namespace RaidDemo.Bootstrap.Editor
             /// <summary>Kenney Car Kit：卡车 / 厢式车 / 挖掘装载机等车辆（批次 6）。</summary>
             CarKit,
 
+            /// <summary>Kenney Furniture Kit：安全屋的货架、柜台与陈设（M8 开篇）。</summary>
+            Furniture,
+
+            /// <summary>Kenney Survival Kit：木箱、油桶、工作台与金属门框（M8 开篇）。</summary>
+            Survival,
+
             /// <summary>Quaternius Toon Shooter：木箱、纸箱、围栏。</summary>
             ToonShooter
         }
@@ -123,6 +129,23 @@ namespace RaidDemo.Bootstrap.Editor
             new PropRecipe(SourceKind.CarKit, "tractor-shovel", "Prop_TractorShovel", 2.6f, true, occluder: true),
             new PropRecipe(SourceKind.CarKit, "van", "Prop_Van", 2.0f, true, occluder: true),
             new PropRecipe(SourceKind.CarKit, "sedan", "Prop_Sedan", 1.45f, true),
+
+            // —— M8 开篇：安全屋陈设（Kenney Furniture Kit）——
+            // 货架与柜体是仓储区的主体；柜台与边桌组成商人摊位；地毯与盆栽只做氛围，不给碰撞体。
+            new PropRecipe(SourceKind.Furniture, "bookcaseOpen", "Prop_Shelf", 1.9f, true, occluder: true),
+            new PropRecipe(SourceKind.Furniture, "bookcaseClosedWide", "Prop_Cabinet", 2.0f, true, occluder: true),
+            new PropRecipe(SourceKind.Furniture, "desk", "Prop_Desk", 0.75f, true),
+            new PropRecipe(SourceKind.Furniture, "tableCloth", "Prop_Counter", 0.85f, true),
+            new PropRecipe(SourceKind.Furniture, "sideTableDrawers", "Prop_SideTable", 0.7f, true),
+            new PropRecipe(SourceKind.Furniture, "rugRectangle", "Prop_Rug", 0.02f, false),
+            new PropRecipe(SourceKind.Furniture, "pottedPlant", "Prop_Plant", 1.1f, false),
+
+            // —— M8 开篇：仓储杂物与出口门框（Kenney Survival Kit）——
+            new PropRecipe(SourceKind.Survival, "barrel", "Prop_Barrel", 1.0f, true),
+            new PropRecipe(SourceKind.Survival, "chest", "Prop_Chest", 0.55f, true),
+            new PropRecipe(SourceKind.Survival, "box-large", "Prop_SurvivalBox", 0.9f, true),
+            new PropRecipe(SourceKind.Survival, "workbench", "Prop_Workbench", 1.0f, true),
+            new PropRecipe(SourceKind.Survival, "structure-metal-doorway", "Prop_MetalDoorway", 2.4f, false),
         };
 
         /// <summary>共享材质路径：一个资源包一个材质，满足「全场材质数量收敛」的要求。</summary>
@@ -131,6 +154,8 @@ namespace RaidDemo.Bootstrap.Editor
             { SourceKind.CityKit, BasinTerrainMaterialBuilder.MaterialsFolder + "/M_KenneyIndustrial.mat" },
             { SourceKind.FactoryKit, BasinTerrainMaterialBuilder.MaterialsFolder + "/M_KenneyFactory.mat" },
             { SourceKind.CarKit, BasinTerrainMaterialBuilder.MaterialsFolder + "/M_KenneyCar.mat" },
+            { SourceKind.Furniture, BasinTerrainMaterialBuilder.MaterialsFolder + "/M_KenneyFurniture.mat" },
+            { SourceKind.Survival, BasinTerrainMaterialBuilder.MaterialsFolder + "/M_KenneySurvival.mat" },
             { SourceKind.ToonShooter, BasinTerrainMaterialBuilder.MaterialsFolder + "/M_ToonShooterProps.mat" },
         };
     }
