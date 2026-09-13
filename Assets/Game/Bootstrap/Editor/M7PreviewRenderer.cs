@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace RaidDemo.Bootstrap.Editor
@@ -20,6 +21,9 @@ namespace RaidDemo.Bootstrap.Editor
     {
         /// <summary>预览图输出目录（仓库相对路径，Library 不入库）。</summary>
         private const string OutputFolder = "Library/M7Preview";
+
+        /// <summary>战局场景路径。命令行渲染入口先打开它，再按固定机位出图。</summary>
+        private const string RaidScenePath = "Assets/Game/Content/Scenes/GreyboxRaid.unity";
 
         private const int ImageWidth = 1600;
 
@@ -115,6 +119,22 @@ namespace RaidDemo.Bootstrap.Editor
         [MenuItem("RaidDemo/M7/渲染场景预览图")]
         public static void RenderFromMenu()
         {
+            Debug.Log(RenderAll());
+        }
+
+        /// <summary>
+        /// 打开战局场景并渲染全部预览图，供命令行验收使用。
+        /// </summary>
+        /// <remarks>
+        /// 批处理模式没有"当前打开的场景"，直接调 <see cref="RenderAll"/> 只会渲染到空场景。
+        /// 这个方法先打开战局场景再渲染，命令行用法：
+        /// <c>Unity.exe -batchmode -projectPath &lt;path&gt; -executeMethod
+        /// RaidDemo.Bootstrap.Editor.M7PreviewRenderer.OpenRaidSceneAndRender -quit</c>。
+        /// 克隆验证用它确认"素材全部入库 + Unity 首次导入"之后地图外观完整。
+        /// </remarks>
+        public static void OpenRaidSceneAndRender()
+        {
+            EditorSceneManager.OpenScene(RaidScenePath, OpenSceneMode.Single);
             Debug.Log(RenderAll());
         }
 
