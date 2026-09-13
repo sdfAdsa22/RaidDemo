@@ -166,6 +166,39 @@ namespace RaidDemo.Simulation
             m_TimeSinceSprintEnd = -1f;
         }
 
+        /// <summary>
+        /// 取一份全量状态快照，用于联机预测的历史记录与服务端快照载入。
+        /// </summary>
+        /// <remarks>
+        /// 与 <see cref="State"/> 的区别：后者只是对外可见的状态，不含体力恢复计时器，
+        /// 因此拿它做回滚重放的起点会得到与权威侧不同的体力曲线。
+        /// </remarks>
+        public PlayerMovementSnapshot CaptureSnapshot()
+        {
+            return new PlayerMovementSnapshot
+            {
+                State = m_State,
+                TimeSinceSprintEnd = m_TimeSinceSprintEnd,
+            };
+        }
+
+        /// <summary>
+        /// 把模拟器恢复到快照描述的时刻。
+        /// </summary>
+        /// <param name="snapshot">要恢复到的状态。</param>
+        /// <remarks>
+        /// <para>它是 <see cref="CaptureSnapshot"/> 的逆操作，两者必须成对使用：
+        /// 回滚重放的流程是「恢复权威快照 → 按序重放未确认输入」。</para>
+        ///
+        /// <para>本方法不做事后校验，也不会拒绝"看起来不合理"的快照：
+        /// 权威侧的结论就是唯一真相，客户端没有资格替服务器修正状态。</para>
+        /// </remarks>
+        public void RestoreSnapshot(in PlayerMovementSnapshot snapshot)
+        {
+            m_State = snapshot.State;
+            m_TimeSinceSprintEnd = snapshot.TimeSinceSprintEnd;
+        }
+
         /// <summary>限制输入长度上限为 1，防止斜向输入获得额外速度。</summary>
         private static float ClampInput(Vector2F intent)
         {
