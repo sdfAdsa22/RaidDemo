@@ -31,12 +31,17 @@ namespace RaidDemo.Bootstrap
         /// <summary>移动体高度（米）。与场景生成器里的胶囊保持一致。</summary>
         private const float BodyHeight = 1.8f;
 
+        /// <summary>移动体半径（米）。与客户端玩家的胶囊保持一致，命中判定才一致。</summary>
+        private const float BodyRadius = 0.4f;
+
         /// <summary>碰撞扫掠的安全边距（米）。</summary>
         private const float CollisionSkin = 0.02f;
 
         private MovementServerWorld m_World;
         private readonly List<PlayerSnapshot> m_SnapshotBuffer = new List<PlayerSnapshot>();
         private readonly Dictionary<int, Transform> m_PlayerBodies = new Dictionary<int, Transform>();
+        private readonly Dictionary<int, GameObject> m_PlayerColliders = new Dictionary<int, GameObject>();
+        private readonly HashSet<int> m_InputLogged = new HashSet<int>();
 
         /// <summary>服务器侧的移动权威世界。供测试与调试读取。</summary>
         public MovementServerWorld World => m_World;
@@ -74,7 +79,9 @@ namespace RaidDemo.Bootstrap
             }
 
             m_PlayerBodies.Clear();
+            m_PlayerColliders.Clear();
             m_SnapshotBuffer.Clear();
+            ShutdownCombat();
             m_World = null;
         }
 
@@ -124,6 +131,8 @@ namespace RaidDemo.Bootstrap
             }
 
             m_Session?.Log.Info($"[服务器] 玩家 {playerId} 已加入（在线 {m_World.PlayerCount} 人）。");
+            AddPlayerToCombat(playerId);
+            BindPlayerHitTarget(playerId);
         }
 
         /// <summary>客户端断开：从权威世界移除。</summary>
@@ -131,6 +140,7 @@ namespace RaidDemo.Bootstrap
         {
             var playerId = (int)clientId;
             m_PlayerBodies.Remove(playerId);
+            RemovePlayerFromCombat(playerId);
 
             if (m_World != null && m_World.RemovePlayer(playerId))
             {
@@ -159,10 +169,25 @@ namespace RaidDemo.Bootstrap
                 message.Sequence,
                 message.Timestamp);
 
+            if (m_InputLogged.Add((int)clientId) && m_Session != null
+                && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
+            {
+                // 联机排障时，"上行消息里到底有什么"是第一手证据：
+                // 它能一次区分"客户端没发""发的是空值"与"发了但服务器没按预期处理"。
+                m_Session.Log.Verbose(
+                    $"[服务器] 收到玩家 {(int)clientId} 的首条输入：" +
+                    $"移动=({message.Move.x:F2},{message.Move.y:F2}) " +
+                    $"朝向=({message.Look.x:F2},{message.Look.y:F2}) " +
+                    $"奔跑={message.Sprint} 扳机={message.TriggerHeld} 换弹={message.ReloadRequested} 序号={message.Sequence}");
+            }
+
             if (!m_World.TrySubmitInput(intent, out var rejection))
             {
                 m_Session?.Log.Verbose($"[服务器] {rejection}");
             }
+
+            // 同一条输入同时驱动移动与战斗：朝向既是"看哪"也是"打哪"。
+            ApplyCombatInput((int)clientId, message, new Vector2F(message.Look.x, message.Look.y));
         }
 
         /// <summary>每帧推进：仿真 → 同步载体位置 → 到节拍就广播快照。</summary>
@@ -174,6 +199,7 @@ namespace RaidDemo.Bootstrap
             }
 
             m_World.Advance(deltaTime);
+            TickCombat(deltaTime);
             SyncPlayerTransforms();
 
             if (m_World.CaptureSnapshots(m_SnapshotBuffer) > 0)
@@ -252,7 +278,19 @@ namespace RaidDemo.Bootstrap
             var instance = new GameObject($"ServerPlayerBody_{playerId}");
             var position = SpawnPositionFor(playerId);
             instance.transform.position = new Vector3(position.X, 0f, position.Y);
+
+            // 形状与客户端角色一致：命中判定用的是同一套胶囊尺寸，
+            // 否则"客户端觉得打中了、服务器觉得没中"会变成常态。
+            var collider = instance.AddComponent<CapsuleCollider>();
+            collider.height = BodyHeight;
+            collider.radius = BodyRadius;
+            collider.center = new Vector3(0f, BodyHeight * 0.5f, 0f);
+
+            // 放到单位层：命中射线的遮罩按层过滤，放错层就永远打不中。
+            PhysicsLayers.ApplyUnitLayer(instance);
+
             m_PlayerBodies[playerId] = instance.transform;
+            m_PlayerColliders[playerId] = instance;
         }
 
         /// <summary>

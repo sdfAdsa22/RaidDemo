@@ -57,7 +57,8 @@ namespace RaidDemo.Combat
             CombatWorld world,
             CombatTuning tuning,
             EventBus eventBus,
-            int ammoPouchContainerId = 0)
+            int ammoPouchContainerId = 0,
+            int playerId = 0)
         {
             m_Weapon = weapon;
             m_Loadout = loadout;
@@ -66,6 +67,11 @@ namespace RaidDemo.Combat
             m_Tuning = tuning ?? CombatTuning.Default;
             m_EventBus = eventBus;
             m_AmmoPouchContainerId = ammoPouchContainerId;
+
+            // 持有者身份在构造时就确定：开火与命中事件都要带上它，
+            // 而"第一次换弹时才知道自己是谁"会让开火事件误报成玩家 0。
+            // 单机碰巧看不出来（本地玩家编号就是 0），联机时表现为"枪声与动画不归任何人"。
+            m_PlayerId = playerId;
         }
 
         /// <summary>手持武器状态。</summary>

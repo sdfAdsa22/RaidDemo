@@ -291,7 +291,11 @@ namespace RaidDemo.Bootstrap
 
             // 会话作用域负责创建与释放会话级服务，并把它们注册为当前场景的静态入口。
             // 单机走的是「本机内嵌服务器」形态：权威逻辑与客户端同进程，但边界已经按服务器设计。
-            m_Session = SessionScope.CreateLocal();
+            // 联机客户端按启动参数决定日志等级：诊断联机问题时，
+            // 客户端侧的证据（"我到底发了什么"）和服务器侧同样重要。
+            m_Session = ClientMode.IsActive && ClientMode.Options != null
+                ? new SessionScope("联机客户端", ClientMode.Options.MinimumLogLevel)
+                : SessionScope.CreateLocal();
             m_EventBus = m_Session.Events;
             m_CommandRouter = m_Session.Commands;
 

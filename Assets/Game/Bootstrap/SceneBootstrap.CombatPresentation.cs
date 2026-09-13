@@ -221,12 +221,22 @@ namespace RaidDemo.Bootstrap
                 // 而玩家以为自己刚才只是在整理东西。阵亡同理。
                 m_WeaponController.SetTriggerHeld(false);
             }
+            else if (IsMultiplayerClient)
+            {
+                // 联机时扣扳机与换弹是"意图"，由服务器结算：
+                // 客户端这里只记录要上报的输入，绝不本地推进武器——
+                // 否则两边各扣一次弹药、各判一次命中，权威就不存在了。
+                CollectMultiplayerCombatIntent();
+            }
             else
             {
                 CollectCombatInput();
             }
 
-            m_WeaponController.Tick(deltaTime);
+            if (!IsMultiplayerClient)
+            {
+                m_WeaponController.Tick(deltaTime);
+            }
         }
 
         /// <summary>把装备槽里的主武器同步到手持武器状态。</summary>

@@ -123,6 +123,8 @@ namespace RaidDemo.Bootstrap
                 MovementNetworkChannel.SnapshotMessageName,
                 OnSnapshotBatch);
             m_NetworkSnapshotHandlerRegistered = true;
+
+            RegisterCombatChannel();
         }
 
         /// <summary>连接断开：清理远端视图，避免留下不会动的假队友。</summary>
@@ -219,8 +221,53 @@ namespace RaidDemo.Bootstrap
             var x = (float)Math.Cos(angle);
             var y = (float)Math.Sin(angle);
 
-            m_InputCollector.ScriptedMoveDirection = new Vector2(x, y);
-            m_InputCollector.ScriptedLookDirection = new Vector2F(x, y);
+            // 走的方向是绕圈，但**朝向**要盯着最近的队友：
+            // 只有真的打中，才会走到"伤害结算 → 广播 → 客户端扣血"这条路径上，
+            // 否则验收只能证明"枪响了"，证明不了"打中了"。
+            var aim = ResolveAutoAimDirection(new Vector2F(x, y));
+            m_InputCollector.ScriptedLookDirection = aim;
+
+            // 有队友时朝他走过去，而不是各绕各的圈：
+            // 两人相距几十米时连射程都够不着，验收永远等不到命中。
+            var hasTarget = !aim.Equals(new Vector2F(x, y));
+            m_InputCollector.ScriptedMoveDirection = hasTarget
+                ? new Vector2(aim.X, aim.Y)
+                : new Vector2(x, y);
+        }
+
+        /// <summary>验收模式下把朝向对准最近的远端玩家；没有目标时保持原方向。</summary>
+        private Vector2F ResolveAutoAimDirection(Vector2F fallback)
+        {
+            if (m_RemoteViews.Count == 0 || m_PlayerMotor == null)
+            {
+                return fallback;
+            }
+
+            var self = m_PlayerMotor.SimulatedPosition;
+            var bestSqrDistance = float.MaxValue;
+            var aim = fallback;
+
+            foreach (var view in m_RemoteViews.Values)
+            {
+                if (view == null)
+                {
+                    continue;
+                }
+
+                var position = view.transform.position;
+                var dx = position.x - self.x;
+                var dz = position.z - self.y;
+                var sqrDistance = (dx * dx) + (dz * dz);
+                if (sqrDistance >= bestSqrDistance || sqrDistance < 0.01f)
+                {
+                    continue;
+                }
+
+                bestSqrDistance = sqrDistance;
+                aim = new Vector2F(dx, dz).Normalized;
+            }
+
+            return aim;
         }
 
         /// <summary>
@@ -272,9 +319,15 @@ namespace RaidDemo.Bootstrap
                 Move = new Vector2(intent.MoveDirection.X, intent.MoveDirection.Y),
                 Look = new Vector2(intent.LookDirection.X, intent.LookDirection.Y),
                 Sprint = intent.WantsToSprint,
+                TriggerHeld = m_NetworkTriggerHeld,
+
+                // 换弹是边沿事件：发出去之后就清掉，避免同一次按键被重复上报。
+                ReloadRequested = m_NetworkReloadRequested,
                 Sequence = intent.Sequence,
                 Timestamp = intent.Timestamp,
             };
+
+            m_NetworkReloadRequested = false;
 
             using (var writer = new FastBufferWriter(48, Allocator.Temp))
             {

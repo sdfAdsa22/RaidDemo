@@ -25,6 +25,24 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否请求奔跑（能否跑起来仍由服务器按体力判定）。</summary>
         public bool Sprint;
 
+        /// <summary>
+        /// 是否扣着扳机。
+        /// </summary>
+        /// <remarks>
+        /// 搭在移动输入上一起上行：扣扳机是**持续状态**，与移动同频（每固定步一次），
+        /// 再单开一条消息只会多一份时序问题。服务器拿它驱动权威武器控制器。
+        /// </remarks>
+        public bool TriggerHeld;
+
+        /// <summary>
+        /// 本步是否请求换弹（边沿触发：客户端按下 R 的那一步置 true）。
+        /// </summary>
+        /// <remarks>
+        /// 换弹是**一次性事件**，与"扣着扳机"这种持续状态不同，因此用边沿而不是电平。
+        /// 服务器收到即调用一次换弹请求，重复包不会导致重复换弹。
+        /// </remarks>
+        public bool ReloadRequested;
+
         /// <summary>单调递增的输入序号。</summary>
         public uint Sequence;
 
@@ -37,6 +55,8 @@ namespace RaidDemo.Bootstrap
             serializer.SerializeValue(ref Move);
             serializer.SerializeValue(ref Look);
             serializer.SerializeValue(ref Sprint);
+            serializer.SerializeValue(ref TriggerHeld);
+            serializer.SerializeValue(ref ReloadRequested);
             serializer.SerializeValue(ref Sequence);
             serializer.SerializeValue(ref Timestamp);
         }
