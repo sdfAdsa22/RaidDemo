@@ -361,5 +361,127 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(2, item[0].CellX, "格子坐标必须能送达，否则客户端只能自动摆放，两端布局必然分叉。");
             Assert.AreEqual(3, item[0].CellY, "格子坐标必须能送达，否则客户端只能自动摆放，两端布局必然分叉。");
         }
+
+        /// <summary>
+        /// 同一份内容同步两次，同一格上的同一件东西必须是**同一个物品对象**。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>它防的是哪一类缺陷：</b>界面把物品对象当成身份在用——双击识别比较对象引用，
+        /// 拖拽松手时按对象在网格里找坐标。早先每次同步都把容器内容全部 new 一遍，
+        /// 于是只要有一次同步落在两次点击之间，双击就被当成两次单击（静默失效）；
+        /// 落在一次拖拽中间，松手就什么也不发生。玩家的体感正是"双击有时候管用、有时候完全没反应"，
+        /// 而日志里没有一行错误（P4.5 实机定位的第四处缺陷）。</para>
+        ///
+        /// <para>这条断言把"对象不变"钉死：谁再把铺放逻辑改回"每次全新实例"，它就会红。</para>
+        /// </remarks>
+        [Test]
+        public void Apply_SameContentTwice_KeepsItemInstance()
+        {
+            var containerId = ContainerIds.SceneContainer(5);
+            var grid = new InventoryGrid(4, 4, "战利品");
+            m_Registry.Register(grid, ContainerKind.Loot, containerId);
+
+            LootContainerSync.Apply(m_Registry, m_Catalog, BatchWithRifle(containerId), m_Events);
+            var before = grid.Items[0];
+
+            LootContainerSync.Apply(m_Registry, m_Catalog, BatchWithRifle(containerId), m_Events);
+            var after = grid.Items[0];
+
+            Assert.AreSame(
+                before,
+                after,
+                "同一格、同一件东西在同步前后必须是同一个对象，否则双击与拖拽会莫名失效。");
+        }
+
+        /// <summary>物品在同一容器里换了格子（玩家拖了一格）之后，仍然是同一个对象。</summary>
+        /// <remarks>
+        /// 复用池的键刻意不含坐标：搬动一格不改变"这是哪一件东西"，
+        /// 因此玩家把一件东西拖到新位置后可以接着拖它，而不是每次都要重新点一遍。
+        /// </remarks>
+        [Test]
+        public void Apply_ItemMovedWithinContainer_KeepsItemInstance()
+        {
+            var containerId = ContainerIds.SceneContainer(6);
+            var grid = new InventoryGrid(5, 5, "战利品");
+            m_Registry.Register(grid, ContainerKind.Loot, containerId);
+
+            LootContainerSync.Apply(m_Registry, m_Catalog, BatchWithAmmoAt(containerId, 0, 0), m_Events);
+            var before = grid.Items[0];
+
+            LootContainerSync.Apply(m_Registry, m_Catalog, BatchWithAmmoAt(containerId, 2, 1), m_Events);
+            var after = grid.Items[0];
+
+            Assert.AreSame(before, after, "换了格子不等于换了东西：拖完一格要能接着拖。");
+            Assert.IsTrue(grid.TryGetOrigin(after, out var origin));
+            Assert.AreEqual(2, origin.X);
+            Assert.AreEqual(1, origin.Y, "坐标仍然以服务器为准。");
+        }
+
+        /// <summary>数量变了就不是"同一件东西"：必须换成新实例，数量以服务器为准。</summary>
+        [Test]
+        public void Apply_CountChanged_UsesNewInstance()
+        {
+            var containerId = ContainerIds.SceneContainer(7);
+            var grid = new InventoryGrid(3, 3, "战利品");
+            m_Registry.Register(grid, ContainerKind.Loot, containerId);
+
+            LootContainerSync.Apply(m_Registry, m_Catalog, BatchWithAmmoAt(containerId, 0, 0, 12), m_Events);
+            var before = grid.Items[0];
+
+            LootContainerSync.Apply(m_Registry, m_Catalog, BatchWithAmmoAt(containerId, 0, 0, 30), m_Events);
+            var after = grid.Items[0];
+
+            Assert.AreNotSame(before, after, "数量变了说明堆叠被拆并过，不能继续复用旧实例。");
+            Assert.AreEqual(30, after.StackCount, "数量以服务器为准。");
+        }
+
+        /// <summary>复用池里的一件实例最多被取走一次（否则同一次同步会把一件东西铺两遍）。</summary>
+        [Test]
+        public void ReusePool_Take_ReturnsEachInstanceOnlyOnce()
+        {
+            var grid = new InventoryGrid(3, 3, "箱子");
+            var item = new ItemFactory().Create(m_Catalog.Get(AmmoId), 30);
+            Assert.IsTrue(grid.Place(item, new GridPoint(0, 0), false).Success);
+
+            var pool = new LootContainerItemReusePool();
+            pool.Collect(grid);
+
+            Assert.AreSame(item, pool.Take(AmmoId, 30, false));
+            Assert.IsNull(pool.Take(AmmoId, 30, false), "同一件实例只能被复用它自己的那一次。");
+        }
+
+        /// <summary>造一批"服务器说这个箱子里有一件指定坐标的弹药"。</summary>
+        /// <param name="containerId">容器编号。</param>
+        /// <param name="cellX">格子 X。</param>
+        /// <param name="cellY">格子 Y。</param>
+        /// <param name="count">数量。</param>
+        private static ContainerContentsBatchMessage BatchWithAmmoAt(
+            int containerId, int cellX, int cellY, int count = 12)
+        {
+            return new ContainerContentsBatchMessage
+            {
+                ServerTime = 1d,
+                Containers = new[]
+                {
+                    new ContainerContentsMessage
+                    {
+                        ContainerId = containerId,
+                        Width = 5,
+                        Height = 5,
+                        Items = new[]
+                        {
+                            new ContainerItemMessage
+                            {
+                                ItemId = AmmoId,
+                                Count = count,
+                                Rotated = false,
+                                CellX = cellX,
+                                CellY = cellY,
+                            },
+                        },
+                    },
+                },
+            };
+        }
     }
 }

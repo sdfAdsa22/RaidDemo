@@ -19,6 +19,14 @@ namespace RaidDemo.Bootstrap
     ///
     /// <para><b>铺放顺序即确定性：</b>服务器只下发"有什么、几个、是否横放"，
     /// 格子坐标由两端用同一套放置规则铺出来；同一批物品 + 同一个空网格 → 布局必然一致。</para>
+    ///
+    /// <para><b>为什么同步时要尽量复用物品实例：</b>界面把"物品对象"当成身份在用——
+    /// 双击识别比较的是同一个引用，拖拽松手时要按对象在网格里找坐标。
+    /// 如果每次同步都把容器内容重建一遍（全部 new），那么只要有一次同步落在
+    /// 两次点击之间、或落在一次拖拽的过程里，玩家手上的那件东西就凭空换了对象：
+    /// 双击没反应、拖到位松手什么也没发生，而日志里一句错误都没有
+    /// （P4.5 实测：同一格、同一件东西，两次同步之间的实例号不同）。
+    /// 因此这里按"定义 + 数量 + 摆放方向"复用旧实例，只对真正变化的物品新建。</para>
     /// </remarks>
     public static class LootContainerSync
     {
@@ -98,6 +106,9 @@ namespace RaidDemo.Bootstrap
                     ReportCapacityMismatchOnce(container, grid);
                 }
 
+                // 复用池必须在清空之前收集：清空之后旧实例就再也找不回来了。
+                var reusable = new LootContainerItemReusePool();
+                reusable.Collect(grid);
                 ClearGrid(grid);
 
                 var placed = 0;
@@ -118,7 +129,13 @@ namespace RaidDemo.Bootstrap
                             continue;
                         }
 
-                        var item = factory.Create(definition, Mathf.Max(1, entry.Count));
+                        // 优先复用本地已有的同一件东西，复用不到才新建（见类注释）。
+                        var item = reusable.Take(entry.ItemId, Mathf.Max(1, entry.Count), entry.Rotated);
+                        if (item == null)
+                        {
+                            item = factory.Create(definition, Mathf.Max(1, entry.Count));
+                        }
+
                         item.Rotated = entry.Rotated;
 
                         // 先按服务器给的坐标**原位复原**；只有放不下（例如坐标已被别的物品占据、

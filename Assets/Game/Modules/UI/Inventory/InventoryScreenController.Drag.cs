@@ -56,10 +56,8 @@ namespace RaidDemo.UI
             // 双击 = 快速转移。这是搜刮时最常用的操作：一件件拖太慢，
             // 而玩家在战利品箱与背包之间来回搬东西会做几十次。
             var now = Time.unscaledTime;
-            var isDoubleClick = ReferenceEquals(item, m_LastClickItem)
-                                && (now - m_LastClickTime) <= DoubleClickSeconds;
-            m_LastClickItem = item;
-            m_LastClickTime = now;
+            var isDoubleClick = IsSameItemAsLastClick(view.ContainerId, item, origin, now);
+            RememberClick(view.ContainerId, item, origin, now);
 
             if (isDoubleClick)
             {
@@ -72,6 +70,8 @@ namespace RaidDemo.UI
             m_IsDragging = true;
             m_DragSource = view;
             m_DragItem = item;
+            m_DragStartOrigin = origin;
+            m_DragItemId = ItemIdOf(item);
             m_DragRotated = item.Rotated;
             m_DragGrabOffset = new GridPoint(cell.X - origin.X, cell.Y - origin.Y);
         }
@@ -114,7 +114,7 @@ namespace RaidDemo.UI
             var view = FindGridAt(pointer, out var cell);
             // 坐标必须从**源**容器查，而不是松手时所在的容器：
             // 物品不在目标容器里，对目标容器查询坐标一定失败，命令就发不出去了。
-            if (view != null && m_DragSource.Grid.TryGetOrigin(m_DragItem, out var origin))
+            if (view != null && TryResolveDragOrigin(out var origin))
             {
                 var size = SizeForDrag();
                 var grab = ClampGrabOffset(size);
@@ -228,7 +228,7 @@ namespace RaidDemo.UI
         /// <summary>发出装备命令。</summary>
         private void DispatchEquip(EquipmentSlot slot)
         {
-            if (!m_DragSource.Grid.TryGetOrigin(m_DragItem, out var origin))
+            if (!TryResolveDragOrigin(out var origin))
             {
                 return;
             }
@@ -249,6 +249,7 @@ namespace RaidDemo.UI
             m_IsDragging = false;
             m_DragSource = null;
             m_DragItem = null;
+            m_DragItemId = null;
             m_DragRotated = false;
             ClearPreviews();
         }
