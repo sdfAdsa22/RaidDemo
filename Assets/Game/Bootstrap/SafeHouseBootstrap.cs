@@ -194,7 +194,10 @@ namespace RaidDemo.Bootstrap
 
             var uiOpen = (m_InventoryScreen != null && m_InventoryScreen.IsOpen)
                 || (m_Ui != null && m_Ui.IsOpen)
-                || (m_MerchantScreen != null && m_MerchantScreen.IsOpen);
+                || (m_MerchantScreen != null && m_MerchantScreen.IsOpen)
+                // 联机界面与房间界面同样会挡住安全屋的操作：它们需要鼠标，
+                // 而且 Esc 要归它们（退出输入框 / 返回上一界面）。
+                || flow.IsBlockingScreenVisible;
 
             // 安全屋里按 Esc 打开暂停菜单；界面打开时 Esc 先交给界面自己处理。
             if (!uiOpen
@@ -208,7 +211,14 @@ namespace RaidDemo.Bootstrap
             // 主菜单与结算界面属于"需要鼠标"的流程状态：
             // 它们不是战局/安全屋里的操作面板，不能因为背包没开就锁光标。
             var needsMouse = flow.State == RaidFlowController.FlowState.MainMenu
-                || flow.State == RaidFlowController.FlowState.Result;
+                || flow.State == RaidFlowController.FlowState.Result
+                || flow.IsBlockingScreenVisible;
+
+            if (needsMouse)
+            {
+                // 需要鼠标的界面：释放光标（ReleaseCursor 不受"是否启用光标锁定"开关影响）。
+                m_InputCollector?.ReleaseCursor();
+            }
             var uiBlocking = uiOpen || needsMouse;
 
             // 商人界面关闭后恢复背包的 Tab 输入；打开商人时会临时关掉它，

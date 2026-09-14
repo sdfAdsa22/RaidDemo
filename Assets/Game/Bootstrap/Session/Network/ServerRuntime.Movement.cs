@@ -289,12 +289,24 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void CreatePlayerBody(int playerId)
         {
-            var instance = new GameObject($"ServerPlayerBody_{playerId}");
             var position = SpawnPositionFor(playerId);
 
             // 出生高度取导航网格采样：此时服务器已经烘焙过导航数据，它是"地面在哪"最省事的权威答案。
             // 找不到导航数据时退回 0 米；随后的每帧地面探测会把胶囊修正到真实地面。
             var ground = NavMeshGroundSampler.TrySample(position, out var sampled) ? sampled : 0f;
+
+            // 已经有载体就**复用**它，只把位置与地面高度更新一遍：
+            // 重复创建会留下一个"没人认领的胶囊"——它还带着旧的目标编号待在场景里，
+            // 射线会先撞到它、把命中判定引到一个已经退场的战斗单位上（P4 踩过：见排障手册 P-34）。
+            if (m_PlayerColliders.TryGetValue(playerId, out var existing) && existing != null)
+            {
+                existing.transform.position = new Vector3(position.X, ground, position.Y);
+                m_PlayerBodies[playerId] = existing.transform;
+                m_PlayerGroundHeights[playerId] = ground;
+                return;
+            }
+
+            var instance = new GameObject($"ServerPlayerBody_{playerId}");
             instance.transform.position = new Vector3(position.X, ground, position.Y);
             m_PlayerGroundHeights[playerId] = ground;
 

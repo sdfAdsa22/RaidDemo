@@ -166,7 +166,15 @@ namespace RaidDemo.Bootstrap
 
             if (m_Combat.TryAddPlayer(playerId, out var error))
             {
-                m_Session?.Log.Info($"[服务器] 玩家 {playerId} 已进入战斗（配发武器与备弹）。");
+                // 命中标识必须紧跟"参战"这一步：目标编号是参战时才分配的，
+                // 而 AI 的视线判定就是靠射线命中的 CombatTargetView 去认人。
+                // 曾经把它漏在一次"战局重开"的路径上，症状是敌人永远停在警惕、贴脸也不开火——
+                // 日志一切正常，只有"视线恒为 false"这一个间接表现。
+                BindPlayerHitTarget(playerId);
+
+                var combatantId = m_Combat.GetCombatantId(playerId);
+                m_Session?.Log.Info(
+                    $"[服务器] 玩家 {playerId} 已进入战斗（配发武器与备弹，命中标识={combatantId}）。");
             }
             else
             {

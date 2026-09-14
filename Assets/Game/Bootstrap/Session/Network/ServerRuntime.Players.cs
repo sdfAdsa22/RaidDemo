@@ -1,4 +1,5 @@
 using RaidDemo.Shared;
+using UnityEngine;
 
 namespace RaidDemo.Bootstrap
 {
@@ -75,6 +76,15 @@ namespace RaidDemo.Bootstrap
 
             m_PlayerBodies.Remove(playerId);
             m_PlayerGroundHeights.Remove(playerId);
+
+            // 载体对象必须显式销毁：它带着胶囊碰撞体与命中标识，留在场景里就是"幽灵玩家"——
+            // 射线会打到它，命中判定会把伤害算到一个已经离场的编号上。
+            if (m_PlayerColliders.TryGetValue(playerId, out var body) && body != null)
+            {
+                Object.Destroy(body);
+            }
+
+            m_PlayerColliders.Remove(playerId);
             UnregisterPlayerContainers(playerId);
             UnregisterRaidProgress(playerId);
             UnregisterLifeState(playerId);

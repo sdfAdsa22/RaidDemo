@@ -36,6 +36,25 @@ namespace RaidDemo.Bootstrap
         /// <summary>联机相关的界面当前是否处于显示状态（用于判断"断开后要不要回到联机界面"）。</summary>
         private bool m_MultiplayerUiActive;
 
+        /// <summary>正在主动退出联机（点「返回主菜单」或暂停菜单退出）时为 true。</summary>
+        /// <remarks>
+        /// 断开连接会同步触发 <see cref="OnSessionChanged"/>，而那段逻辑看到"联机界面开着"
+        /// 就会把服务器列表**再推回来**——于是「返回主菜单」看起来毫无反应（P4 用户反馈）。
+        /// 用一个显式标记把"玩家主动退出"与"被动掉线"区分开。
+        /// </remarks>
+        private bool m_LeavingMultiplayer;
+
+        /// <summary>
+        /// 是否有任何"阻塞型界面"正在显示（主菜单 / 结算 / 联机 / 房间）。
+        /// </summary>
+        /// <remarks>
+        /// 场景启动类用它决定"要不要锁光标、Esc 归谁"：这些界面都需要鼠标，
+        /// 而它们不属于背包/商人那套已知面板，安全屋原来只认那几个，于是玩家一点输入框
+        /// 光标就被重新锁住了（P4 用户反馈的"鼠标消失"）。
+        /// </remarks>
+        public bool IsBlockingScreenVisible =>
+            State == FlowState.MainMenu || State == FlowState.Result || m_MultiplayerUiActive;
+
         /// <summary>局域网扫描窗口（秒）。直接取发现模块的常量，避免两处数值不一致。</summary>
         private const float ScanWindowSeconds = LanDiscoveryScanner.ScanWindowSeconds;
 
@@ -58,6 +77,7 @@ namespace RaidDemo.Bootstrap
                 JoinRoom = OnMultiplayerJoinRoom,
                 StartRaid = OnMultiplayerStartRaid,
                 LeaveRoom = OnMultiplayerLeaveRoom,
+                Back = OnMultiplayerBackToServers,
             });
         }
 
@@ -143,7 +163,7 @@ namespace RaidDemo.Bootstrap
 
                 default:
                     // 未连接：如果界面正开着（说明玩家来过联机），把失败原因显示出来。
-                    if (m_MultiplayerUiActive)
+                    if (m_MultiplayerUiActive && !m_LeavingMultiplayer)
                     {
                         ShowServersScreen(m_Session.LastError, m_Session.LastError == null ? "连接已断开。" : null);
                     }
@@ -245,44 +265,6 @@ namespace RaidDemo.Bootstrap
             }
         }
 
-        /// <summary>点「局域网扫描」或点某一行扫描结果：把地址填进界面。</summary>
-        private void OnMultiplayerJoinFound(string address, int port)
-        {
-            m_MultiplayerScreen.SetDefaults(null, null, address, port);
-            m_MultiplayerScreen.SetStatus($"已选择 {address}:{port}，点「连接」加入。", false);
-        }
-
-        /// <summary>点「扫描」：开始一轮局域网发现。</summary>
-        private void OnMultiplayerScan()
-        {
-            m_ScanDeadline = Time.realtimeSinceStartup + ScanWindowSeconds;
-            m_MultiplayerScreen.SetScanning(true);
-            m_MultiplayerScreen.SetStatus("正在搜索局域网房间…", false);
-            StartLanScan();
-        }
-
-        /// <summary>扫描窗口结束：收起"扫描中"状态。</summary>
-        private void TickScanWindow()
-        {
-            if (m_ScanDeadline < 0f)
-            {
-                return;
-            }
-
-            // 扫描期间每帧收包：回包可能随时到达（服务器是被动应答），
-            // 只在窗口结束时收一次会把这 1.2 秒里的包堆在系统缓冲里，容易丢。
-            m_LanScanner?.Poll();
-
-            if (Time.realtimeSinceStartup < m_ScanDeadline)
-            {
-                return;
-            }
-
-            m_ScanDeadline = -1f;
-            m_MultiplayerScreen.SetScanning(false);
-            FinishLanScan();
-        }
-
         /// <summary>点「创建房间」。</summary>
         private void OnMultiplayerCreateRoom(string roomName, string password)
         {
@@ -334,6 +316,20 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 房间界面点「返回」：断开会话并回到联机界面（服务器列表）。
+        /// </summary>
+        /// <remarks>
+        /// 断开而不是"保留连接回到列表"：联机界面上的「连接」是唯一的入口，
+        /// 保留一条已建立的连接会让那个按钮处于"已经连上了"的哑火状态，玩家只能靠猜。
+        /// 服务器侧会把这次断开当作退出房间处理。
+        /// </remarks>
+        private void OnMultiplayerBackToServers()
+        {
+            m_Session?.Disconnect();
+            ShowServersScreen(null, "已返回服务器列表。");
+        }
+
+        /// <summary>
         /// 服务器通知开局：收起界面并加载地图。
         /// </summary>
         /// <param name="mapSceneName">服务器指定的地图场景名。</param>
@@ -363,8 +359,15 @@ namespace RaidDemo.Bootstrap
         /// <summary>联机界面点「返回主菜单」：断开连接并回到主菜单。</summary>
         private void ReturnToMainMenuFromMultiplayer()
         {
+            m_LeavingMultiplayer = true;
+            m_MultiplayerUiActive = false;
+            m_MultiplayerScreen?.SetVisible(false);
+            m_LobbyScreen?.SetVisible(false);
+
             m_Session?.Disconnect();
             ShowMainMenu();
+
+            m_LeavingMultiplayer = false;
         }
 
         /// <summary>拆分"主机[:端口]"（用于把上次地址回填到界面）。</summary>

@@ -23,27 +23,6 @@ namespace RaidDemo.Bootstrap
         /// <summary>枪口相对角色脚底的高度（米）。</summary>
         private const float MuzzleHeight = 1.05f;
 
-        /// <summary>灰盒靶子的高度（米）。</summary>
-        private const float TargetHeight = 1.8f;
-
-        /// <summary>靶子之间的距离（米）。</summary>
-        private const float TargetSpacing = 4f;
-
-        /// <summary>被四个靶子包围的射击线：正前方、左右两侧、以及一个更远的。</summary>
-        private static readonly float[] s_TargetLateralOffsets = { -4f, 0f, 4f };
-
-        /// <summary>靶子阵列距离原点的距离（米）。</summary>
-        private const float TargetRangeDistance = 9f;
-
-        /// <summary>靶子的生命值。</summary>
-        private const float TargetHealth = 100f;
-
-        /// <summary>靶子的防护等级。0 表示无甲。</summary>
-        private const int TargetArmorLevel = 2;
-
-        /// <summary>靶子的护甲耐久。</summary>
-        private const float TargetArmorDurability = 60f;
-
         private CombatWorld m_CombatWorld;
         private CombatTuning m_CombatTuning;
         private PlayerWeapon m_PlayerWeapon;
@@ -109,7 +88,11 @@ namespace RaidDemo.Bootstrap
             m_EventBus.Subscribe<DamageAppliedEvent>(OnDamageApplied);
 
             BuildCombatPresentation();
-            SpawnTargets();
+
+            // 战局里**不再生成灰盒靶子**（2026-09-14 负责人决定删除）：
+            // 它是灰盒阶段的试枪占位物，正常玩法里没有意义，还会在地图上留下一串洋红胶囊
+            // （CreatePrimitive 的默认材质在 URP 构建里不存在）。
+            // 试枪需求由安全屋的靶场承担——那里有真正的靶子、伤害数字与试枪流程。
         }
 
         /// <summary>取枪口世界坐标。</summary>

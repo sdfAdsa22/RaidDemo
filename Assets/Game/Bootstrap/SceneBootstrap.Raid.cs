@@ -316,36 +316,18 @@ namespace RaidDemo.Bootstrap
                 m_ExtractionTracker != null ? m_ExtractionTracker.Progress01 : 0f);
         }
 
-        /// <summary>把当前装备的头盔与护甲同步到战斗单位。</summary>
-        /// <remarks>
-        /// 订阅「背包变化」而不是「装备变化」：M2 没有单独的装备事件，而每次换装必然伴随背包变化。
-        /// <b>没换装就直接返回</b>：SetArmor 会把耐久重置为满，每次整理背包都调用等于免费修甲。
-        /// </remarks>
-        private void RefreshPlayerArmor()
-        {
-            if (m_CombatWorld == null || m_PlayerCombatantId == 0 || m_Loadout == null)
-            {
-                return;
-            }
-
-            var helmet = m_Loadout.Equipment?.Get(EquipmentSlot.Head)?.Definition?.ArmorStats;
-            var vest = m_Loadout.Equipment?.Get(EquipmentSlot.Body)?.Definition?.ArmorStats;
-            if (ReferenceEquals(helmet, m_LastAppliedHelmet) && ReferenceEquals(vest, m_LastAppliedVest))
-            {
-                return;
-            }
-
-            if (m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
-            {
-                state.SetArmor(helmet, vest);
-                m_LastAppliedHelmet = helmet;
-                m_LastAppliedVest = vest;
-            }
-        }
-
         /// <summary>玩家当前是否存活。</summary>
         private bool IsPlayerAlive()
         {
+            // 联机客户端没有本地战斗世界（战斗全部由服务器权威），因此"我还活着吗"不能问本地战斗世界。
+            // 之前这里直接落到下面的 return false，导致联机里**搜刮提示、医疗包使用、撤离读条**全部失效
+            // （玩家靠近箱子没有任何提示）——它们都以此函数为门。P4 用户反馈后改为读服务器下发的状态：
+            // 本地只知道"是否被打倒"（m_LocalDowned），阵亡会由结算消息把玩家带离战局。
+            if (IsMultiplayerClient)
+            {
+                return !m_LocalDowned;
+            }
+
             if (m_CombatWorld == null || m_PlayerCombatantId == 0)
             {
                 return false;

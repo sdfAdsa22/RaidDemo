@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using RaidDemo.UI;
+using UnityEngine;
 
 namespace RaidDemo.Bootstrap
 {
@@ -76,5 +77,43 @@ namespace RaidDemo.Bootstrap
                     : "没有发现局域网房间：可以手输地址（本机填 127.0.0.1）。",
                 false);
         }
+        /// <summary>点「局域网扫描」或点某一行扫描结果：把地址填进界面。</summary>
+        private void OnMultiplayerJoinFound(string address, int port)
+        {
+            m_MultiplayerScreen.SetDefaults(null, null, address, port);
+            m_MultiplayerScreen.SetStatus($"已选择 {address}:{port}，点「连接」加入。", false);
+        }
+
+        /// <summary>点「扫描」：开始一轮局域网发现。</summary>
+        private void OnMultiplayerScan()
+        {
+            m_ScanDeadline = Time.realtimeSinceStartup + ScanWindowSeconds;
+            m_MultiplayerScreen.SetScanning(true);
+            m_MultiplayerScreen.SetStatus("正在搜索局域网房间…", false);
+            StartLanScan();
+        }
+
+        /// <summary>扫描窗口结束：收起"扫描中"状态。</summary>
+        private void TickScanWindow()
+        {
+            if (m_ScanDeadline < 0f)
+            {
+                return;
+            }
+
+            // 扫描期间每帧收包：回包可能随时到达（服务器是被动应答），
+            // 只在窗口结束时收一次会把这 1.2 秒里的包堆在系统缓冲里，容易丢。
+            m_LanScanner?.Poll();
+
+            if (Time.realtimeSinceStartup < m_ScanDeadline)
+            {
+                return;
+            }
+
+            m_ScanDeadline = -1f;
+            m_MultiplayerScreen.SetScanning(false);
+            FinishLanScan();
+        }
+
     }
 }

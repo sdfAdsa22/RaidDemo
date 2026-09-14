@@ -27,13 +27,8 @@ namespace RaidDemo.Presentation
         private static readonly int LocomotionRateId =
             Animator.StringToHash(LocomotionAnimationBinding.RateParameterName);
 
-        /// <summary>地面探测的高度范围（米）。与本地玩家同量级。</summary>
-        private const float GroundProbeHeight = 3f;
-
         /// <summary>落地跟随的平滑系数（每秒）。</summary>
         private const float GroundFollowRate = 12f;
-
-        private readonly RaycastHit[] m_GroundHits = new RaycastHit[8];
 
         private Animator m_Animator;
         private LocomotionAnimationBinding m_Binding;
@@ -105,39 +100,23 @@ namespace RaidDemo.Presentation
         /// </remarks>
         private float ResolveGroundHeight(in PlayerMoveState state, float deltaTime)
         {
-            var origin = new Vector3(state.Position.X, transform.position.y + GroundProbeHeight, state.Position.Y);
-            var count = Physics.RaycastNonAlloc(
-                origin,
-                Vector3.down,
-                m_GroundHits,
-                GroundProbeHeight * 2f,
-                PhysicsLayers.GroundProbeMask,
-                QueryTriggerInteraction.Ignore);
+            var plane = new RaidDemo.Shared.Vector2F(state.Position.X, state.Position.Y);
+            var last = m_HasGroundHeight ? m_GroundHeight : transform.position.y;
 
-            var best = float.NegativeInfinity;
-            for (var i = 0; i < count; i++)
-            {
-                var hit = m_GroundHits[i];
-                if (hit.point.y > best)
-                {
-                    best = hit.point.y;
-                }
-            }
-
-            if (best == float.NegativeInfinity)
-            {
-                // 探测不到地面（刚出生在半空）时保持上一次高度，避免角色掉到地图下方。
-                return m_HasGroundHeight ? m_GroundHeight : transform.position.y;
-            }
+            // 用与本地玩家、服务器**同一份**采样规则（GroundProbe）：
+            // 曾经这里另写了一套"取最高命中"的探测，缺了"朝上才算地面""单次抬升上限 0.35 米"
+            // 与"排除自身碰撞体"三条规则，结果是远端角色在集装箱/栅栏/坡体旁边被抬到更高的面上——
+            // 队友看你时你浮在天上，而你自己看自己是正常的（P4 的用户反馈）。
+            var sampled = GroundProbe.SampleGroundHeight(plane, transform.position.y, last, transform);
 
             if (!m_HasGroundHeight)
             {
-                m_GroundHeight = best;
                 m_HasGroundHeight = true;
-                return best;
+                m_GroundHeight = sampled;
+                return sampled;
             }
 
-            m_GroundHeight = Mathf.Lerp(m_GroundHeight, best, Mathf.Clamp01(deltaTime * GroundFollowRate));
+            m_GroundHeight = Mathf.Lerp(m_GroundHeight, sampled, Mathf.Clamp01(deltaTime * GroundFollowRate));
             return m_GroundHeight;
         }
 
@@ -151,6 +130,9 @@ namespace RaidDemo.Presentation
                 capsule.transform.SetParent(transform, false);
                 capsule.transform.localPosition = new Vector3(0f, 0.9f, 0f);
                 Destroy(capsule.GetComponent<Collider>());
+
+                // 占位物也必须用工程自己的 URP 材质：内置默认材质在构建版里是洋红（missing shader）。
+                PresentationFallback.Apply(capsule);
                 return;
             }
 

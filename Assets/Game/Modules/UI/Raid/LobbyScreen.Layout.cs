@@ -56,10 +56,16 @@ namespace RaidDemo.UI
             m_JoinButton = UiFactory.CreateButton(
                 m_JoinPanel, "加入房间", new Vector2(Padding + 232f, top + 246f), new Vector2(220f, 54f));
 
+            // 返回：未进房时唯一能离开这个界面的入口（Esc 同样绑到它）。
+            // 宽度按面板余量取 140：面板宽 680、内边距 36，右对齐后右边缘 640 不越界。
+            m_BackButton = UiFactory.CreateButton(
+                m_JoinPanel, "返回", new Vector2(Padding + 464f, top + 246f), new Vector2(140f, 54f));
+
             UiFactory.CreateLabel(
                 m_JoinPanel,
                 "一台服务器同时只有一个房间：没有房间时创建，已经有了就加入。\n"
-                + "加入需要知道房间密码；密码错、房间满、已开局都会由服务器给出具体原因。",
+                + "加入需要知道房间密码；密码错、房间满、已开局都会由服务器给出具体原因。\n"
+                + "按 Esc 或点「返回」可回到服务器列表。",
                 new Vector2(Padding, top + 322f),
                 new Vector2(PanelSize.x - (Padding * 2f), 76f),
                 UiPalette.SmallSize,
@@ -146,6 +152,11 @@ namespace RaidDemo.UI
                 {
                     m_Actions.LeaveRoom?.Invoke();
                 }
+                else
+                {
+                    // 未进房时 Esc 走"返回上一界面"：否则玩家在这个界面里没有出路（P4 用户反馈）。
+                    m_Actions.Back?.Invoke();
+                }
             }
         }
 
@@ -219,14 +230,23 @@ namespace RaidDemo.UI
 
             var overCreate = !m_IsBusy && m_CreateButton.Contains(pointer);
             var overJoin = !m_IsBusy && m_JoinButton.Contains(pointer);
+            var overBack = !m_IsBusy && m_BackButton.Contains(pointer);
 
             m_CreateButton.SetHovered(overCreate);
             m_JoinButton.SetHovered(overJoin);
+            m_BackButton.SetHovered(overBack);
             m_CreateButton.ApplyVisual(overCreate && isPressed);
             m_JoinButton.ApplyVisual(overJoin && isPressed);
+            m_BackButton.ApplyVisual(overBack && isPressed);
 
             if (!wasPressed || consumed)
             {
+                return;
+            }
+
+            if (overBack)
+            {
+                m_Actions.Back?.Invoke();
                 return;
             }
 
@@ -295,6 +315,7 @@ namespace RaidDemo.UI
             {
                 m_CreateButton.Interactable = !m_IsBusy;
                 m_JoinButton.Interactable = !m_IsBusy;
+                m_BackButton.Interactable = !m_IsBusy;
                 m_StartButton.Interactable = !m_IsBusy && m_IsHost && !m_IsInRaid;
                 m_LeaveButton.Interactable = !m_IsBusy;
             }

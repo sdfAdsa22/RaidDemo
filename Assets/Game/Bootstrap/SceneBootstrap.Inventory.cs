@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Meta;
@@ -232,5 +232,32 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.SetCursorLock(locked);
             }
         }
+        /// <summary>把当前装备的头盔与护甲同步到战斗单位。</summary>
+        /// <remarks>
+        /// <para>订阅「背包变化」而不是「装备变化」：M2 没有单独的装备事件，而每次换装必然伴随背包变化。</para>
+        /// <para><b>没换装就直接返回</b>：SetArmor 会把耐久重置为满，每次整理背包都调用等于免费修甲。</para>
+        /// </remarks>
+        private void RefreshPlayerArmor()
+        {
+            if (m_CombatWorld == null || m_PlayerCombatantId == 0 || m_Loadout == null)
+            {
+                return;
+            }
+
+            var helmet = m_Loadout.Equipment?.Get(EquipmentSlot.Head)?.Definition?.ArmorStats;
+            var vest = m_Loadout.Equipment?.Get(EquipmentSlot.Body)?.Definition?.ArmorStats;
+            if (ReferenceEquals(helmet, m_LastAppliedHelmet) && ReferenceEquals(vest, m_LastAppliedVest))
+            {
+                return;
+            }
+
+            if (m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
+            {
+                state.SetArmor(helmet, vest);
+                m_LastAppliedHelmet = helmet;
+                m_LastAppliedVest = vest;
+            }
+        }
+
     }
 }

@@ -38,6 +38,16 @@ namespace RaidDemo.UI
 
         /// <summary>离开房间。</summary>
         public Action LeaveRoom;
+
+        /// <summary>
+        /// 返回上一界面（联机界面·服务器列表）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须单独有一条退出路径：</b>这个界面在"未进房"形态下既没有离开房间的对象
+        /// （还没进去），也没有返回按钮——玩家点进来就出不去了（P4 用户反馈的"图1 无法返回"）。
+        /// Esc 原本只在"已在房间"分支里生效，同样救不了他这个处境。</para>
+        /// </remarks>
+        public Action Back;
     }
 
     /// <summary>
@@ -81,6 +91,7 @@ namespace RaidDemo.UI
         private UiButton m_JoinButton;
         private UiButton m_StartButton;
         private UiButton m_LeaveButton;
+        private UiButton m_BackButton;
         private LobbyRoomActions m_Actions;
         private Keyboard m_SubscribedKeyboard;
         private bool m_IsVisible;

@@ -114,55 +114,6 @@ namespace RaidDemo.Bootstrap
             host.AddComponent<AudioListener>();
         }
 
-        /// <summary>
-        /// 生成一排灰盒靶子。
-        /// </summary>
-        /// <remarks>
-        /// <para>靶子在运行时创建而不是烘焙进场景：灰盒阶段靶子的位置与数量还要反复调整，
-        /// 放在代码里改一个常量就生效，不必每次重新生成场景。</para>
-        /// <para>排成一排是为了方便验证射程与散布——站定不动往一个方向打，
-        /// 就能看出子弹落在哪、打不打得穿护甲。</para>
-        /// </remarks>
-        private void SpawnTargets()
-        {
-            var root = new GameObject("CombatTargets");
-            root.transform.SetParent(transform, worldPositionStays: false);
-
-            var armor = new GreyboxArmorStats(TargetArmorLevel, TargetArmorDurability);
-
-            // 正前方必须有靶子：玩家站定不动往瞄准方向打，就能立刻看到命中反馈。
-            // 如果排成一圈但正中间是空的，第一次试枪会全打空，看起来像射击没生效。
-            for (var i = 0; i < s_TargetLateralOffsets.Length; i++)
-            {
-                CreateTarget(
-                    root.transform,
-                    new Vector3(TargetRangeDistance, 0f, s_TargetLateralOffsets[i]),
-                    armor);
-            }
-
-            CreateTarget(
-                root.transform,
-                new Vector3(TargetRangeDistance + TargetSpacing, 0f, 0f),
-                armor);
-        }
-
-        /// <summary>创建单个靶子。</summary>
-        private void CreateTarget(Transform parent, Vector3 groundPosition, IArmorStats armor)
-        {
-            var host = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            host.name = $"Target_{m_CombatWorld.Count + 1}";
-            host.transform.SetParent(parent, worldPositionStays: false);
-
-            // 胶囊图元的原点在几何中心，因此抬高半个高度才是"站在地面上"。
-            host.transform.position = groundPosition + (Vector3.up * (TargetHeight * 0.5f));
-            host.transform.localScale = new Vector3(0.8f, TargetHeight * 0.5f, 0.8f);
-
-            var view = host.AddComponent<CombatTargetView>();
-            var id = m_CombatWorld.Create(TargetHealth, armor);
-            view.Initialize(id);
-            m_TargetViews[id] = view;
-        }
-
         /// <summary>命中后让靶子闪一下。</summary>
         private void OnDamageApplied(DamageAppliedEvent evt)
         {

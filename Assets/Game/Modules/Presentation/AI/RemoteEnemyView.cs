@@ -237,6 +237,7 @@ namespace RaidDemo.Presentation
                 capsule.transform.SetParent(transform, false);
                 capsule.transform.localPosition = new Vector3(0f, 0.9f, 0f);
                 Destroy(capsule.GetComponent<Collider>());
+                PresentationFallback.Apply(capsule);
                 return;
             }
 
