@@ -80,20 +80,32 @@ namespace RaidDemo.Bootstrap
         /// <summary>
         /// 宽限到期：真正把这个人从房间与世界里清掉。
         /// </summary>
-        /// <param name="clientId">掉线时的连接编号。</param>
-        private void FinishDisconnectedSession(int clientId)
+        /// <param name="graceKey">宽限记录在名册字典里的键。</param>
+        /// <remarks>
+        /// <b>为什么参数是"字典键"而不是"连接编号"：</b>传输层重建（P-51 自愈）之后，
+        /// 同一连接编号可能被新连接复用，宽限记录会被挪到负槽位（见 <c>OnLobbyClientConnected</c>）。
+        /// 此时"名册里的成员"与"世界里的身体"仍然挂在 <see cref="LobbyClient.ClientId"/> 上，
+        /// 拿字典键去找它们会全部落空——症状是幽灵成员永远留在房间里、房间永远不结束。
+        /// </remarks>
+        private void FinishDisconnectedSession(int graceKey)
         {
-            var member = m_Room.Find(clientId);
-            m_LobbyClients.Remove(clientId);
-            RemovePlayerFromWorld(clientId);
-            m_RaidProgress.Remove(clientId);
+            if (!m_LobbyClients.TryGetValue(graceKey, out var client))
+            {
+                return;
+            }
 
-            if (member != null && m_Room.TryLeave(clientId, out var roomEnded))
+            var realId = client.ClientId;
+            var member = m_Room.Find(realId);
+            m_LobbyClients.Remove(graceKey);
+            RemovePlayerFromWorld(realId);
+            m_RaidProgress.Remove(realId);
+
+            if (member != null && m_Room.TryLeave(realId, out var roomEnded))
             {
                 m_Session?.Log.Info(
                     roomEnded
-                        ? $"[服务器] 玩家 {clientId}「{member.Nickname}」的宽限到期仍未重连，房间已解散。"
-                        : $"[服务器] 玩家 {clientId}「{member.Nickname}」的宽限到期仍未重连，"
+                        ? $"[服务器] 玩家 {realId}「{member.Nickname}」的宽限到期仍未重连，房间已解散。"
+                        : $"[服务器] 玩家 {realId}「{member.Nickname}」的宽限到期仍未重连，"
                           + $"已退出房间（剩余 {m_Room.MemberCount} 人）。");
 
                 BroadcastRoomState();
@@ -107,8 +119,9 @@ namespace RaidDemo.Bootstrap
         /// </summary>
         /// <param name="nickname">账号昵称。</param>
         /// <param name="exceptClientId">要排除的连接编号（当前这条新连接）。</param>
+        /// <param name="graceKey">找到时输出它在名册字典里的键（换绑要按这个键删除记录）。</param>
         /// <returns>宽限记录；没有时返回 null。</returns>
-        private LobbyClient FindGracedClient(string nickname, int exceptClientId)
+        private LobbyClient FindGracedClient(string nickname, int exceptClientId, out int graceKey)
         {
             foreach (var pair in m_LobbyClients)
             {
@@ -120,10 +133,12 @@ namespace RaidDemo.Bootstrap
 
                 if (string.Equals(client.Nickname, nickname, System.StringComparison.Ordinal))
                 {
+                    graceKey = pair.Key;
                     return client;
                 }
             }
 
+            graceKey = 0;
             return null;
         }
 
@@ -131,9 +146,10 @@ namespace RaidDemo.Bootstrap
         /// 重连接管：把宽限中的旧连接换成这条新连接。
         /// </summary>
         /// <param name="graced">宽限中的旧记录。</param>
+        /// <param name="graceKey">旧记录在名册字典里的键（编号被复用时可能已挪到负槽位）。</param>
         /// <param name="fresh">刚登录成功的新连接。</param>
         /// <returns>成功接管返回 true；失败时调用方按"普通新玩家"继续。</returns>
-        private bool TryResumeGracedSession(LobbyClient graced, LobbyClient fresh)
+        private bool TryResumeGracedSession(LobbyClient graced, int graceKey, LobbyClient fresh)
         {
             var oldId = graced.ClientId;
             var newId = fresh.ClientId;
@@ -148,7 +164,7 @@ namespace RaidDemo.Bootstrap
 
             fresh.Nickname = nickname;
             fresh.LoggedIn = true;
-            m_LobbyClients.Remove(oldId);
+            m_LobbyClients.Remove(graceKey);
 
             RebindPlayerState(oldId, newId);
 

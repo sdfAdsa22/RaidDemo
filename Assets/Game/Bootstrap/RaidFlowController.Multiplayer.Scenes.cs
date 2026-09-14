@@ -107,5 +107,40 @@ namespace RaidDemo.Bootstrap
                 SceneManager.LoadScene(GameScenes.SafeHouse);
             }
         }
+
+        /// <summary>
+        /// 重连成功（P-51）：把当前场景整个重新装一遍。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须重载场景：</b>断线期间 NGO 关闭会话，把客户端的命名消息处理器
+        /// 全部清空了——战局里的移动快照、敌人表现、容器链接，安全屋里的仓库 / 衣柜交互，
+        /// 全都挂在那些处理器上，而它们只在场景装配时注册一次。不重载场景就没有第二个注册时机，
+        /// 玩家会看到"连着但什么都收不到"。重载后装配根重新跑一遍，服务器随后下发的
+        /// 容器内容与快照会把世界纠正回最新状态。</para>
+        ///
+        /// <para><b>为什么重载"当前场景"而不是固定某张图：</b>重连可能发生在战局里，
+        /// 也可能发生在安全屋（含联机界面与房间等待）。玩家在哪个场景，就把哪个场景装回来——
+        /// 这与服务器在 <c>TryResumeGracedSession</c> 里"重发房间状态 + 战局开始"的下行是对齐的。</para>
+        ///
+        /// <para><b>已知边界：</b>结算面板（State == Result）正在显示时重连会把它一并装掉，
+        /// 玩家看到的是安全屋的默认画面——记录在 M9 文档里，属于可接受的取舍
+        /// （代价是丢一次面板显示，收益是"联机链路一定恢复"）。</para>
+        /// </remarks>
+        private void OnResumedFromReconnect()
+        {
+            var scene = SceneManager.GetActiveScene().name;
+            if (string.IsNullOrEmpty(scene))
+            {
+                Debug.LogWarning("[联机] 重连恢复：当前场景名为空，跳过场景重载。");
+                return;
+            }
+
+            // 暂停菜单打开时掉线会留下 timeScale = 0：场景加载本身不受影响，
+            // 但新场景在时间冻结下启动会有违直觉的行为，先恢复。
+            Time.timeScale = 1f;
+
+            Debug.Log($"[联机] 重连恢复：重新加载场景「{scene}」以重建网络链路。");
+            SceneManager.LoadScene(scene);
+        }
     }
 }

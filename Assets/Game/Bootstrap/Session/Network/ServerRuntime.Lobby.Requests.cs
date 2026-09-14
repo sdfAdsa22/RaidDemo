@@ -45,13 +45,13 @@ namespace RaidDemo.Bootstrap
             // 重连接管（P5）：如果这个昵称正处在掉线宽限里，本次登录就是"回来接管自己"，
             // 而不是一次新的登录。必须排在"昵称是否在线"之前判断——宽限中的那条记录
             // 在名册上仍然是 LoggedIn，不区分的话会被判成"昵称已被占用"。
-            var graced = FindGracedClient(displayName, client.ClientId);
+            var graced = FindGracedClient(displayName, client.ClientId, out var graceKey);
             if (graced != null)
             {
                 client.Nickname = displayName;
                 client.LoggedIn = true;
 
-                if (TryResumeGracedSession(graced, client))
+                if (TryResumeGracedSession(graced, graceKey, client))
                 {
                     SendLobbyResult(
                         client.ClientId,

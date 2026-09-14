@@ -26,6 +26,8 @@ namespace RaidDemo.Bootstrap
                     return "房间中";
                 case MultiplayerClientPhase.InRaid:
                     return "战局中";
+                case MultiplayerClientPhase.Reconnecting:
+                    return "重连中";
                 default:
                     return "未连接";
             }

@@ -38,6 +38,7 @@ namespace RaidDemo.Bootstrap
                 ConnectedPlayerCount = m_LobbyClients.Count,
                 RaidElapsedSeconds = m_RaidStartedAt >= 0f ? now - m_RaidStartedAt : 0f,
                 SnapshotBatches = SnapshotBroadcastCount,
+                TransportRebuildCount = m_TransportRebuildCount,
                 WorldText = DescribeWorld(m_WorldKind),
                 WorldScene = m_WorldSceneName,
                 PlayersInWorld = m_World != null ? m_World.PlayerCount : 0,

@@ -151,6 +151,12 @@ namespace RaidDemo.Bootstrap
                 AppendRow(html, "本局已进行", FormatDuration(snapshot.RaidElapsedSeconds));
             }
 
+            // P-51：传输层自愈的累计次数。验收脚本对两次采样取差值即可确认"自愈确实发生过"；
+            // 对运维则是一个简单的健康读数——正常对局它应该一直是 0。
+            AppendRow(html, "传输层自愈（P-51）", snapshot.TransportRebuildCount == 0
+                ? "0 次"
+                : $"{snapshot.TransportRebuildCount} 次");
+
             AppendRow(html, "服务器存档目录", snapshot.SaveDirectory);
             html.Append("</tbody></table></div>");
         }

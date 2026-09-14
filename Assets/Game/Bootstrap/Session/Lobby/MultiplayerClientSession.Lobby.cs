@@ -93,7 +93,10 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void TickAutoRoom()
         {
-            if (!AutoRoom || m_AutoRoomRequested || Phase != MultiplayerClientPhase.InLobby)
+            // SelfInRoom 这一条是为自动重连（P-51）加的：重连者如果已经接管回原来的房间，
+            // 就不该再自动建房 / 加房——服务器的房间状态可能比登录结果先到，
+            // 没有这道保护时机器人会在"已回房"的状态下再发一次创建请求。
+            if (!AutoRoom || m_AutoRoomRequested || Phase != MultiplayerClientPhase.InLobby || SelfInRoom)
             {
                 return;
             }
@@ -178,6 +181,10 @@ namespace RaidDemo.Bootstrap
                     SetPhase(MultiplayerClientPhase.InLobby);
                     StatusText = string.IsNullOrEmpty(detail) ? "已登录" : detail;
                     RaiseChanged();
+
+                    // P-51：如果这是自动重连回来的一次登录，通知装配层把当前场景重新装起来
+                    // （断线期间 NGO 把命名消息处理器清空了，场景里的链路需要重新挂接）。
+                    OnLoginSucceededAfterReconnect();
                     break;
                 }
 

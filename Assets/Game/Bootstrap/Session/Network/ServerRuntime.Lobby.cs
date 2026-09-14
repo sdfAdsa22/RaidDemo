@@ -74,11 +74,13 @@ namespace RaidDemo.Bootstrap
         {
             m_Identities = new ServerIdentityStore(m_Options.SaveDirectory);
 
+            // 连接 / 断开事件只订阅一次：NGO 关闭会话时重建的是消息处理器（CustomMessagingManager），
+            // 而 NetworkManager 上的这两条事件订阅是活下来的（见 ServerRuntime.TransportWatchdog）。
+            // 反过来，如果在这里"重建时也重新订阅一遍"，同一条事件会被处理两次。
             m_Network.OnClientConnectedCallback += OnLobbyClientConnected;
             m_Network.OnClientDisconnectCallback += OnLobbyClientDisconnected;
-            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
-                LobbyChannel.RequestMessageName,
-                OnLobbyRequestReceived);
+
+            RegisterLobbyMessageHandlers();
 
             m_Session.Log.Info(
                 $"[服务器] 大厅已就绪：默认房间名「{m_Options.RoomName}」，等待第一个客户端创建房间。");
@@ -87,6 +89,18 @@ namespace RaidDemo.Bootstrap
 
             // 状态页与局域网发现：两个都不参与游戏规则，起不来只降级。
             InitializeServerIntegrations();
+        }
+
+        /// <summary>
+        /// 注册大厅的命名消息处理器。
+        /// </summary>
+        /// <remarks>首次启动与传输层重建（P-51）后都要调用：NGO 每次启动会话都会新建一个
+        /// <c>CustomMessagingManager</c>，旧的处理器不会跟过来。</remarks>
+        private void RegisterLobbyMessageHandlers()
+        {
+            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
+                LobbyChannel.RequestMessageName,
+                OnLobbyRequestReceived);
         }
 
         /// <summary>断开大厅的事件与通道，丢弃连接表。</summary>
@@ -104,62 +118,6 @@ namespace RaidDemo.Bootstrap
 
             m_LobbyClients.Clear();
             m_AutoStartDeadline = -1f;
-        }
-
-        /// <summary>客户端接入：只登记登录态，不进战局世界。</summary>
-        /// <param name="clientId">连接编号。</param>
-        /// <remarks>
-        /// 这里刻意**不广播房间状态**：此刻对方的命名消息处理器还没注册完（P-20 的教训），
-        /// 广播会直接丢掉。改为在他发来登录请求之后再点对点回一份状态——
-        /// 那一定发生在他注册处理器之后。
-        /// </remarks>
-        private void OnLobbyClientConnected(ulong clientId)
-        {
-            var id = (int)clientId;
-            m_LobbyClients[id] = new LobbyClient { ClientId = id };
-
-            m_Session?.Log.Info(
-                $"[服务器] 客户端 {id} 已接入服务（未登录），在线连接 {m_LobbyClients.Count} 个。");
-        }
-
-        /// <summary>
-        /// 客户端断开：在房间里的人进入宽限，其他人直接清理（P5）。
-        /// </summary>
-        /// <param name="clientId">连接编号。</param>
-        /// <remarks>
-        /// <para><b>这里不再立刻清场。</b>P-48 的实测结论是：在"队友被硬杀"的那一刻立即清理，
-        /// 会把其余玩家的上行链路一起打断。现在把清理推迟到宽限到期
-        /// （<see cref="TickDisconnectGrace"/>），期间他的位置、背包与战局进度都留在服务器上。</para>
-        ///
-        /// <para>不立刻移除世界里的身体：那由断开路径上的移动部分判断
-        /// （见 <c>ServerRuntime.Players.OnClientDisconnected</c>）——同样是"在房间里就保留"。</para>
-        /// </remarks>
-        private void OnLobbyClientDisconnected(ulong clientId)
-        {
-            var id = (int)clientId;
-
-            var member = m_Room.Find(id);
-            if (member == null)
-            {
-                // 还没进房间（只是挂在服务器列表上、或登录到一半）：没有可保留的东西，直接清理。
-                m_LobbyClients.Remove(id);
-                return;
-            }
-
-            var grace = m_Options != null ? m_Options.ReconnectGraceSeconds : LaunchOptions.DefaultReconnectGraceSeconds;
-            if (!m_LobbyClients.TryGetValue(id, out var client))
-            {
-                // 兜底：名册记录缺失时补一条，否则宽限逻辑没有可标记的对象。
-                client = new LobbyClient { ClientId = id, Nickname = member.Nickname, LoggedIn = true };
-                m_LobbyClients[id] = client;
-            }
-
-            client.GraceDeadline = Time.realtimeSinceStartup + grace;
-
-            m_Session?.Log.Info(
-                $"[服务器] 玩家 {id}「{member.Nickname}」连接断开：保留其位置与背包 {grace:F0} 秒"
-                + "（宽限期内可重连回局）。");
-            BroadcastRoomState();
         }
 
         /// <summary>收到一条大厅请求。</summary>

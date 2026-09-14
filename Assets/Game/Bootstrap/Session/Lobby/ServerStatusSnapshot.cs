@@ -74,6 +74,13 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public int SnapshotBatches;
 
+        /// <summary>传输层自愈的重建次数（P-51）。</summary>
+        /// <remarks>
+        /// 与 <see cref="SnapshotBatches"/> 同一类读数：把"自愈到底有没有发生"变成外部可见的数字。
+        /// 验收脚本对两次采样做差即可确认——期间发生过重建，且日志里能对上原因。
+        /// </remarks>
+        public int TransportRebuildCount;
+
         /// <summary>最近的服务端日志（新的在前）。</summary>
         public List<ServerStatusLogEntry> Logs = new List<ServerStatusLogEntry>();
     }

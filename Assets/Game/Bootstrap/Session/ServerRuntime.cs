@@ -104,15 +104,9 @@ namespace RaidDemo.Bootstrap
                 ? Unity.Netcode.LogLevel.Developer
                 : Unity.Netcode.LogLevel.Normal;
 
-            // SetConnectionData(远端地址, 端口, 监听地址)：
-            // 服务器只用得到「监听地址」这一侧；远端地址填回环即可，它只对客户端连接有意义。
-            m_Transport.SetConnectionData(ListenAddress, (ushort)options.Port, ListenAddress);
-
-            // 网络配置与客户端共用同一份工厂：两端不一致时 NGO 会在握手阶段直接断开，
-            // 且只在开发者日志里留一条极难发现的警告（M9-P-11）。
-            m_Network.NetworkConfig = NetworkConfigFactory.Create(m_Transport);
-
-            if (!m_Network.StartServer())
+            // 监听参数与启动收在 StartServerListener 里：传输层自愈（排障手册 P-51）会再走一遍同样的路径，
+            // 共用一份才不会出现"重建之后漏设了某一项参数"这种只在自愈之后才暴露的问题。
+            if (!StartServerListener())
             {
                 log.Error($"[服务器] 监听失败：端口 {options.Port} 可能已被占用，或被系统防火墙拦截。");
                 return;
@@ -137,6 +131,10 @@ namespace RaidDemo.Bootstrap
             // 本帧活动场景就是安全屋（构建列表第 0 个），因此这次切换会立刻完成。
             EnterSafeHouseWorld();
 
+            // 传输层自愈（P-51）：放在最后建，此时会话、大厅、世界都已就绪，
+            // 一旦判定成立就能直接进入"保留名册 → 重建 → 等客户端回来"这条路径。
+            InitializeTransportWatchdog();
+
             m_NextHeartbeatTime = Time.unscaledTime + HeartbeatSeconds;
         }
 
@@ -147,6 +145,10 @@ namespace RaidDemo.Bootstrap
         {
             // 主线程卡顿看门狗：卡顿会让客户端心跳超时（表现为"玩家掉线"），必须留证据。
             FrameStallWatchdog.Tick("服务器");
+
+            // 传输层自愈（P-51）必须排在下面那道"未监听就返回"的门之前：
+            // 重建期间 IsListening 恰好是 false，放在门后会让重建永远停在第一步。
+            TickTransportWatchdog();
 
             if (m_Network == null || m_Session == null || !m_Network.IsListening)
             {

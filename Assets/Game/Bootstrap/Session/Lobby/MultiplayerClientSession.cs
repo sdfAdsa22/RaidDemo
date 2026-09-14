@@ -26,6 +26,9 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>战局进行中。</summary>
         InRaid = 5,
+
+        /// <summary>连接意外断开，正在自动重连（P-51 的客户端半边）。</summary>
+        Reconnecting = 6,
     }
 
     /// <summary>房间成员（客户端侧视图）。</summary>
@@ -191,87 +194,16 @@ namespace RaidDemo.Bootstrap
             FrameStallWatchdog.Tick("客户端");
 
             TickConnectTimeout();
+            TickReconnect();
             TickAutoRoom();
-        }
-
-        /// <summary>
-        /// 连接到服务器并登录。
-        /// </summary>
-        /// <param name="address">服务器地址（主机[:端口]）。</param>
-        /// <param name="nickname">昵称。</param>
-        /// <param name="passphrase">口令（本地若存有该昵称的 token，则优先用 token）。</param>
-        /// <returns>参数合法并已发起连接时返回 true。</returns>
-        /// <remarks>地址与端口分开的重载供界面直接使用（界面把主机与端口分成两个输入框）。</remarks>
-        public bool Connect(string address, int port, string nickname, string passphrase)
-        {
-            var host = string.IsNullOrWhiteSpace(address) ? "127.0.0.1" : address.Trim();
-            var text = port > 0 && port <= 65535 ? $"{host}:{port}" : host;
-            return Connect(text, nickname, passphrase);
-        }
-
-        /// <summary>
-        /// 连接到服务器并登录。
-        /// </summary>
-        /// <param name="address">服务器地址（主机[:端口]）。</param>
-        /// <param name="nickname">昵称。</param>
-        /// <param name="passphrase">口令（本地若存有该昵称的 token，则优先用 token）。</param>
-        /// <returns>参数合法并已发起连接时返回 true。</returns>
-        public bool Connect(string address, string nickname, string passphrase)
-        {
-            if (IsConnected)
-            {
-                SetError("已经连接到服务器了。");
-                return false;
-            }
-
-            if (!LobbyLimits.IsValidNickname(nickname))
-            {
-                SetError($"昵称需要 1~{LobbyLimits.MaxNicknameLength} 个字符，且不能包含竖线。");
-                return false;
-            }
-
-            if (!LobbyLimits.IsValidPassphrase(passphrase))
-            {
-                SetError($"口令需要 {LobbyLimits.MinPassphraseDigits}~{LobbyLimits.MaxPassphraseDigits} 位数字。");
-                return false;
-            }
-
-            var (host, port) = SplitAddress(address, out var parsed);
-            if (!parsed)
-            {
-                SetError($"服务器地址不合法：「{address}」。格式为 主机 或 主机:端口。");
-                return false;
-            }
-
-            Address = string.IsNullOrWhiteSpace(address) ? host : address.Trim();
-            Nickname = nickname.Trim();
-            m_PendingPassphrase = passphrase;
-            m_AutoRoomRequested = false;
-            m_RaidStartSeen = false;
-
-            CreateNetworkManager();
-            m_Transport.SetConnectionData(host, port);
-
-            // 与服务器共用同一份配置工厂：任何一处差异都会让 NGO 在握手阶段直接断开（P-11）。
-            m_Network.NetworkConfig = NetworkConfigFactory.Create(m_Transport);
-
-            if (!m_Network.StartClient())
-            {
-                SetPhase(MultiplayerClientPhase.Offline);
-                SetError($"无法发起连接：{host}:{port}。");
-                return false;
-            }
-
-            m_ConnectDeadline = Time.realtimeSinceStartup + ConnectTimeoutSeconds;
-            SetPhase(MultiplayerClientPhase.Connecting);
-            StatusText = $"正在连接 {host}:{port} …";
-            Debug.Log($"[联机] 正在连接 {host}:{port}（昵称「{Nickname}」）。");
-            return true;
         }
 
         /// <summary>断开连接并回到未连接状态。</summary>
         public void Disconnect()
         {
+            // 玩家主动退出：取消（并禁止）自动重连。
+            MarkIntentionalDisconnect();
+
             if (m_Network != null && m_Network.IsListening)
             {
                 m_Network.Shutdown();
@@ -292,91 +224,6 @@ namespace RaidDemo.Bootstrap
             LastError = string.Empty;
             StatusText = string.Empty;
             RaiseChanged();
-        }
-
-        /// <summary>建立网络管理器与客户端回调（只在第一次连接时建）。</summary>
-        private void CreateNetworkManager()
-        {
-            if (m_Network != null)
-            {
-                return;
-            }
-
-            m_Network = gameObject.AddComponent<NetworkManager>();
-            m_Transport = gameObject.AddComponent<UnityTransport>();
-
-            // 诊断联机问题时客户端侧的证据同样重要（与服务器 -logLevel 对称）。
-            var verbose = ClientMode.Options != null
-                          && ClientMode.Options.MinimumLogLevel == RaidDemo.Kernel.LogLevel.Verbose;
-            m_Network.LogLevel = verbose ? Unity.Netcode.LogLevel.Developer : Unity.Netcode.LogLevel.Normal;
-
-            m_Network.OnClientConnectedCallback += OnClientConnectedToServer;
-            m_Network.OnClientDisconnectCallback += OnClientDisconnectedFromServer;
-            m_Network.OnClientStopped += OnClientStopped;
-        }
-
-        /// <summary>连上服务器：注册处理器并立刻登录。</summary>
-        private void OnClientConnectedToServer(ulong clientId)
-        {
-            LocalClientId = (int)clientId;
-            m_ConnectDeadline = -1f;
-            RegisterHandlers();
-            SetPhase(MultiplayerClientPhase.LoggingIn);
-            StatusText = "正在登录…";
-
-            Debug.Log($"[联机] 已连接服务器，玩家编号 {LocalClientId}，开始登录。");
-
-            // 有本地 token 就直接用它：这是"之后自动登录"路径。
-            var secret = ClientAccountStore.TryGetToken(Nickname, out var token) ? token : m_PendingPassphrase;
-            SendLobbyRequest(LobbyRequestKind.Login, Nickname, secret);
-        }
-
-        /// <summary>与服务器断开：清干净房间状态并通知界面。</summary>
-        private void OnClientDisconnectedFromServer(ulong clientId)
-        {
-            CleanupHandlers();
-            ResetRoomState();
-            LocalClientId = -1;
-            SetPhase(MultiplayerClientPhase.Offline);
-
-            // 主动断开（Disconnect）与意外断开走同一条回调；主动断开时不该再写"连接失败"。
-            if (!string.IsNullOrEmpty(LastError))
-            {
-                RaiseChanged();
-                return;
-            }
-
-            SetError("与服务器断开连接。");
-        }
-
-        /// <summary>网络管理器停止（客户端侧收尾）。</summary>
-        private void OnClientStopped(bool wasHost)
-        {
-            CleanupHandlers();
-        }
-
-        /// <summary>连接超时：服务器没起、端口不对或被防火墙拦截时给一句人话。</summary>
-        private void TickConnectTimeout()
-        {
-            if (m_ConnectDeadline < 0f || Phase != MultiplayerClientPhase.Connecting)
-            {
-                return;
-            }
-
-            if (Time.realtimeSinceStartup < m_ConnectDeadline)
-            {
-                return;
-            }
-
-            m_ConnectDeadline = -1f;
-
-            if (m_Network != null && m_Network.IsListening)
-            {
-                m_Network.Shutdown();
-            }
-
-            SetPhase(MultiplayerClientPhase.Offline);
-            SetError($"连接超时：{Address}（确认服务器已启动、地址端口正确、防火墙放行 UDP）。");
         }
 
         /// <summary>房间状态复位。</summary>

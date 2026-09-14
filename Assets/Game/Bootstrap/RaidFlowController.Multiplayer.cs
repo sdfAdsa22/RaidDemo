@@ -124,6 +124,7 @@ namespace RaidDemo.Bootstrap
                 m_Session.RaidStarting -= OnRaidStarting;
                 m_Session.RaidEnding -= OnRaidEnding;
                 m_Session.MoneyChanged -= OnMoneyChanged;
+                m_Session.ResumedFromReconnect -= OnResumedFromReconnect;
             }
 
             m_Session = session;
@@ -131,6 +132,7 @@ namespace RaidDemo.Bootstrap
             m_Session.RaidStarting += OnRaidStarting;
             m_Session.RaidEnding += OnRaidEnding;
             m_Session.MoneyChanged += OnMoneyChanged;
+            m_Session.ResumedFromReconnect += OnResumedFromReconnect;
 
             // 会话可能在我们订阅之前就已经走到了某个阶段（例如命令行直接连接），
             // 因此订阅之后立刻按当前状态刷一次界面。
@@ -154,126 +156,6 @@ namespace RaidDemo.Bootstrap
             }
 
             Progress.ApplyServerMoney(money);
-        }
-
-        /// <summary>把当前会话状态映射到界面。</summary>
-        private void OnSessionChanged()
-        {
-            if (m_Session == null || m_MultiplayerScreen == null)
-            {
-                return;
-            }
-
-            switch (m_Session.Phase)
-            {
-                case MultiplayerClientPhase.Connecting:
-                case MultiplayerClientPhase.LoggingIn:
-                    m_LobbyScreen.SetVisible(false);
-                    m_MultiplayerScreen.SetVisible(true);
-                    m_MultiplayerScreen.SetBusy(true);
-                    m_MultiplayerScreen.SetStatus(m_Session.StatusText, false);
-                    break;
-
-                case MultiplayerClientPhase.InLobby:
-                    ApplyLobbyScreen();
-                    break;
-
-                case MultiplayerClientPhase.InRoom:
-                    // P4.5-b：进房即在共享安全屋里活动——房间界面收起（角标由安全屋界面负责），
-                    // 玩家可以走动、整备，房主走到出口选图。
-                    EnterSafeHouseFromRoom();
-                    break;
-
-                case MultiplayerClientPhase.InRaid:
-                    m_MultiplayerScreen.SetVisible(false);
-                    m_LobbyScreen.SetVisible(false);
-                    break;
-
-                default:
-                    // 未连接：如果界面正开着（说明玩家来过联机），把失败原因显示出来。
-                    if (m_MultiplayerUiActive && !m_LeavingMultiplayer)
-                    {
-                        ShowServersScreen(m_Session.LastError, m_Session.LastError == null ? "连接已断开。" : null);
-                    }
-
-                    break;
-            }
-        }
-
-        /// <summary>显示联机界面（服务器地址、昵称、口令、扫描结果）。</summary>
-        private void ShowServersScreen(string error, string status)
-        {
-            var nickname = string.Empty;
-            var address = "127.0.0.1";
-            var port = LaunchOptions.DefaultPort;
-
-            if (ClientAccountStore.TryLoad(out var data))
-            {
-                nickname = data.Nickname ?? string.Empty;
-                if (!string.IsNullOrEmpty(data.LastAddress))
-                {
-                    ParseAddress(data.LastAddress, out address, out port);
-                }
-            }
-
-            if (string.IsNullOrEmpty(nickname))
-            {
-                nickname = LobbyText.SuggestNickname();
-            }
-
-            m_MultiplayerScreen.SetDefaults(nickname, DefaultPassphrase, address, port);
-            m_MultiplayerScreen.SetBusy(false);
-            m_MultiplayerScreen.SetScanning(false);
-            m_MultiplayerScreen.SetStatus(
-                string.IsNullOrEmpty(error) ? (status ?? string.Empty) : error,
-                !string.IsNullOrEmpty(error));
-            m_MultiplayerScreen.SetVisible(true);
-            m_LobbyScreen.SetVisible(false);
-            m_MultiplayerUiActive = true;
-        }
-
-        /// <summary>默认口令：与命令行验收用的默认值一致，方便第一次联机的人直接连上。</summary>
-        private const string DefaultPassphrase = "123456";
-
-        /// <summary>显示房间界面（创建 / 加入 / 成员列表）。</summary>
-        private void ApplyLobbyScreen()
-        {
-            m_MultiplayerScreen.SetVisible(false);
-            m_LobbyScreen.SetVisible(true);
-            m_MultiplayerUiActive = true;
-            m_LobbyScreen.SetBusy(false);
-            m_LobbyScreen.SetStatus(m_Session.LastError, !string.IsNullOrEmpty(m_Session.LastError));
-            m_LobbyScreen.SetNickname(m_Session.Nickname);
-
-            m_RoomMembers.Clear();
-            if (m_Session.SelfInRoom)
-            {
-                ResetRoomMemberBuffer();
-            }
-
-            // 只有在房间里才显示成员列表；不在房间里时传空房间名，界面会回到"创建 / 加入"表单。
-            var roomName = m_Session.SelfInRoom ? m_Session.RoomName : string.Empty;
-            m_LobbyScreen.SetRoom(
-                roomName,
-                m_Session.RoomHasPassword,
-                m_Session.IsHost,
-                m_Session.RoomPhase == LobbyPhase.InRaid,
-                m_RoomMembers);
-        }
-
-        /// <summary>把会话里的成员列表映射成界面结构。</summary>
-        private void ResetRoomMemberBuffer()
-        {
-            var members = m_Session.RoomMembers;
-            for (var i = 0; i < members.Count; i++)
-            {
-                m_RoomMembers.Add(new LobbyRoomMember
-                {
-                    Nickname = members[i].Nickname,
-                    IsHost = members[i].IsHost,
-                    IsSelf = members[i].ClientId == m_Session.LocalClientId,
-                });
-            }
         }
 
         /// <summary>点「连接」：建立会话并登录。</summary>

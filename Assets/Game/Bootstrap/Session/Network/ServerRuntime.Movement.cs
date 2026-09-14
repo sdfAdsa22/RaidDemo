@@ -54,8 +54,25 @@ namespace RaidDemo.Bootstrap
             m_World = new MovementServerWorld(collisionFactory: CreateCollisionWorld);
 
             // 接入事件由大厅处理（P4）：连上不等于进图，只有开局才把人放进权威世界。
+            // 这条订阅只做一次：它会活过 NGO 的关闭 / 重启（见 ServerRuntime.TransportWatchdog），
+            // 传输层重建后不需要（也不能）再订一遍。
             m_Network.OnClientDisconnectCallback += OnClientDisconnected;
 
+            RegisterMovementMessageHandlers();
+
+            m_Session.Log.Info("[服务器] 移动权威世界已就绪（60 Hz 仿真 / 20 Hz 快照）。");
+        }
+
+        /// <summary>
+        /// 注册移动与容器相关的命名消息处理器。
+        /// </summary>
+        /// <remarks>
+        /// 首次启动与传输层重建（P-51）后都要调用：NGO 每次启动会话都会新建一个
+        /// <c>CustomMessagingManager</c>，旧的处理器不会跟过来——漏掉的症状是
+        /// "重连上来了，但走不动、捡不了东西、大厅也没反应"。
+        /// </remarks>
+        private void RegisterMovementMessageHandlers()
+        {
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
                 MovementNetworkChannel.InputMessageName,
                 OnInputMessageReceived);
@@ -75,8 +92,6 @@ namespace RaidDemo.Bootstrap
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
                 ContainerNetworkChannel.EquipCommandMessageName,
                 OnInventoryEquipCommandReceived);
-
-            m_Session.Log.Info("[服务器] 移动权威世界已就绪（60 Hz 仿真 / 20 Hz 快照）。");
         }
 
         /// <summary>断开连接事件并丢弃权威世界。</summary>
