@@ -3,6 +3,37 @@ using Unity.Netcode;
 namespace RaidDemo.Bootstrap
 {
     /// <summary>
+    /// 背包上行命令的种类。
+    /// </summary>
+    /// <remarks>
+    /// <para><b>为什么用"一种消息 + 种类字段"而不是每种命令一条通道：</b>这些命令的载荷形状几乎一样
+    /// （源容器 / 目标容器 / 格子 / 数量），合并之后服务器侧只需要一个入口、一个 switch，
+    /// 新增命令不再改动网络层——与大厅请求的做法一致。</para>
+    ///
+    /// <para><b>为什么必须把这几条都接上来：</b>背包的权威在服务器（P3-1 起容器内容由服务器下发），
+    /// 客户端本地执行任何一条背包命令都会被随后的权威内容覆盖回去。
+    /// 曾经只接管了"拖拽移动"与"装备"，于是**双击快速转移 / 旋转 / 整理 / 拆分**在联机里全都"点了没反应"
+    /// （本地改了、服务器又刷回来，见 U-75）。</para>
+    /// </remarks>
+    public static class InventoryCommandKinds
+    {
+        /// <summary>拖拽移动：从源格子拿到目标格子。</summary>
+        public const byte Move = 0;
+
+        /// <summary>双击快速转移：目标落点由规则层决定（先合并、再找空位）。</summary>
+        public const byte QuickTransfer = 1;
+
+        /// <summary>旋转：原地把物品转 90 度。</summary>
+        public const byte Rotate = 2;
+
+        /// <summary>整理：把一个容器里的物品重排。</summary>
+        public const byte Sort = 3;
+
+        /// <summary>拆分：把一格里的物品分成两份（数量见 <see cref="InventoryMoveCommandMessage.Count"/>）。</summary>
+        public const byte Split = 4;
+    }
+
+    /// <summary>
     /// 客户端上行的"把某件物品从 A 容器移到 B 容器"命令。
     /// </summary>
     /// <remarks>
@@ -37,6 +68,12 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否横放。</summary>
         public bool Rotated;
 
+        /// <summary>命令种类（<see cref="InventoryCommandKinds"/> 的取值）。</summary>
+        public byte Kind;
+
+        /// <summary>拆分数量（仅"拆分"使用；其余命令为 0）。</summary>
+        public int Count;
+
         /// <summary>命令序号（客户端单调递增，用于日志与去重）。</summary>
         public uint Sequence;
 
@@ -50,6 +87,8 @@ namespace RaidDemo.Bootstrap
             serializer.SerializeValue(ref TargetCellX);
             serializer.SerializeValue(ref TargetCellY);
             serializer.SerializeValue(ref Rotated);
+            serializer.SerializeValue(ref Kind);
+            serializer.SerializeValue(ref Count);
             serializer.SerializeValue(ref Sequence);
         }
     }

@@ -58,6 +58,12 @@ namespace RaidDemo.Tests.EditMode
             m_Context = new InventoryContext(m_Registry, m_Loadout, new EventBus());
             m_Router = new CommandRouter();
             m_Router.Register<InventoryMoveIntent>(new InventoryMoveCommandHandler(m_Context));
+            // U-75：双击快速转移与旋转/整理/拆分同样由服务器执行——服务器侧注册的
+            // handler 集合必须与客户端一致，否则上行命令会因为"没注册"被静默丢弃。
+            m_Router.Register<InventoryQuickTransferIntent>(new InventoryQuickTransferCommandHandler(m_Context));
+            m_Router.Register<InventoryRotateIntent>(new InventoryRotateCommandHandler(m_Context));
+            m_Router.Register<InventorySortIntent>(new InventorySortCommandHandler(m_Context));
+            m_Router.Register<InventorySplitIntent>(new InventorySplitCommandHandler(m_Context));
             m_Router.Register<InventoryEquipIntent>(new InventoryEquipCommandHandler(m_Context));
         }
 
@@ -113,6 +119,33 @@ namespace RaidDemo.Tests.EditMode
                 PlayerId, ContainerIds.SceneContainer(1), ContainerIds.PlayerBackpack,
                 origin.X, origin.Y, 0, 0));
             Assert.IsFalse(second.Success, "已经空了的格子不能再拿走一次。");
+        }
+
+        /// <summary>
+        /// 双击快速转移：服务器侧必须能把物品从箱子搬进背包（U-75）。
+        /// </summary>
+        /// <remarks>
+        /// 这条命令曾经只在客户端本地执行 → 本地改了、服务器下发的权威内容又改回去，
+        /// 玩家看到的是"搜到了却怎么都搬不进背包"。服务器侧注册这个 handler 是修复的一半，
+        /// 另一半是客户端把它接管成"只上行"（见排障手册 P-40）。
+        /// </remarks>
+        [Test]
+        public void 双击快速转移把物品从箱子搬进背包()
+        {
+            var origin = PlaceWeaponInContainer(ContainerIds.SceneContainer(3));
+
+            var result = m_Router.Dispatch(new InventoryQuickTransferIntent(
+                PlayerId,
+                ContainerIds.SceneContainer(3),
+                ContainerIds.PlayerBackpack,
+                origin.X,
+                origin.Y));
+
+            Assert.IsTrue(result.Success, $"快速转移应当成功：{result.Code} - {result.Message}");
+
+            m_Registry.TryGetGrid(ContainerIds.SceneContainer(3), out var loot);
+            Assert.AreEqual(0, loot.Items.Count, "快速转移后箱子里不该还有东西。");
+            Assert.Greater(m_Loadout.Backpack.Items.Count, 0, "快速转移后背包里应当有东西。");
         }
 
         /// <summary>装备：背包里的武器装进主武器槽。</summary>

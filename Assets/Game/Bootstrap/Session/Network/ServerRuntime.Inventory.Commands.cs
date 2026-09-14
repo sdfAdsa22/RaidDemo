@@ -56,6 +56,12 @@ namespace RaidDemo.Bootstrap
             var context = new InventoryContext(m_Containers, loadout, m_Session.Events);
             var router = new CommandRouter();
             router.Register<InventoryMoveIntent>(new InventoryMoveCommandHandler(context));
+            // 与客户端注册的是同一批 handler：快速转移 / 旋转 / 整理 / 拆分也走服务器执行，
+            // 否则这些操作会在客户端本地发生、再被权威内容覆盖回去（U-75）。
+            router.Register<InventoryQuickTransferIntent>(new InventoryQuickTransferCommandHandler(context));
+            router.Register<InventoryRotateIntent>(new InventoryRotateCommandHandler(context));
+            router.Register<InventorySortIntent>(new InventorySortCommandHandler(context));
+            router.Register<InventorySplitIntent>(new InventorySplitCommandHandler(context));
             // 装备与卸下用同一套 handler：服务器与客户端执行的规则完全一致。
             router.Register<InventoryEquipIntent>(new InventoryEquipCommandHandler(context));
             router.Register<InventoryUnequipIntent>(new InventoryUnequipCommandHandler(context));
@@ -95,23 +101,48 @@ namespace RaidDemo.Bootstrap
             var source = TranslateContainerId(playerId, message.SourceContainerId);
             var target = TranslateContainerId(playerId, message.TargetContainerId);
 
-            var intent = new InventoryMoveIntent(
-                playerId,
-                source,
-                target,
-                message.SourceCellX,
-                message.SourceCellY,
-                message.TargetCellX,
-                message.TargetCellY,
-                message.Rotated,
-                message.Sequence);
+            // 按"命令种类"分派到对应的意图：所有种类共用一条上行通道（见 InventoryCommandKinds）。
+            CommandResult result;
+            switch (message.Kind)
+            {
+                case InventoryCommandKinds.QuickTransfer:
+                    result = router.Dispatch(new InventoryQuickTransferIntent(
+                        playerId, source, target, message.SourceCellX, message.SourceCellY, message.Sequence));
+                    break;
 
-            var result = router.Dispatch(intent);
+                case InventoryCommandKinds.Rotate:
+                    result = router.Dispatch(new InventoryRotateIntent(
+                        playerId, source, message.SourceCellX, message.SourceCellY, message.Sequence));
+                    break;
+
+                case InventoryCommandKinds.Sort:
+                    result = router.Dispatch(new InventorySortIntent(playerId, source, message.Sequence));
+                    break;
+
+                case InventoryCommandKinds.Split:
+                    result = router.Dispatch(new InventorySplitIntent(
+                        playerId, source, message.SourceCellX, message.SourceCellY, message.Count, message.Sequence));
+                    break;
+
+                default:
+                    result = router.Dispatch(new InventoryMoveIntent(
+                        playerId,
+                        source,
+                        target,
+                        message.SourceCellX,
+                        message.SourceCellY,
+                        message.TargetCellX,
+                        message.TargetCellY,
+                        message.Rotated,
+                        message.Sequence));
+                    break;
+            }
 
             if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
             {
                 m_Session.Log.Verbose(
-                    $"[服务器] 玩家 {playerId} 背包命令：{message.SourceContainerId}->{message.TargetContainerId}"
+                    $"[服务器] 玩家 {playerId} 背包命令（种类 {message.Kind}）："
+                    + $"{message.SourceContainerId}->{message.TargetContainerId}"
                     + $" 结果={result.Success}（{result.Code}）");
             }
 

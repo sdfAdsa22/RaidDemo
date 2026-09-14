@@ -49,7 +49,80 @@ namespace RaidDemo.Bootstrap
                 new MultiplayerUnequipCommandHandler(this),
                 overwrite: true);
 
-            Debug.Log("[联机] 背包移动改为上行；装备本地执行并同步给服务器。");
+            // 其余会改动容器内容的命令同样必须上行（U-75）：
+            // 它们若在本地执行，服务器的权威内容会在下一帧把它们改回去，
+            // 玩家看到的就是"双击搬不动、转不动、整理没反应"。
+            m_CommandRouter.Register<InventoryQuickTransferIntent>(
+                new MultiplayerQuickTransferCommandHandler(this),
+                overwrite: true);
+            m_CommandRouter.Register<InventoryRotateIntent>(
+                new MultiplayerRotateCommandHandler(this),
+                overwrite: true);
+            m_CommandRouter.Register<InventorySortIntent>(
+                new MultiplayerSortCommandHandler(this),
+                overwrite: true);
+            m_CommandRouter.Register<InventorySplitIntent>(
+                new MultiplayerSplitCommandHandler(this),
+                overwrite: true);
+
+            Debug.Log("[联机] 背包移动 / 快速转移 / 旋转 / 整理 / 拆分改为上行；装备本地执行并同步给服务器。");
+        }
+
+        /// <summary>
+        /// 把一条"只改容器内容"的意图发到服务器（移动 / 快速转移 / 旋转 / 整理 / 拆分）。
+        /// </summary>
+        /// <param name="kind">命令种类。</param>
+        /// <param name="sourceContainerId">源容器编号。</param>
+        /// <param name="targetContainerId">目标容器编号（旋转 / 整理 / 拆分时等于源容器）。</param>
+        /// <param name="sourceCellX">源格子 X。</param>
+        /// <param name="sourceCellY">源格子 Y。</param>
+        /// <param name="targetCellX">目标格子 X（快速转移时忽略）。</param>
+        /// <param name="targetCellY">目标格子 Y（快速转移时忽略）。</param>
+        /// <param name="rotated">是否横放（移动用）。</param>
+        /// <param name="count">拆分数量（拆分用）。</param>
+        private CommandResult SendInventoryKindToServer(
+            byte kind,
+            int sourceContainerId,
+            int targetContainerId,
+            int sourceCellX,
+            int sourceCellY,
+            int targetCellX,
+            int targetCellY,
+            bool rotated,
+            int count)
+        {
+            if (m_NetworkClient == null || !m_NetworkClient.IsConnectedClient
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return CommandResult.Fail(CommandCodes.InventoryNotFound, "尚未连接到服务器。");
+            }
+
+            var message = new InventoryMoveCommandMessage
+            {
+                Kind = kind,
+                SourceContainerId = sourceContainerId,
+                TargetContainerId = targetContainerId,
+                SourceCellX = sourceCellX,
+                SourceCellY = sourceCellY,
+                TargetCellX = targetCellX,
+                TargetCellY = targetCellY,
+                Rotated = rotated,
+                Count = count,
+                Sequence = ++m_InventoryCommandSequence,
+            };
+
+            using (var writer = new FastBufferWriter(64, Allocator.Temp))
+            {
+                writer.WriteValueSafe(message);
+                m_NetworkClient.CustomMessagingManager.SendNamedMessage(
+                    ContainerNetworkChannel.CommandMessageName,
+                    NetworkManager.ServerClientId,
+                    writer,
+                    NetworkDelivery.ReliableSequenced);
+            }
+
+            // 与移动一致：返回成功而不是"已发送"——界面已乐观更新，真正的结果由服务器回发的容器内容纠正。
+            return CommandResult.Ok();
         }
 
         /// <summary>
