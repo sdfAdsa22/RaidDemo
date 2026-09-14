@@ -82,6 +82,14 @@ namespace RaidDemo.Bootstrap
                 Progress.ClearLoadout();
             }
 
+            // 联机：从战局退回主菜单等于退出联机（连接与房间都不会跨进程保留），
+            // 主动断开并让服务器把这一局按退赛处理；不清掉会话的话，
+            // 回到安全屋后大厅界面会立刻又冒出来。
+            if (MultiplayerClientSession.IsActive)
+            {
+                MultiplayerClientSession.Current.Disconnect();
+            }
+
             m_RaidInProgress = false;
             SaveNow();
             HidePauseMenu();
