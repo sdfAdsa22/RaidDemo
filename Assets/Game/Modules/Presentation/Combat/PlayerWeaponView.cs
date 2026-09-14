@@ -24,9 +24,14 @@ namespace RaidDemo.Presentation
         /// <summary>
         /// 枪身相对角色的前向偏移（米）。
         /// </summary>
-        /// <remarks>0.2 米大致是角色双手自然前伸的位置。再小会让枪身埋进躯干，
-        /// 在 62 度俯角下只剩枪口露在外面。</remarks>
-        private const float ForwardOffset = 0.2f;
+        /// <remarks>
+        /// <para><b>为什么是 0.6 而不是 0.2：</b>枪的枢轴在**握把**处，枪托还在枢轴**后方 0.35 米**。
+        /// 0.2 米的前移等于把整段枪托留在躯干里——玩家看到的不是"手里拿着枪"，
+        /// 而是"枪从身体里长出来"（P-47 实机截屏：枪几乎全被躯干挡住，只露出一截枪托）。</para>
+        /// <para>0.6 米让枪托后缘落在身体前缘之外（0.6 - 0.35 = 0.25 米），
+        /// 在 62 度俯角下枪身整段可见；再往前推会让枪看起来"飘在手前面"。</para>
+        /// </remarks>
+        private const float ForwardOffset = 0.6f;
 
         /// <summary>灰盒枪身的横截面尺寸（米）。</summary>
         private const float CrossSection = 0.09f;
@@ -34,8 +39,15 @@ namespace RaidDemo.Presentation
         /// <summary>灰盒枪身每格换算出的长度（米）。</summary>
         private const float LengthPerGridCell = 0.34f;
 
-        /// <summary>持枪高度（米）：角色胸口略下方，与手臂自然下垂的位置相当。</summary>
-        private const float HeldHeight = 1.0f;
+        /// <summary>
+        /// 持枪高度（米）：角色胸口。
+        /// </summary>
+        /// <remarks>
+        /// 角色模型实高 1.72 米（Kenney Mini 角色，缩放 2.56），1.05 米落在胸口与手臂之间。
+        /// 这个值还必须与服务器的枪口高度 <c>ServerRuntime.Combat.MuzzleHeight</c> 保持一致：
+        /// 服务器用它算弹道起点与命中，两边不一致会出现"看着打中了却没命中"这类错位。
+        /// </remarks>
+        private const float HeldHeight = 1.05f;
 
         /// <summary>灰盒枪身颜色。</summary>
         private static readonly Color WeaponColor = new Color(0.18f, 0.18f, 0.20f);

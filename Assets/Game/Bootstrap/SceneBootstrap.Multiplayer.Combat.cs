@@ -116,9 +116,25 @@ namespace RaidDemo.Bootstrap
             switch (message.Kind)
             {
                 case CombatEventMessage.KindFired:
+                    // 自己那一发：起点改用**本地枪口**。
+                    //
+                    // 服务器的起点来自它的权威位置，而本机是本地预测 + 视觉跟随，
+                    // 起步、变向时服务器位置能落后一米以上——用服务器起点画线，
+                    // 玩家看到的就是"子弹从移动前的位置飞出来"（P-47 实机量到过 z=0.6
+                    // 对客户端 z=2.16 的差距）。终点仍用服务器的命中点：那条才是权威结果。
+                    //
+                    // 别人的弹道不改：他们的位置本来就是服务器给的，起点与画面天然一致。
+                    var origin = message.Origin;
+                    if (message.SourceId == m_LocalPlayerId
+                        && m_WeaponView != null
+                        && m_WeaponView.IsEquipped)
+                    {
+                        origin = m_WeaponView.MuzzleWorldPosition;
+                    }
+
                     m_EventBus.Publish(new WeaponFiredEvent(
                         message.SourceId,
-                        message.Origin,
+                        origin,
                         message.EndPoint,
                         message.DidHit,
                         message.TargetId,

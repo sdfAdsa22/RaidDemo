@@ -145,8 +145,15 @@ namespace RaidDemo.Bootstrap.Editor
             // 解包后再动 Transform：嵌套预制体上的覆盖可能在保存时被回退（M7-P-01 的教训）。
             PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
 
-            // 源模型朝向 +X，项目的"前"是 +Z：绕 Y 轴 -90 度即可对齐。
-            instance.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            // 源模型是 Z-up：朝向 +X、上方 +Z（Blender 系导出常见约定）。
+            // 项目要的是"前 = +Z、上 = +Y"，因此需要两步：
+            //   ① 绕 Y 轴 -90°，把枪口从 +X 转到 +Z；
+            //   ② 再绕枪管轴（转完之后的 Z）滚 -90°，把原模型的 +Z（枪的上方）立到 +Y。
+            // 少第②步的后果是枪"侧躺着"：竖直方向只剩枪的厚度（0.14 米），
+            // 而 0.64 米的枪身高度横着摊开，看上去既不在手里、也分不清枪口朝哪（P-47）。
+            // 滚 +90° 会变成"弹匣朝上"的倒置，方向必须是 -90°（实机截屏比对过）。
+            instance.transform.localRotation =
+                Quaternion.Euler(0f, 0f, -90f) * Quaternion.Euler(0f, -90f, 0f);
             FitLength(instance, recipe.LengthMeters);
             AlignPivotToGrip(instance);
             ApplyMaterials(instance);
