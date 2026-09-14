@@ -108,10 +108,30 @@ namespace RaidDemo.Bootstrap
                     continue;
                 }
 
-                var grid = new InventoryGrid(
-                    container.Width,
-                    container.Height,
-                    $"服务器容器 {container.ContainerId}");
+                // 就地重建而不是 Replace：背包网格被 PlayerLoadout 直接持有，
+                // 换掉对象会让装备、重量、快捷转移全都指向旧网格。
+                if (!m_ContainerRegistry.TryGetGrid(container.ContainerId, out var grid))
+                {
+                    continue;
+                }
+
+                // 尺寸不一致（换了背包）时也没法就地改，只能换对象——
+                // 这种情况在联机里由服务器的装备同步负责，这里先只处理尺寸一致的情形。
+                if (grid.Width != container.Width || grid.Height != container.Height)
+                {
+                    m_ContainerRegistry.Replace(container.ContainerId, new InventoryGrid(
+                        container.Width,
+                        container.Height,
+                        grid.Label));
+                    m_ContainerRegistry.TryGetGrid(container.ContainerId, out grid);
+                }
+
+                if (grid == null)
+                {
+                    continue;
+                }
+
+                ClearGrid(grid);
 
                 var placed = 0;
                 var items = container.Items;
@@ -136,12 +156,7 @@ namespace RaidDemo.Bootstrap
                     }
                 }
 
-                // Replace 而不是重新注册：容器编号必须保持不变，
-                // 否则界面里已经打开的面板、命令里的编号会立刻指向别的箱子。
-                if (m_ContainerRegistry.Replace(container.ContainerId, grid))
-                {
-                    rebuilt++;
-                }
+                rebuilt++;
 
                 if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
                 {
@@ -154,6 +169,27 @@ namespace RaidDemo.Bootstrap
 
             // 一条汇总痕迹：它证明"箱子内容来自服务器"这件事真的发生了。
             Debug.Log($"[联机] 容器内容已同步：{rebuilt} 个（服务器权威）。");
+        }
+
+        /// <summary>清空一个网格（逐个移除，保持网格对象本身不变）。</summary>
+        /// <param name="grid">目标网格。</param>
+        private static void ClearGrid(InventoryGrid grid)
+        {
+            // Items 是只读视图，直接遍历时 Remove 会改集合，因此先拷一份出来。
+            var items = grid.Items;
+            var snapshot = new ItemInstance[items.Count];
+            for (var i = 0; i < items.Count; i++)
+            {
+                snapshot[i] = items[i];
+            }
+
+            for (var i = 0; i < snapshot.Length; i++)
+            {
+                if (snapshot[i] != null)
+                {
+                    grid.Remove(snapshot[i]);
+                }
+            }
         }
     }
 }

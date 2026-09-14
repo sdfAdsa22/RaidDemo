@@ -155,6 +155,21 @@ namespace RaidDemo.Inventory
             return m_Grids.TryGetValue(containerId, out grid);
         }
 
+        /// <summary>
+        /// 注销一个容器（玩家断开时撤掉他随身的那几个）。
+        /// </summary>
+        /// <param name="containerId">容器 ID。</param>
+        /// <returns>确实注销了返回 true。</returns>
+        /// <remarks>
+        /// 只删除映射，不清理网格内容：网格对象仍被 <c>PlayerLoadout</c> 持有，
+        /// 玩家重连时会重新登记同一个编号。
+        /// </remarks>
+        public bool Unregister(int containerId)
+        {
+            m_Kinds.Remove(containerId);
+            return m_Grids.Remove(containerId);
+        }
+
         /// <summary>按 ID 查找容器种类。</summary>
         /// <param name="containerId">容器 ID。</param>
         /// <param name="kind">找到的种类。</param>

@@ -209,19 +209,63 @@ namespace RaidDemo.Bootstrap
             }
         }
 
+        /// <summary>
+        /// 把"场景容器 + 这名玩家自己的容器"发给他本人。
+        /// </summary>
+        /// <param name="playerId">玩家编号。</param>
+        /// <remarks>
+        /// 背包命令执行完之后走这条路：场景容器可能少了一件（所有人都要知道），
+        /// 而他的背包里多了一件（只有他自己需要看到）。
+        /// </remarks>
+        private void SendContainerContentsTo(int playerId)
+        {
+            var manager = m_Network;
+            if (manager == null || manager.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            var batch = BuildContainerContentsBatch(playerId);
+            using (var writer = new FastBufferWriter(ContainerContentsCapacity(batch), Allocator.Temp))
+            {
+                writer.WriteValueSafe(batch);
+                manager.CustomMessagingManager.SendNamedMessage(
+                    ContainerNetworkChannel.ContentsMessageName,
+                    (ulong)playerId,
+                    writer,
+                    NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
         /// <summary>把当前容器注册表里所有场景容器的内容打包成一条消息。</summary>
         private ContainerContentsBatchMessage BuildContainerContentsBatch()
         {
+            return BuildContainerContentsBatch(playerId: -1);
+        }
+
+        /// <summary>
+        /// 打包容器内容；<paramref name="playerId"/> 为负数时只含场景容器。
+        /// </summary>
+        /// <param name="playerId">要一并打包其随身容器的玩家；-1 表示不带玩家容器。</param>
+        private ContainerContentsBatchMessage BuildContainerContentsBatch(int playerId)
+        {
             var ids = m_Containers.ContainerIds;
             var entries = new List<ContainerContentsMessage>(ids.Count);
+            var backpackId = playerId >= 0
+                ? ContainerIds.ServerPlayerContainer(playerId, ContainerIds.PlayerSlot.Backpack)
+                : 0;
+            var pouchId = playerId >= 0
+                ? ContainerIds.ServerPlayerContainer(playerId, ContainerIds.PlayerSlot.AmmoPouch)
+                : 0;
 
             for (var i = 0; i < ids.Count; i++)
             {
                 var containerId = ids[i];
+                var isSceneContainer = containerId >= ContainerIds.SceneBase
+                                       && containerId < ContainerIds.ServerPlayerBase;
+                var isOwnContainer = containerId == backpackId || containerId == pouchId;
 
-                // 只同步场景容器（箱子）：玩家自己的背包由各自的客户端持有，
-                // 现在把它发出去只会浪费带宽，等 P3-2 的背包权威化再处理。
-                if (containerId < ContainerIds.SceneBase)
+                if (!isSceneContainer && !isOwnContainer)
                 {
                     continue;
                 }
@@ -231,7 +275,14 @@ namespace RaidDemo.Bootstrap
                     continue;
                 }
 
-                entries.Add(BuildContainerContents(containerId, grid));
+                // 客户端只认自己那套编号（背包 1 / 弹药挂 2），因此玩家容器要翻译回去。
+                var wireId = containerId == backpackId
+                    ? ContainerIds.PlayerBackpack
+                    : containerId == pouchId
+                        ? ContainerIds.AmmoPouch
+                        : containerId;
+
+                entries.Add(BuildContainerContents(wireId, grid));
             }
 
             return new ContainerContentsBatchMessage

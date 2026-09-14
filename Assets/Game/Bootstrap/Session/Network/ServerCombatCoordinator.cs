@@ -176,6 +176,28 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 取某名玩家的随身装备（背包 / 弹药挂 / 装备槽）。
+        /// </summary>
+        /// <param name="playerId">玩家标识。</param>
+        /// <param name="loadout">该玩家的随身装备。</param>
+        /// <returns>玩家已参战时返回 true。</returns>
+        /// <remarks>
+        /// 服务器侧的背包命令要用它：命令里的"1 号容器"是**玩家自己的背包**，
+        /// 而服务器上一张注册表放着所有人的容器，靠这份 loadout 才能把编号落到具体对象上。
+        /// </remarks>
+        public bool TryGetLoadout(int playerId, out RaidDemo.Inventory.PlayerLoadout loadout)
+        {
+            if (m_Participants.TryGetValue(playerId, out var participant))
+            {
+                loadout = participant.Loadout;
+                return true;
+            }
+
+            loadout = null;
+            return false;
+        }
+
+        /// <summary>
         /// 接收一条战斗输入：扳机状态与瞄准方向。
         /// </summary>
         /// <remarks>

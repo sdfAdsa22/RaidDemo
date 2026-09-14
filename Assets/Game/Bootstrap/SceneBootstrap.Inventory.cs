@@ -66,6 +66,9 @@ namespace RaidDemo.Bootstrap
             m_CommandRouter.Register<PlayerSwitchWeaponIntent>(
                 new WeaponSwitchCommandHandler(m_Loadout.Equipment, m_EventBus));
 
+            // 联机时把背包移动命令换成上行（服务器裁定物归谁）；单机保持本地执行。
+            OverrideInventoryCommandsForMultiplayer();
+
             var uiHost = new GameObject("InventoryScreen");
             uiHost.transform.SetParent(transform, worldPositionStays: false);
             m_InventoryScreen = uiHost.AddComponent<InventoryScreenController>();

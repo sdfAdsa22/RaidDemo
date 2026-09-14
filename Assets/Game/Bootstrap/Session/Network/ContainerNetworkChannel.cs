@@ -22,5 +22,14 @@ namespace RaidDemo.Bootstrap
         /// 而且没有任何报错。改成客户端就绪后主动要一次，竞态就不存在了。</para>
         /// </remarks>
         public const string RequestMessageName = "RaidDemo.Container.Request";
+
+        /// <summary>
+        /// 客户端 → 服务器：一条背包操作命令（把物品从 A 容器移到 B 容器）。
+        /// </summary>
+        /// <remarks>
+        /// 走可靠有序投递：背包命令是有先后语义的（先拿走的那个才算拿到），
+        /// 丢一条或乱序都会让"谁拿到了"变得不可解释。
+        /// </remarks>
+        public const string CommandMessageName = "RaidDemo.Container.Command";
     }
 }

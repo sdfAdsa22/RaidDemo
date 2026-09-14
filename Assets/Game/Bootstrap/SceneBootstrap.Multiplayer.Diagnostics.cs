@@ -1,4 +1,5 @@
 using System;
+using RaidDemo.Inventory;
 using RaidDemo.Shared;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
@@ -94,6 +95,58 @@ namespace RaidDemo.Bootstrap
             m_InputCollector.ScriptedMoveDirection = hasTarget
                 ? new Vector2(aim.X, aim.Y)
                 : new Vector2(x, y);
+
+            TryIssueAutoLootCommand();
+        }
+
+        /// <summary>验收模式下自动拾取的间隔（秒）。</summary>
+        private const float AutoLootIntervalSeconds = 4f;
+
+        private double m_NextAutoLootTime;
+
+        /// <summary>
+        /// 验收模式下周期性从场景容器里拿一件东西。
+        /// </summary>
+        /// <remarks>
+        /// <para>它走的是与玩家拖拽**完全相同**的命令路径（<c>InventoryMoveIntent</c> →
+        /// 命令路由 → 联机时上行给服务器），因此验证的是真实链路，而不是一条测试专用旁路。</para>
+        ///
+        /// <para>两名客户端都会去拿同一个箱子：这正是"先到先得"要验收的场景——
+        /// 先发的那个拿到物品，后发的那个拿到失败，而两边的箱子内容最终一致。</para>
+        /// </remarks>
+        private void TryIssueAutoLootCommand()
+        {
+            if (m_CommandRouter == null || m_ContainerRegistry == null
+                || Time.timeAsDouble < m_NextAutoLootTime)
+            {
+                return;
+            }
+
+            m_NextAutoLootTime = Time.timeAsDouble + AutoLootIntervalSeconds;
+
+            // 固定拿 100 号容器（地图上的第一个箱子）：两个人抢同一个箱子才有意义。
+            const int lootContainerId = ContainerIds.SceneBase;
+            if (!m_ContainerRegistry.TryGetGrid(lootContainerId, out var grid) || grid.Items.Count == 0)
+            {
+                return;
+            }
+
+            var item = grid.Items[0];
+            if (!grid.TryGetOrigin(item, out var origin))
+            {
+                return;
+            }
+
+            var result = m_CommandRouter.Dispatch(new InventoryMoveIntent(
+                m_LocalPlayerId,
+                lootContainerId,
+                ContainerIds.PlayerBackpack,
+                origin.X,
+                origin.Y,
+                0,
+                0));
+
+            Debug.Log($"[联机] 自动拾取：容器 {lootContainerId} 第 ({origin.X},{origin.Y}) 格 → 背包，结果={result.Success}");
         }
 
         /// <summary>验收模式下瞄准的最大距离（米）。比步枪射程略小，留一点余量。</summary>

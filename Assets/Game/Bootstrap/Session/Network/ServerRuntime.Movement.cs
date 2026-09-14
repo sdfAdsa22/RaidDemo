@@ -73,6 +73,11 @@ namespace RaidDemo.Bootstrap
                 ContainerNetworkChannel.RequestMessageName,
                 OnContainerContentsRequested);
 
+            // 背包操作的上行通道：客户端发意图，服务器用同一套背包规则执行（P3-2）。
+            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
+                ContainerNetworkChannel.CommandMessageName,
+                OnInventoryMoveCommandReceived);
+
             m_Session.Log.Info("[服务器] 移动权威世界已就绪（60 Hz 仿真 / 20 Hz 快照）。");
 
             if (!string.IsNullOrEmpty(m_Options.MapSceneName))
@@ -93,6 +98,8 @@ namespace RaidDemo.Bootstrap
                     MovementNetworkChannel.InputMessageName);
                 m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
                     ContainerNetworkChannel.RequestMessageName);
+                m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
+                    ContainerNetworkChannel.CommandMessageName);
             }
 
             m_PlayerBodies.Clear();
@@ -153,6 +160,9 @@ namespace RaidDemo.Bootstrap
             AddPlayerToCombat(playerId);
             BindPlayerHitTarget(playerId);
 
+            // 背包命令通道要在参战之后建：它需要这名玩家的随身装备（武器 / 背包 / 弹药挂）。
+            RegisterPlayerContainers(playerId);
+
             // 容器内容随接入下发：晚进来的玩家必须看到与先到者完全一样的箱子。
             SendAllContainerContentsTo(clientId);
         }
@@ -163,6 +173,7 @@ namespace RaidDemo.Bootstrap
             var playerId = (int)clientId;
             m_PlayerBodies.Remove(playerId);
             m_PlayerGroundHeights.Remove(playerId);
+            UnregisterPlayerContainers(playerId);
             RemovePlayerFromCombat(playerId);
 
             if (m_World != null && m_World.RemovePlayer(playerId))

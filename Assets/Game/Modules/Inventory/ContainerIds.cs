@@ -40,5 +40,41 @@ namespace RaidDemo.Inventory
         {
             return SceneBase + (index < 0 ? 0 : index);
         }
+
+        /// <summary>
+        /// 服务器侧"某名玩家自己的容器"的编号起点。
+        /// </summary>
+        /// <remarks>
+        /// <para>客户端说"1 号容器"时，指的永远是**它自己的背包**（见上面的常量）。
+        /// 但服务器上同时存在多名玩家的背包，一个注册表放不下两个"1 号"。
+        /// 因此服务器给每名玩家的容器分配一段独占编号，命令进来时先做一次翻译：
+        /// 客户端编号 &lt; <see cref="SceneBase"/> 的，翻译成"这名玩家自己的那一个"。</para>
+        /// </remarks>
+        public const int ServerPlayerBase = 1000;
+
+        /// <summary>每名玩家占用的编号个数（背包 / 弹药挂 / 仓库各一个）。</summary>
+        private const int SlotsPerPlayer = 10;
+
+        /// <summary>玩家容器的槽位。</summary>
+        public enum PlayerSlot
+        {
+            /// <summary>随身背包。</summary>
+            Backpack = 0,
+
+            /// <summary>弹药挂。</summary>
+            AmmoPouch = 1,
+
+            /// <summary>仓库。</summary>
+            Stash = 2,
+        }
+
+        /// <summary>取某名玩家某个槽位在**服务器注册表**里的编号。</summary>
+        /// <param name="playerId">玩家编号。</param>
+        /// <param name="slot">槽位。</param>
+        public static int ServerPlayerContainer(int playerId, PlayerSlot slot)
+        {
+            var index = playerId < 0 ? 0 : playerId;
+            return ServerPlayerBase + (index * SlotsPerPlayer) + (int)slot;
+        }
     }
 }
