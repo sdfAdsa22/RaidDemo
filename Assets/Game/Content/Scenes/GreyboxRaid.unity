@@ -10301,8 +10301,8 @@ MonoBehaviour:
   m_LootSearchDurationSeconds: 2
   m_LootSearchRangeMeters: 2.2
   m_LootSeed: 0
-  m_PlayerSpawnPosition: {x: -4, y: 0}
-  m_PlayerSpawnFacingDegrees: 0
+  m_PlayerSpawnPosition: {x: -16.8, y: -24.1}
+  m_PlayerSpawnFacingDegrees: 55
   m_PlayerMotor: {fileID: 1943214077}
   m_InputCollector: {fileID: 1048683095}
   m_CameraController: {fileID: 130199901}
@@ -18456,7 +18456,7 @@ Transform:
   m_GameObject: {fileID: 1943214076}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4, y: -6, z: 0}
+  m_LocalPosition: {x: -16.8, y: -6, z: -24.1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

@@ -82,7 +82,7 @@ namespace RaidDemo.Bootstrap
                 m_PlayerGroundHeights.Remove(playerId);
 
                 var spawn = SpawnPositionFor(playerId);
-                m_World.TryTeleport(playerId, spawn);
+                m_World.TryTeleport(playerId, spawn, SpawnFacing);
 
                 CreatePlayerBody(playerId);
                 RegisterLifeState(playerId);
@@ -94,12 +94,27 @@ namespace RaidDemo.Bootstrap
             BroadcastAllContainerContents();
             m_Session?.Log.Info("[服务器] 战局已重开：容器重抽、AI 重建、玩家回到出生点。");
         }
-        /// <summary>按玩家标识排布出生点（验收模式下改到撤离区）。</summary>
-        /// 按玩家标识排布出生点。
+        /// <summary>
+        /// 出生基准点：地图西南角的开阔草地（客户端场景里的 m_PlayerSpawnPosition 必须一致）。
         /// </summary>
         /// <remarks>
-        /// 每个人都叠在地图原点会让第一帧看起来像只有一个角色。P1 用一圈小队列把玩家排开，
-        /// 真正的出生点由战局配置决定（P3 的生成管理）。
+        /// <para><b>为什么从地图正中挪到这里：</b>原来的出生点是谷底正中，最近的敌人出生点只有约 5 米，
+        /// 玩家一进图就落在敌人的视线与射程里——站着不动 25 秒左右必死。
+        /// 实机验收与自动脚本都被这一点拖累：还没走到第一个箱子就阵亡。</para>
+        ///
+        /// <para><b>为什么选这里：</b>离最近的敌人出生点约 17.6 米（AI 的必发现距离是 6 米、
+        /// 警惕带 6~9 米，留足反应空间），离最近的撤离点约 17.7 米（不至于一出生就能撤），
+        /// 半径 1.2 米内除了地形没有任何碰撞体（不会卡在货箱或墙里）。</para>
+        /// </remarks>
+        private static readonly Vector2F SpawnBase = new Vector2F(-16.8f, -24.1f);
+
+        /// <summary>出生朝向（度）：指向地图中心，进图第一眼就朝着工业区。</summary>
+        private static readonly Vector2F SpawnFacing = Vector2F.FromDegrees(55f);
+
+        /// <summary>按玩家标识排布出生点（验收模式下改到撤离区）。</summary>
+        /// <remarks>
+        /// 每个人都叠在同一个点会让第一帧看起来像只有一个角色，因此按 1.6 米的间距
+        /// 在基准点**往东北方向**排成小网格（往东北是为了不把玩家推出谷底西南角的空地边界）。
         /// </remarks>
         private Vector2F SpawnPositionFor(int playerId)
         {
@@ -116,7 +131,9 @@ namespace RaidDemo.Bootstrap
             }
 
             var index = playerId < 0 ? 0 : playerId;
-            return new Vector2F((index % 4) * SpawnSpacing, (index / 4) * SpawnSpacing);
+            return new Vector2F(
+                SpawnBase.X + ((index % 4) * SpawnSpacing),
+                SpawnBase.Y + ((index / 4) * SpawnSpacing));
         }
     }
 }

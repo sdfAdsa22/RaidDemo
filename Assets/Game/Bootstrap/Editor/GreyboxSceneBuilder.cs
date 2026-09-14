@@ -39,11 +39,15 @@ namespace RaidDemo.Bootstrap.Editor
         /// 玩家出生点。
         /// </summary>
         /// <remarks>
-        /// 选在地图中央偏西的空地：往西是主厂房、往东是集装箱堆场、往南是装卸平台，
-        /// 三个方向都有内容可去，玩家一出生就能看清自己有哪些选择。
-        /// 刻意不放在任何撤离点旁边——出生就能撤离等于没有风险。
+        /// <para><b>M9 P4.5 起挪到地图西南角的开阔草地</b>（负责人圈定的位置）。
+        /// 原来放在谷底正中：最近的敌人出生点只有约 5 米，玩家一进图就落在敌人射程里，
+        /// 站着不动 25 秒左右必死——实机验收与自动脚本都被这一点拖累。</para>
+        ///
+        /// <para><b>为什么是这里：</b>离最近的敌人出生点约 17.6 米、最近的撤离点约 17.7 米，
+        /// 半径 1.2 米内除了地形没有碰撞体。与服务器侧 <c>ServerRuntime.SpawnBase</c> **必须一致**，
+        /// 否则进图第一帧会先出现在旧位置再被服务器拉过去。</para>
         /// </remarks>
-        private static readonly Vector3 PlayerSpawn = new Vector3(-4f, 0f, 0f);
+        private static readonly Vector3 PlayerSpawn = new Vector3(-16.8f, 0f, -24.1f);
 
         /// <summary>角色身高（米）。灰盒阶段用于确定身体与头部的位置。</summary>
         private const float PlayerHeight = 1.8f;

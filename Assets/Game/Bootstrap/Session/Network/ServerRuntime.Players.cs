@@ -44,7 +44,7 @@ namespace RaidDemo.Bootstrap
             CreatePlayerBody(playerId);
 
             var position = SpawnPositionFor(playerId);
-            if (!m_World.TryAddPlayer(playerId, position, Vector2F.Up, out var error))
+            if (!m_World.TryAddPlayer(playerId, position, SpawnFacing, out var error))
             {
                 m_Session?.Log.Warning($"[服务器] 玩家 {playerId} 加入权威世界失败：{error}");
                 m_PlayerBodies.Remove(playerId);
