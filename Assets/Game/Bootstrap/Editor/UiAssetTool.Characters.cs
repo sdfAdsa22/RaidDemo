@@ -350,7 +350,19 @@ namespace RaidDemo.Bootstrap.Editor
             }
         }
 
-        /// <summary>只收入会出现在界面上的字符范围。</summary>
+        /// <summary>
+        /// 只收入会出现在界面上的字符范围。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么几何图形区（U+25A0–U+25FF）必须在列表里：</b>
+        /// 口令与房间密码输入框用 <c>●</c>（U+25CF）做遮罩——它不在汉字区、
+        /// 也不在常用符号区，早先被这里静默丢掉，结果是"字体资产预烘焙成功、
+        /// 但游戏里口令框打了字却什么都不显示"（看起来像输入框坏了）。
+        /// 这一区间还包含 ■□◆◇▲▼ 这类界面符号，一并收进来。</para>
+        ///
+        /// <para>白名单仍然是白名单（不是"全都收"）：注释与日志里的汉字不该进图集，
+        /// 否则图集页数会为永远不会显示的字白白膨胀。</para>
+        /// </remarks>
         private static void AddIfUiCharacter(HashSet<char> characters, char c)
         {
             if (c >= 32 && c <= 126)
@@ -363,6 +375,7 @@ namespace RaidDemo.Bootstrap.Editor
                 (c >= 0x3000 && c <= 0x303F) ||
                 (c >= 0xFF00 && c <= 0xFFEF) ||
                 (c >= 0x2000 && c <= 0x206F) ||
+                (c >= 0x25A0 && c <= 0x25FF) ||
                 c == '✓' || c == '×' || c == '÷' || c == '±')
             {
                 characters.Add(c);

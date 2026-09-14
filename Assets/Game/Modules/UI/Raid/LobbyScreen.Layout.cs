@@ -48,7 +48,8 @@ namespace RaidDemo.UI
                 UiPalette.SmallSize, TextAlignmentOptions.Left, UiPalette.InkSoft);
             m_PasswordInput = UiTextInput.Create(
                 m_JoinPanel, "RoomPasswordInput", new Vector2(Padding, top + 178f), new Vector2(300f, 46f),
-                "可留空", true, LobbyText.RoomPasswordDigits);
+                // 同上：房间密码明文显示，玩家能确认自己输的是哪四位。
+                "可留空", false, LobbyText.RoomPasswordDigits);
 
             m_CreateButton = UiFactory.CreateButton(
                 m_JoinPanel, "创建房间", new Vector2(Padding, top + 246f), new Vector2(220f, 54f), UiButtonKind.Primary);

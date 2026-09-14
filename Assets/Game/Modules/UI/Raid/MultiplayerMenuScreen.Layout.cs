@@ -62,7 +62,9 @@ namespace RaidDemo.UI
                 UiPalette.SmallSize, TextAlignmentOptions.Left, UiPalette.InkSoft);
             m_PassphraseInput = UiTextInput.Create(
                 panel, "PassphraseInput", new Vector2(Padding, top + 222f), new Vector2(300f, 46f),
-                "例：1234", true, LobbyText.MaxPassphraseDigits);
+                // 明文显示（负责人 2026-09-14 决定）：这是单机演示与局域网合作，口令只用于区分账号，
+                // 遮罩反而让"到底打进去了没有"变成每次都要猜的事（本批就因为遮罩字形缺失白查了一轮）。
+                "例：1234", false, LobbyText.MaxPassphraseDigits);
 
             m_ConnectButton = UiFactory.CreateButton(
                 panel, "连接并进入大厅", new Vector2(Padding, top + 290f), new Vector2(300f, 62f), UiButtonKind.Primary);
