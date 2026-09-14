@@ -138,6 +138,14 @@ namespace RaidDemo.Bootstrap
             AppendRow(html, "房主", string.IsNullOrEmpty(snapshot.HostNickname) ? "（无）" : snapshot.HostNickname);
             AppendRow(html, "在线人数（含未进房）", snapshot.ConnectedPlayerCount.ToString());
 
+            // P4.5-b：服务器会在"共享安全屋 ⇄ 战局"之间切换托管的世界，
+            // 运维最常问的两个问题正好是"现在在哪张图"与"有几个人在局里"。
+            var world = string.IsNullOrEmpty(snapshot.WorldScene)
+                ? snapshot.WorldText
+                : $"{snapshot.WorldText}（{snapshot.WorldScene}）";
+            AppendRow(html, "当前世界", world);
+            AppendRow(html, "在局人数（权威世界）", snapshot.PlayersInWorld.ToString());
+
             if (snapshot.RaidElapsedSeconds > 0f)
             {
                 AppendRow(html, "本局已进行", FormatDuration(snapshot.RaidElapsedSeconds));

@@ -60,8 +60,18 @@ namespace RaidDemo.Bootstrap
             SendLobbyRequest(LobbyRequestKind.JoinRoom, string.Empty, password ?? string.Empty);
         }
 
-        /// <summary>开始战局（仅房主）。</summary>
-        public void StartRaid()
+        /// <summary>
+        /// 开始战局（仅房主）。
+        /// </summary>
+        /// <param name="mapSceneName">房主选择的地图场景名；留空表示由服务器决定（验收路径）。</param>
+        /// <remarks>
+        /// <para>P4.5-b 起，这条请求由**安全屋出口**发出：房主在出口选定地图、确认全员都在屋里之后，
+        /// 客户端把地图名一起上行，服务器据此切换自己托管的世界。</para>
+        ///
+        /// <para>地图名走"字段 A"：大厅请求的结构体是复用的（见 <c>LobbyRequestMessage</c>），
+        /// 新增一种含义不需要新增通道，也不必为它单独加一个字段。</para>
+        /// </remarks>
+        public void StartRaid(string mapSceneName = null)
         {
             if (!RequirePhase(MultiplayerClientPhase.InRoom))
             {
@@ -69,7 +79,8 @@ namespace RaidDemo.Bootstrap
             }
 
             ClearError();
-            SendLobbyRequest(LobbyRequestKind.StartRaid, string.Empty, string.Empty);
+            SetStatus("正在前往战局…");
+            SendLobbyRequest(LobbyRequestKind.StartRaid, mapSceneName ?? string.Empty, string.Empty);
         }
 
         /// <summary>离开房间（连接保持）。</summary>

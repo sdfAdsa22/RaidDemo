@@ -38,6 +38,9 @@ namespace RaidDemo.Bootstrap
                 ConnectedPlayerCount = m_LobbyClients.Count,
                 RaidElapsedSeconds = m_RaidStartedAt >= 0f ? now - m_RaidStartedAt : 0f,
                 SnapshotBatches = SnapshotBroadcastCount,
+                WorldText = DescribeWorld(m_WorldKind),
+                WorldScene = m_WorldSceneName,
+                PlayersInWorld = m_World != null ? m_World.PlayerCount : 0,
             };
 
             snapshot.Addresses.Add($"{ServerAddressReporter.LoopbackAddress}:{m_Options.Port}");

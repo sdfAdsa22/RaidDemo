@@ -136,9 +136,6 @@ namespace RaidDemo.Bootstrap
         /// <summary>任一可见状态变化（界面据此重绘）。</summary>
         public event Action Changed;
 
-        /// <summary>收到"战局开始"（参数为要加载的地图场景名）。</summary>
-        public event Action<string> RaidStarting;
-
         private readonly List<MultiplayerMemberView> m_RoomMembers = new List<MultiplayerMemberView>();
 
         private NetworkManager m_Network;

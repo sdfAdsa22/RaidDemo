@@ -66,7 +66,7 @@ namespace RaidDemo.Bootstrap
                 $"[联机] 战局结算：玩家 {message.PlayerId} {outcome}，"
                 + $"带出价值 {message.CarriedValue}，击杀 {message.Kills}。");
 
-            if (message.PlayerId != m_LocalPlayerId || m_LocalOutcomeApplied)
+            if (message.PlayerId != LocalNetworkPlayerId || m_LocalOutcomeApplied)
             {
                 return;
             }

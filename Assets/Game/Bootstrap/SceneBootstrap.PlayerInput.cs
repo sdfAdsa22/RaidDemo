@@ -164,6 +164,23 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 清空移动意图（打开背包 / 结算 / 阵亡时调用）。
+        /// </summary>
+        /// <remarks>
+        /// <para>本地模拟与"待上行意图"必须<b>一起</b>清：联机的上行用的是 <c>m_Pending*</c> 这几个字段，
+        /// 只清本地意图的话服务器会继续按上一帧的方向移动玩家——客户端原地不动、快照每次把它往前拉一下，
+        /// 表现是"翻着背包人还在往前走"。</para>
+        ///
+        /// <para>朝向不清：那是"看着哪"，界面打开时保持朝向不会让角色移动（而且枪口跟着光标更自然）。</para>
+        /// </remarks>
+        private void ClearLocalMovementIntent()
+        {
+            m_MoveHandler?.ClearIntent();
+            m_PendingMoveIntent = Vector2F.Zero;
+            m_PendingWantsToSprint = false;
+        }
+
+        /// <summary>
         /// 把输入意图封装成命令并交给命令路由。
         /// </summary>
         /// <remarks>

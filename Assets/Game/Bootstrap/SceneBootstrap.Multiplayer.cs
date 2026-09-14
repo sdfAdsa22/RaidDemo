@@ -1,61 +1,36 @@
 using System.Collections.Generic;
 using RaidDemo.Presentation;
-using RaidDemo.Shared;
-using RaidDemo.Simulation;
-using Unity.Collections;
 using Unity.Netcode;
-using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
 namespace RaidDemo.Bootstrap
 {
     /// <summary>
-    /// 战局装配根的联机客户端部分：上行输入、下行快照、本地预测与远端插值。
+    /// 战局装配根的联机客户端部分：接管连接、挂战局专属通道、驱动共享的移动链路。
     /// </summary>
     /// <remarks>
-    /// <para><b>为什么客户端也要按固定步长推进：</b>预测能成立的前提是"两边用同样的步长算同样的输入"。
-    /// 若客户端按帧间隔推进、服务器按 1/60 秒推进，两条轨迹会持续分叉，
-    /// 表现为角色一直在被轻微回拉。</para>
-    ///
-    /// <para><b>输入与步长一一对应：</b>每个固定步产生一条输入并记录一条预测，
-    /// 序号随步递增。服务器的输入序号就是按这个节奏消费的，因此对账时能精确对上。</para>
-    ///
-    /// <para><b>远端玩家的表现：</b>快照进插值缓冲，渲染时取"服务器估计时间 − 100 ms"的位置，
-    /// 因此队友看起来比真实位置晚一点点，但轨迹是连续平滑的。</para>
+    /// <para><b>P4.5-b 起，"移动"不再是战局独有的东西</b>：共享安全屋需要一模一样的
+    /// 固定步预测、输入上行、快照对账与远端插值。因此那部分整体下沉到
+    /// <see cref="MultiplayerMovementLink"/>，本文件只剩两件事——</para>
+    /// <list type="number">
+    /// <item><description>把战局专属的通道挂上连接（战斗 / 敌人 / 容器 / 结算 / 生命）；</description></item>
+    /// <item><description>把本帧的战局意图（扳机、换弹、救援、倒地状态）交给链路。</description></item>
+    /// </list>
+    /// <para>这样"移动手感"的规则只有一份实现，安全屋与战局不可能出现两套容差或两条保活规则。</para>
     /// </remarks>
     public sealed partial class SceneBootstrap
     {
-        /// <summary>预测与服务器的共同步长：60 Hz。</summary>
-        private const float NetworkFixedStep = 1f / 60f;
-
-        /// <summary>单帧最多补算的固定步数，防止卡顿后追帧雪崩。</summary>
-        private const int MaxNetworkStepsPerFrame = 4;
-
-        /// <summary>位置误差超过该值（米）才回滚重放。</summary>
         private NetworkManager m_NetworkClient;
 
-        /// <summary>
-        /// 当前真正持有战局网络通道的装配根（跨场景注册的归属标记）。
-        /// </summary>
-        /// <remarks>
-        /// <para><b>为什么必须有这个标记：</b>P4 起网络管理器由大厅会话持有、跨场景存活，
-        /// 而战局通道（快照 / 战斗 / 敌人 / 容器 / 结算 / 生命）是**每个战局场景**各自注册的。
-        /// 场景切换的真实顺序是：<c>新场景 Awake（注册）→ 旧场景 OnDestroy（退订）</c>——
-        /// 旧场景的生命周期回调会把新场景刚注册的处理器**按同名全部删掉**。
-        /// 症状极具迷惑性：进图时那一次同步是好的（发生在删除之前），
-        /// 之后服务器发什么都没反应——容器搬不动、队友与敌人也不动（P4 验收实机定位）。</para>
-        ///
-        /// <para>做法：注册时认领，退订时先看自己是不是持有者；不是就什么都不做。
-        /// 这样"谁注册谁负责退订"这条规矩在跨场景共享的连接上依然成立。</para>
-        /// </remarks>
-        private static SceneBootstrap s_ActiveChannelOwner;
-        private MovementPredictionBuffer m_Prediction;
-        private float m_NetworkStepAccumulator;
-        private uint m_NetworkSequence;
-        private int m_LocalPlayerId = -1;
-        private bool m_NetworkSnapshotHandlerRegistered;
+        /// <summary>共享的移动链路（上行输入 / 快照对账 / 远端玩家插值）。</summary>
+        private MultiplayerMovementLink m_MovementLink;
+
         private bool m_AutoWalk;
         private double m_NextNetworkReportTime;
+
+        /// <summary>远端玩家视图为空时的常量空表（避免调用方到处判空）。</summary>
+        private static readonly IReadOnlyDictionary<int, RemotePlayerView> s_EmptyRemoteViews =
+            new Dictionary<int, RemotePlayerView>();
 
         /// <summary>是否处于联机客户端模式。</summary>
         public bool IsMultiplayerClient => m_NetworkClient != null;
@@ -66,7 +41,7 @@ namespace RaidDemo.Bootstrap
         /// 断线、掉包、界面冻结的表现都是"对面没反应"。把它做成可读计数，
         /// 采样两次就能区分"没在发"与"发了但对面没收到"（2026-09-14 联机基础问题排查）。
         /// </remarks>
-        public int SentInputCount { get; private set; }
+        public int SentInputCount => m_MovementLink != null ? m_MovementLink.SentInputCount : 0;
 
         /// <summary>最后一次"上行停滞"的原因（诊断用）。</summary>
         /// <remarks>
@@ -75,21 +50,18 @@ namespace RaidDemo.Bootstrap
         /// 重复刷屏没有价值，而"第一次从哪条分支掉出去"正好是定位需要的全部信息
         /// （2026-09-14 联机掉线排查）。
         /// </remarks>
-        public string LastInputStallReason { get; private set; } = string.Empty;
+        public string LastInputStallReason =>
+            m_MovementLink != null ? m_MovementLink.LastInputStallReason : string.Empty;
 
-        /// <summary>记录一次上行停滞；同一原因只记一次。</summary>
-        private void NoteInputStall(string reason)
-        {
-            if (LastInputStallReason == reason)
-            {
-                return;
-            }
+        /// <summary>本局因对账超差而回滚重放的次数（诊断与验收用）。</summary>
+        public int RollbackCount => m_MovementLink != null ? m_MovementLink.RollbackCount : 0;
 
-            LastInputStallReason = reason;
-            // 用 Warning 而不是 Verbose：联机客户端的会话在编辑器里跑的是默认 Info 级，
-            // Verbose 会被直接过滤掉——而"上行停在哪条分支"恰恰要能在实机日志里看见。
-            m_Session?.Log.Warning($"[联机] 上行停滞：{reason}（已发 {SentInputCount} 包）。");
-        }
+        /// <summary>已建立的远端玩家视图数量（调试与验收用）。</summary>
+        public int RemoteViewCount => m_MovementLink != null ? m_MovementLink.RemoteViewCount : 0;
+
+        /// <summary>远端玩家视图表（自瞄与救援脚本按玩家编号查位置）。</summary>
+        internal IReadOnlyDictionary<int, RemotePlayerView> RemoteViews =>
+            m_MovementLink != null ? m_MovementLink.RemoteViews : s_EmptyRemoteViews;
 
         /// <summary>
         /// 本进程是否以联机客户端身份运行。
@@ -106,7 +78,7 @@ namespace RaidDemo.Bootstrap
         private static bool IsMultiplayerProcess => ClientMode.IsActive || MultiplayerClientSession.IsActive;
 
         /// <summary>本机玩家的标识；未连接时为 -1。</summary>
-        public int LocalNetworkPlayerId => m_LocalPlayerId;
+        public int LocalNetworkPlayerId => m_MovementLink != null ? m_MovementLink.LocalPlayerId : -1;
 
         /// <summary>
         /// 若本次运行是联机客户端，则接管大厅会话已经建立的连接，并装配预测缓冲。
@@ -129,7 +101,6 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            m_Prediction = new MovementPredictionBuffer();
             m_AutoWalk = ClientMode.Options != null && ClientMode.Options.AutoWalk;
 
             if (m_AutoWalk && m_InputCollector != null)
@@ -138,6 +109,16 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.UseScriptedInput = true;
                 Debug.Log("[联机] 已开启自动行走（-autowalk），用于无头验收。");
             }
+
+            m_MovementLink = new MultiplayerMovementLink(
+                m_Session,
+                m_MoveHandler,
+                m_PlayerMotor,
+                m_PresentationCatalog,
+                ResolveLocalCharacterId,
+                m_AutoWalk);
+            m_MovementLink.Attached += OnMovementLinkAttached;
+            m_MovementLink.Disconnected += OnMovementLinkDisconnected;
 
             m_NetworkClient = session.Network;
             m_NetworkClient.OnClientDisconnectCallback += OnNetworkDisconnected;
@@ -167,25 +148,22 @@ namespace RaidDemo.Bootstrap
         private void DetachFromServer()
         {
             // 只允许"当前持有者"退订：跨场景连接上，旧场景的 OnDestroy 发生在新场景注册之后，
-            // 不做这个判断就会把新场景刚注册的处理器全部删掉（见 s_ActiveChannelOwner 的说明）。
-            if (!ReferenceEquals(s_ActiveChannelOwner, this))
+            // 不做这个判断就会把新场景刚注册的处理器全部删掉（见 MultiplayerMovementLink 的说明）。
+            if (m_MovementLink == null || !m_MovementLink.IsChannelOwner)
             {
+                m_MovementLink = null;
+                m_NetworkClient = null;
                 return;
             }
-
-            s_ActiveChannelOwner = null;
 
             if (m_NetworkClient != null)
             {
                 m_NetworkClient.OnClientConnectedCallback -= OnNetworkConnected;
                 m_NetworkClient.OnClientDisconnectCallback -= OnNetworkDisconnected;
-
-                var messaging = m_NetworkClient.CustomMessagingManager;
-                if (messaging != null && m_NetworkSnapshotHandlerRegistered)
-                {
-                    messaging.UnregisterNamedMessageHandler(MovementNetworkChannel.SnapshotMessageName);
-                }
             }
+
+            m_MovementLink.Detach();
+            m_MovementLink = null;
 
             UnregisterCombatChannel();
             UnregisterEnemyChannel();
@@ -193,7 +171,6 @@ namespace RaidDemo.Bootstrap
             UnregisterRaidOutcomeChannel();
             UnregisterLifeChannel();
 
-            m_NetworkSnapshotHandlerRegistered = false;
             m_NetworkClient = null;
         }
 
@@ -212,23 +189,15 @@ namespace RaidDemo.Bootstrap
         /// <param name="playerId">本机在服务器上的玩家编号。</param>
         private void AttachToServer(int playerId)
         {
-            m_LocalPlayerId = playerId;
+            Debug.Log($"[联机] 已连接，玩家标识 {playerId}。");
+            m_MovementLink?.Attach(m_NetworkClient, playerId);
+        }
 
-            // 认领通道所有权：只有本实例负责退订（旧场景的销毁回调会被上面那道判断挡掉）。
-            s_ActiveChannelOwner = this;
-
-            Debug.Log($"[联机] 已连接，玩家标识 {m_LocalPlayerId}。");
-
-            if (m_NetworkSnapshotHandlerRegistered || m_NetworkClient.CustomMessagingManager == null)
-            {
-                return;
-            }
-
-            m_NetworkClient.CustomMessagingManager.RegisterNamedMessageHandler(
-                MovementNetworkChannel.SnapshotMessageName,
-                OnSnapshotBatch);
-            m_NetworkSnapshotHandlerRegistered = true;
-
+        /// <summary>
+        /// 移动链路挂上连接之后：注册战局专属通道，并把本地血量按服务器规则初始化。
+        /// </summary>
+        private void OnMovementLinkAttached()
+        {
             RegisterCombatChannel();
             RegisterEnemyChannel();
             RegisterContainerChannel();
@@ -240,13 +209,17 @@ namespace RaidDemo.Bootstrap
             ApplyLocalHealthFromServer(ServerCombatCoordinator.DefaultMaxHealth, true);
         }
 
+        /// <summary>移动链路断开：清掉敌人视图（玩家视图由链路自己清）。</summary>
+        private void OnMovementLinkDisconnected()
+        {
+            ClearRemoteEnemyViews();
+        }
+
         /// <summary>连接断开：清理远端视图，避免留下不会动的假队友。</summary>
         private void OnNetworkDisconnected(ulong clientId)
         {
             Debug.LogWarning($"[联机] 与服务器断开（clientId={clientId}）。");
-
-            ClearRemoteViews();
-            ClearRemoteEnemyViews();
+            m_MovementLink?.NotifyDisconnected();
         }
 
         /// <summary>
@@ -258,13 +231,11 @@ namespace RaidDemo.Bootstrap
 
             if (m_NetworkClient == null || !m_NetworkClient.IsConnectedClient)
             {
-                NoteInputStall("网络未连接");
+                // 链路自己会记录"上行停滞：网络未连接"，这里只需要推进远端插值，避免画面卡死。
+                m_MovementLink?.Tick(deltaTime, networkDeltaTime, BuildMovementLinkIntent());
+                UpdateRemoteEnemyViews(deltaTime);
                 return;
             }
-
-            // 上行节拍用未缩放时间：时间被冻结时（结算 / 暂停 / 角色选择）也要继续发包保活，
-            // 这也是"冻结期间只发零输入"这条规则的落点（见 StepAndSendInput）。
-            m_NetworkStepAccumulator += networkDeltaTime;
 
             CollectReviveIntent();
             TickDownedHud(deltaTime);
@@ -274,128 +245,40 @@ namespace RaidDemo.Bootstrap
                 UpdateAutoWalkInput();
             }
 
-            var steps = 0;
-            while (m_NetworkStepAccumulator >= NetworkFixedStep && steps < MaxNetworkStepsPerFrame)
-            {
-                m_NetworkStepAccumulator -= NetworkFixedStep;
-                steps++;
-                StepAndSendInput();
-            }
+            // 移动链路负责：固定步预测 → 上行 → 本机对账 → 远端玩家插值。
+            m_MovementLink?.Tick(deltaTime, networkDeltaTime, BuildMovementLinkIntent());
 
-            // 累积器超过一秒的步长说明节拍推进异常（正常每帧只攒一两步）。
-            if (m_NetworkStepAccumulator > 1f)
-            {
-                NoteInputStall("节拍积压");
-            }
-
-            // 卡顿之后**不要**把攒下的时间全部补回来：一帧最多补 MaxNetworkStepsPerFrame 步，
-            // 多出来的时间直接丢掉（欠账上限就是一帧的量）。
-            //
-            // 为什么必须丢：服务器每个固定步只消费一条输入（60 条/秒）。若客户端把一次
-            // 场景加载卡顿攒下的半秒时间在几帧里补完，就会瞬间连发几十条输入，
-            // 服务器消费不过来 → 待处理队列积压 → 触发丢弃 → 两端位置错开（P-45）。
-            var maxDebt = NetworkFixedStep * MaxNetworkStepsPerFrame;
-            if (m_NetworkStepAccumulator > maxDebt)
-            {
-                m_NetworkStepAccumulator = maxDebt;
-            }
-
-            UpdateRemoteViews(deltaTime);
             UpdateRemoteEnemyViews(deltaTime);
         }
 
         /// <summary>
-        /// 推进一个固定步：先本地预测，再把这条输入发给服务器。
+        /// 把本帧的战局意图整理给移动链路。
         /// </summary>
         /// <remarks>
-        /// 顺序不能反：先算出"这条输入的结果"再记录预测，才能保证记录的是该输入对应的状态。
+        /// 换弹不在这里传：它是边沿事件，由链路线性锁存（见 <see cref="MultiplayerMovementLink.RequestReload"/>）。
+        /// 倒地时链路只发保活零输入——本地预测也必须跟着停，
+        /// 否则本地位置会一直往前跑，快照每 50 毫秒把它拉回来一次，画面上是"躺着还在抽"。
         /// </remarks>
-        private void StepAndSendInput()
+        private MovementLinkIntent BuildMovementLinkIntent()
         {
-            if (m_MoveHandler == null)
+            return new MovementLinkIntent
             {
-                NoteInputStall("移动处理器缺失");
-                return;
-            }
-
-            m_NetworkSequence++;
-
-            // 倒地期间发零输入：服务器本来就不收，而本地预测也必须跟着停——
-            // 否则本地位置会一直往前跑，快照每 50 毫秒把它拉回来一次，画面上是"躺着还在抽"。
-            //
-            // 时间被冻结（结算 / 暂停 / 角色选择界面把 timeScale 压成 0）同样发零输入：
-            // 此时发包的唯一目的是保活，界面上残留的按键状态绝不能变成服务器上的移动或开火。
-            var frozen = Time.timeScale <= 0f;
-            var noControl = m_LocalDowned || frozen;
-            var intent = new PlayerMoveIntent(
-                m_LocalPlayerId,
-                noControl ? RaidDemo.Shared.Vector2F.Zero : m_PendingMoveIntent,
-                m_PendingLookDirection,
-                noControl ? false : m_PendingWantsToSprint,
-                m_NetworkSequence,
-                Time.timeAsDouble);
-
-            m_MoveHandler.Tick(NetworkFixedStep);
-            m_Prediction.Record(intent, NetworkFixedStep, Movement.CaptureSnapshot());
-
-            SendInputToServer(intent);
+                Move = m_PendingMoveIntent,
+                Look = m_PendingLookDirection,
+                Sprint = m_PendingWantsToSprint,
+                TriggerHeld = m_NetworkTriggerHeld,
+                ReviveHeld = m_NetworkReviveHeld,
+                NoControl = m_LocalDowned,
+            };
         }
 
         /// <summary>
-        /// 把这一条输入发给服务器。
+        /// 本机选择的角色标识：远端玩家先用同一套外观（每名玩家各自的外观属于大厅范畴）。
         /// </summary>
-        /// <remarks>
-        /// 用命名消息而不是 RPC：P1 还没有玩家网络对象（见 <see cref="MovementNetworkChannel"/> 的说明）。
-        /// 连接已断时这里什么都不做——每帧的连接状态检查会负责收尾。
-        /// </remarks>
-        private void SendInputToServer(in PlayerMoveIntent intent)
+        private string ResolveLocalCharacterId()
         {
-            var messaging = m_NetworkClient != null ? m_NetworkClient.CustomMessagingManager : null;
-            if (messaging == null)
-            {
-                NoteInputStall("消息通道缺失");
-                return;
-            }
-
-            // 本方法与 StepAndSendInput 是两条调用路径，冻结判断各自算一次：
-            // 两边都必须遵守"冻结 = 只保活"的规则。
-            var frozen = Time.timeScale <= 0f;
-            var message = new PlayerInputMessage
-            {
-                Move = new Vector2(intent.MoveDirection.X, intent.MoveDirection.Y),
-                Look = new Vector2(intent.LookDirection.X, intent.LookDirection.Y),
-                Sprint = intent.WantsToSprint,
-                // 冻结期间不带任何战斗意图：结算 / 暂停时按下的键不该变成服务器的开火或换弹请求。
-                TriggerHeld = !frozen && m_NetworkTriggerHeld,
-
-                // 换弹是边沿事件：发出去之后就清掉，避免同一次按键被重复上报。
-                ReloadRequested = !frozen && m_NetworkReloadRequested,
-                ReviveHeld = !frozen && m_NetworkReviveHeld,
-                Sequence = intent.Sequence,
-                Timestamp = intent.Timestamp,
-            };
-
-            m_NetworkReloadRequested = false;
-
-            using (var writer = new FastBufferWriter(48, Allocator.Temp))
-            {
-                writer.WriteValueSafe(message);
-                messaging.SendNamedMessage(
-                    MovementNetworkChannel.InputMessageName,
-                    NetworkManager.ServerClientId,
-                    writer);
-            }
-
-            // 发送成功才计数：它衡量的是"真正上行的流量"，采样两次即可判断丢线方向。
-            SentInputCount++;
-            if (SentInputCount % 600 == 0)
-            {
-                // 每 600 包（约 10 秒）一条进度：断线后回看日志，
-                // 最后一条进度与断开之间的时间差就是"上行是什么时候停的"。
-                // 用 Info 而不是 Verbose：默认日志级别下 Verbose 会被过滤（见上一条）。
-                m_Session?.Log.Info($"[联机] 上行正常：已发 {SentInputCount} 包。");
-            }
+            var progress = RaidFlowController.Ensure().Progress;
+            return progress != null ? progress.SelectedCharacterId : null;
         }
-
     }
 }

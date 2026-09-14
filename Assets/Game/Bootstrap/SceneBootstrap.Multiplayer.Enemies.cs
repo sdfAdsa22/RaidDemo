@@ -90,7 +90,7 @@ namespace RaidDemo.Bootstrap
 
             // 服务器时间与玩家快照共用同一条估计：两者同一节拍到达，
             // 各自维护一份时钟只会让敌人与玩家错开半帧。
-            NoteServerClock(batch.ServerTime);
+            m_MovementLink?.NoteServerClock(batch.ServerTime);
 
             var enemies = batch.Enemies;
             if (enemies == null)
@@ -149,12 +149,12 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            var estimatedServerTime =
-                m_ServerClockAtSnapshot + (Time.timeAsDouble - m_LocalClockAtSnapshot);
+            var estimatedServerTime = m_MovementLink != null ? m_MovementLink.EstimatedServerTime : 0d;
 
             foreach (var pair in m_RemoteEnemyBuffers)
             {
-                if (!pair.Value.TrySample(estimatedServerTime, InterpolationDelay, out var state))
+                if (!pair.Value.TrySample(
+                        estimatedServerTime, MultiplayerMovementLink.InterpolationDelaySeconds, out var state))
                 {
                     continue;
                 }

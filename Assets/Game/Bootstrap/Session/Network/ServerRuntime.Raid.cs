@@ -79,6 +79,13 @@ namespace RaidDemo.Bootstrap
         /// <summary>每 0.2 秒推进一次战局裁决：撤离读秒与生死。</summary>
         private void TickRaid()
         {
+            // 只有战局世界才有"撤离与结算"这件事。安全屋里的玩家也有生命状态（供将来使用），
+            // 但绝不能在这里被判定成"撤离成功"或"阵亡"——那会让一屋子人在整备时被写进战局结果。
+            if (m_WorldKind != ServerWorldKind.Raid)
+            {
+                return;
+            }
+
             if (!m_RaidZonesReady)
             {
                 TryCollectExtractionZones();

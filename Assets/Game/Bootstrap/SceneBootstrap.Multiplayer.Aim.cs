@@ -60,7 +60,7 @@ namespace RaidDemo.Bootstrap
         /// <summary>验收模式下把朝向对准最近的远端玩家；没有目标时保持原方向。</summary>
         private Vector2F ResolveAutoAimDirection(Vector2F fallback)
         {
-            if (m_RemoteViews.Count == 0 || m_PlayerMotor == null)
+            if (RemoteViews.Count == 0 || m_PlayerMotor == null)
             {
                 return fallback;
             }
@@ -69,7 +69,7 @@ namespace RaidDemo.Bootstrap
             var bestSqrDistance = float.MaxValue;
             var aim = fallback;
 
-            foreach (var view in m_RemoteViews.Values)
+            foreach (var view in RemoteViews.Values)
             {
                 if (view == null)
                 {
@@ -120,7 +120,7 @@ namespace RaidDemo.Bootstrap
             for (var i = 0; i < m_DownedTeammates.Count; i++)
             {
                 var teamMateId = m_DownedTeammates[i];
-                if (!m_RemoteViews.TryGetValue(teamMateId, out var view) || view == null)
+                if (!RemoteViews.TryGetValue(teamMateId, out var view) || view == null)
                 {
                     continue;
                 }

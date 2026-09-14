@@ -60,15 +60,21 @@ namespace RaidDemo.Bootstrap
         /// 标记"导航数据待建立"。
         /// </summary>
         /// <remarks>
-        /// <para>只登记意图，不在这里烘焙：地图场景是在 <c>InitializeMovement</c> 里加载的，
+        /// <para><b>P4.5-b 起只对战局世界烘焙</b>：安全屋里没有 AI，也没有需要寻路的单位，
+        /// 烘一张空网格除了花时间没有任何意义——而"安全屋里为什么有导航数据"本身就是个误导。
+        /// 世界切换时由 <c>ServerRuntime.World</c> 在进入战局后调用本方法。</para>
+        ///
+        /// <para>只登记意图，不在这里烘焙：地图场景是在世界切换里加载的，
         /// 而 <c>SceneManager.LoadScene</c> 在 <c>AfterSceneLoad</c> 回调里发出时**要到本帧稍后才生效**
         /// （见 <see cref="TickNavigation"/> 的说明）。</para>
         /// </remarks>
         private void BeginNavigation()
         {
-            if (string.IsNullOrEmpty(m_Options.MapSceneName))
+            if (m_WorldKind != ServerWorldKind.Raid)
             {
-                m_Session?.Log.Info("[服务器] 未指定地图（-map），跳过导航烘焙：AI 将退化为直线移动。");
+                // 安全屋世界：没有 AI，不需要导航。
+                m_NavigationPending = false;
+                m_NavigationWaitingReported = false;
                 return;
             }
 
@@ -94,7 +100,7 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            var mapScene = m_Options.MapSceneName;
+            var mapScene = m_WorldSceneName;
             var active = SceneManager.GetActiveScene().name;
             if (active != mapScene)
             {

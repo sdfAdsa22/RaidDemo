@@ -122,11 +122,13 @@ namespace RaidDemo.Bootstrap
             {
                 m_Session.Changed -= OnSessionChanged;
                 m_Session.RaidStarting -= OnRaidStarting;
+                m_Session.RaidEnding -= OnRaidEnding;
             }
 
             m_Session = session;
             m_Session.Changed += OnSessionChanged;
             m_Session.RaidStarting += OnRaidStarting;
+            m_Session.RaidEnding += OnRaidEnding;
 
             // 会话可能在我们订阅之前就已经走到了某个阶段（例如命令行直接连接），
             // 因此订阅之后立刻按当前状态刷一次界面。
@@ -152,8 +154,13 @@ namespace RaidDemo.Bootstrap
                     break;
 
                 case MultiplayerClientPhase.InLobby:
-                case MultiplayerClientPhase.InRoom:
                     ApplyLobbyScreen();
+                    break;
+
+                case MultiplayerClientPhase.InRoom:
+                    // P4.5-b：进房即在共享安全屋里活动——房间界面收起（角标由安全屋界面负责），
+                    // 玩家可以走动、整备，房主走到出口选图。
+                    EnterSafeHouseFromRoom();
                     break;
 
                 case MultiplayerClientPhase.InRaid:
@@ -327,33 +334,6 @@ namespace RaidDemo.Bootstrap
         {
             m_Session?.Disconnect();
             ShowServersScreen(null, "已返回服务器列表。");
-        }
-
-        /// <summary>
-        /// 服务器通知开局：收起界面并加载地图。
-        /// </summary>
-        /// <param name="mapSceneName">服务器指定的地图场景名。</param>
-        private void OnRaidStarting(string mapSceneName)
-        {
-            if (string.IsNullOrEmpty(mapSceneName))
-            {
-                Debug.LogError("[联机] 服务器通知开局，但没有给出地图名。");
-                return;
-            }
-
-            m_MultiplayerScreen.SetVisible(false);
-            m_LobbyScreen.SetVisible(false);
-            m_MultiplayerUiActive = false;
-            State = FlowState.InRaid;
-            Time.timeScale = 1f;
-
-            if (SceneManager.GetActiveScene().name == mapSceneName)
-            {
-                return;
-            }
-
-            Debug.Log($"[联机] 加载战局地图：{mapSceneName}");
-            SceneManager.LoadScene(mapSceneName);
         }
 
         /// <summary>联机界面点「返回主菜单」：断开连接并回到主菜单。</summary>

@@ -20,8 +20,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>地图生效后收集撤离点。</summary>
         private void TryCollectExtractionZones()
         {
-            if (string.IsNullOrEmpty(m_Options.MapSceneName)
-                || SceneManager.GetActiveScene().name != m_Options.MapSceneName)
+            // 撤离点只属于战局世界；门禁把它挡在安全屋之外，也顺带避免"在安全屋里找到撤离点"。
+            if (m_WorldKind != ServerWorldKind.Raid
+                || SceneManager.GetActiveScene().name != m_WorldSceneName)
             {
                 return;
             }

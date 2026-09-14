@@ -58,12 +58,13 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void TickContainers()
         {
-            if (m_ContainersReady || string.IsNullOrEmpty(m_Options.MapSceneName))
+            // 只有战局世界才有战利品容器：安全屋里没有搜刮点，也不该有任何"这局的箱子"。
+            if (m_ContainersReady || m_WorldKind != ServerWorldKind.Raid)
             {
                 return;
             }
 
-            if (SceneManager.GetActiveScene().name != m_Options.MapSceneName)
+            if (SceneManager.GetActiveScene().name != m_WorldSceneName)
             {
                 return;
             }

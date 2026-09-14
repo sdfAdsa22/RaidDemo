@@ -5,7 +5,6 @@ using RaidDemo.Simulation;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace RaidDemo.Bootstrap
 {
@@ -78,11 +77,6 @@ namespace RaidDemo.Bootstrap
                 OnInventoryEquipCommandReceived);
 
             m_Session.Log.Info("[服务器] 移动权威世界已就绪（60 Hz 仿真 / 20 Hz 快照）。");
-
-            if (!string.IsNullOrEmpty(m_Options.MapSceneName))
-            {
-                LoadMapScene(m_Options.MapSceneName);
-            }
         }
 
         /// <summary>断开连接事件并丢弃权威世界。</summary>
@@ -121,23 +115,6 @@ namespace RaidDemo.Bootstrap
             HandleClientInput(senderId, message);
         }
 
-        /// <summary>
-        /// 加载服务器侧地图场景。
-        /// </summary>
-        /// <remarks>
-        /// 服务器需要地图的碰撞体（以及 P2 起的导航数据），但它不装配客户端世界——
-        /// 场景里的装配根会在服务器模式下自行退出（见 <see cref="ServerMode"/>）。
-        /// </remarks>
-        private void LoadMapScene(string sceneName)
-        {
-            if (SceneManager.GetActiveScene().name == sceneName)
-            {
-                return;
-            }
-
-            m_Session.Log.Info($"[服务器] 加载地图场景：{sceneName}");
-            SceneManager.LoadScene(sceneName);
-        }
 
         /// <summary>
         /// 处理一条来自客户端的输入。

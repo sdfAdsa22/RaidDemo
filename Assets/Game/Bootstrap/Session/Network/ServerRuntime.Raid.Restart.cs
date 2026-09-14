@@ -35,6 +35,15 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // P4.5-b：重开只在战局世界里成立。回到安全屋之后再收到（延迟到达的）重开请求
+            // 必须忽略——否则会把安全屋当成战局重置：容器重建、玩家被传送到战局出生点，
+            // 而这张场景里根本没有那些坐标。
+            if (m_WorldKind != ServerWorldKind.Raid)
+            {
+                m_Session?.Log.Info("[服务器] 重开请求被忽略：当前不在战局世界（已回到安全屋）。");
+                return;
+            }
+
             m_Session?.Log.Info($"[服务器] 房主 {playerId} 请求重开，正在重置战局。");
             RestartRaid();
         }
@@ -118,6 +127,13 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private Vector2F SpawnPositionFor(int playerId)
         {
+            // 安全屋世界有自己的一张"小地图"（房间 + 设施），出生点当然也不同：
+            // 用战局地图的西南角坐标会把人放进安全屋的墙里（P4.5-b 起世界是两张场景）。
+            if (m_WorldKind == ServerWorldKind.SafeHouse)
+            {
+                return SafeHouseSpawnPositionFor(playerId);
+            }
+
             // 验收模式：出生点放进撤离区，用于验收"撤离读秒与结算由服务器裁定"。
             // 只改出生位置，不改任何规则：读秒、判定、结算走的都是真实路径。
             if (m_Options != null && m_Options.SpawnAtExtraction && m_ExtractionZones.Count > 0)

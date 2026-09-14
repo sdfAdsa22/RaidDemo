@@ -25,6 +25,9 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>服务器 → 房间成员：战局开始，请加载地图并进入战局。</summary>
         public const string RaidStartMessageName = "RaidDemo.Lobby.RaidStart";
+
+        /// <summary>服务器 → 房间成员：这一局结束，请加载安全屋场景（P4.5-b 的战后回屋）。</summary>
+        public const string RaidEndMessageName = "RaidDemo.Lobby.RaidEnd";
     }
 
     /// <summary>大厅请求的种类。</summary>

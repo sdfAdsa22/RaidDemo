@@ -155,7 +155,7 @@ namespace RaidDemo.Bootstrap
                 {
                     m_EquipmentSelfTestDone = true;
                     var equip = m_CommandRouter.Dispatch(new InventoryEquipIntent(
-                        m_LocalPlayerId,
+                        LocalNetworkPlayerId,
                         ContainerIds.PlayerBackpack,
                         origin.X,
                         origin.Y,
@@ -327,7 +327,7 @@ namespace RaidDemo.Bootstrap
             }
 
             var result = m_CommandRouter.Dispatch(new InventoryMoveIntent(
-                m_LocalPlayerId,
+                LocalNetworkPlayerId,
                 lootContainerId,
                 ContainerIds.PlayerBackpack,
                 origin.X,

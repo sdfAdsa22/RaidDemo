@@ -17,6 +17,19 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public sealed partial class MultiplayerClientSession
     {
+        /// <summary>收到"战局开始"（参数为要加载的地图场景名）。</summary>
+        public event System.Action<string> RaidStarting;
+
+        /// <summary>
+        /// 收到"本局结束、回安全屋"（参数为要返回的场景名）。
+        /// </summary>
+        /// <remarks>
+        /// 与 <see cref="RaidStarting"/> 对称：装配层据此加载安全屋场景，
+        /// 而世界内容（谁在屋里、站在哪）由服务器在同一个时刻重建（P4.5-b 的战后回屋循环）。
+        /// 两条事件都定义在这里，因为它们的唯一来源就是本文件里的两条下行消息处理器。
+        /// </remarks>
+        public event System.Action<string> RaidEnding;
+
         /// <summary>注册大厅下行消息处理器。</summary>
         private void RegisterHandlers()
         {
@@ -34,6 +47,9 @@ namespace RaidDemo.Bootstrap
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
                 LobbyChannel.RaidStartMessageName,
                 OnRaidStartReceived);
+            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
+                LobbyChannel.RaidEndMessageName,
+                OnRaidEndReceived);
 
             m_HandlersRegistered = true;
         }
@@ -52,6 +68,7 @@ namespace RaidDemo.Bootstrap
                 messaging.UnregisterNamedMessageHandler(LobbyChannel.ResultMessageName);
                 messaging.UnregisterNamedMessageHandler(LobbyChannel.RoomStateMessageName);
                 messaging.UnregisterNamedMessageHandler(LobbyChannel.RaidStartMessageName);
+                messaging.UnregisterNamedMessageHandler(LobbyChannel.RaidEndMessageName);
             }
 
             m_HandlersRegistered = false;
@@ -188,6 +205,14 @@ namespace RaidDemo.Bootstrap
             var message = default(RaidStartMessage);
             reader.ReadValueSafe(out message);
             EnterRaid(message.MapSceneName.ToString());
+        }
+
+        /// <summary>收到"本局结束"通知（P4.5-b：全员回共享安全屋）。</summary>
+        private void OnRaidEndReceived(ulong senderId, FastBufferReader reader)
+        {
+            var message = default(RaidEndMessage);
+            reader.ReadValueSafe(out message);
+            ReturnFromRaid(message.SceneName.ToString());
         }
 
         /// <summary>

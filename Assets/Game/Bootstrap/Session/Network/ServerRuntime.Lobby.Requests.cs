@@ -87,6 +87,9 @@ namespace RaidDemo.Bootstrap
                 $"[服务器] 房间「{m_Room.RoomName}」已创建：房主 {client.ClientId}「{client.Nickname}」"
                 + (m_Room.HasPassword ? "（设了密码）" : "（未设密码）"));
 
+            // 进房即进屋（P4.5-b）：联机首站是共享安全屋，房主在这里等队友、整备、从出口出击。
+            SpawnMemberIntoSafeHouse(client.ClientId);
+
             BroadcastRoomState();
             ScheduleAutoStart();
         }
@@ -111,25 +114,37 @@ namespace RaidDemo.Bootstrap
             m_Session?.Log.Info(
                 $"[服务器] 玩家 {client.ClientId}「{client.Nickname}」加入房间（{m_Room.MemberCount}/{LobbyLimits.MaxPlayers}）。");
 
+            // 与建房同一条规则：加入房间就把人放进共享安全屋，队友立刻能看见他。
+            SpawnMemberIntoSafeHouse(client.ClientId);
+
             BroadcastRoomState();
         }
 
-        /// <summary>开始战局（仅房主、仅等待阶段）。</summary>
-        private void HandleLobbyStartRaid(LobbyClient client)
+        /// <summary>
+        /// 开始战局（仅房主、仅等待阶段、且全员都在安全屋）。
+        /// </summary>
+        /// <param name="client">发起请求的客户端。</param>
+        /// <param name="mapSceneName">房主选择的地图场景名；为空时由服务器决定（验收路径）。</param>
+        /// <remarks>
+        /// <para><b>P4.5-b 的语义变化：</b>开局不再是"房间里点一个按钮"，
+        /// 而是"所有人都回到安全屋、房主走到出口选图"——因此这条请求要通过门禁检查
+        /// （<see cref="AreAllMembersInSafeHouse"/>）才能进入换图流程。</para>
+        /// </remarks>
+        private void HandleLobbyStartRaid(LobbyClient client, string mapSceneName)
         {
             if (!RequireLobbyLogin(client, LobbyRequestKind.StartRaid))
             {
                 return;
             }
 
-            if (!m_Room.TryStartRaid(client.ClientId, out var error))
+            if (!TryStartRaidFromSafeHouse(client.ClientId, mapSceneName, out var failure))
             {
-                SendLobbyResult(client.ClientId, LobbyRequestKind.StartRaid, false, error, DescribeRoomError(error));
+                SendLobbyResult(client.ClientId, LobbyRequestKind.StartRaid, false, LobbyError.StartRejected, failure);
+                m_Session?.Log.Info($"[服务器] 玩家 {client.ClientId} 的出击请求被拒绝：{failure}");
                 return;
             }
 
-            SendLobbyResult(client.ClientId, LobbyRequestKind.StartRaid, true, LobbyError.None, "正在开始战局。");
-            StartRaidFromLobby();
+            SendLobbyResult(client.ClientId, LobbyRequestKind.StartRaid, true, LobbyError.None, "正在前往战局…");
         }
 
         /// <summary>离开房间。</summary>
@@ -142,18 +157,15 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            var wasInRaid = m_Room.Phase == LobbyPhase.InRaid;
             if (!m_Room.TryLeave(client.ClientId, out var roomEnded))
             {
                 return;
             }
 
-            // 战局中离开等于退赛：把他从世界里撤掉，剩下的队友继续打。
-            if (wasInRaid)
-            {
-                RemovePlayerFromWorld(client.ClientId);
-                m_RaidProgress.Remove(client.ClientId);
-            }
+            // 离开房间就等于离开当前世界：战局中是退赛（队友继续打），
+            // 安全屋中是"先走了"——两种情况下他都不该再以木桩的形式留在别人的屏幕上。
+            RemovePlayerFromWorld(client.ClientId);
+            m_RaidProgress.Remove(client.ClientId);
 
             SendLobbyResult(client.ClientId, LobbyRequestKind.LeaveRoom, true, LobbyError.None, "已离开房间。");
             m_Session?.Log.Info(

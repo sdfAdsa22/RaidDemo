@@ -48,6 +48,15 @@ namespace RaidDemo.Bootstrap
         /// <summary>房主昵称；空闲阶段为空。</summary>
         public string HostNickname = string.Empty;
 
+        /// <summary>服务器当前托管的世界（共享安全屋 / 战局 / 未托管），P4.5-b 起有值。</summary>
+        public string WorldText = "未托管";
+
+        /// <summary>当前世界的场景名（服务器在安全屋与战局之间切换，这里显示它现在在哪张图上）。</summary>
+        public string WorldScene = string.Empty;
+
+        /// <summary>已经在权威世界里的玩家数（安全屋门禁用它判断"全员是否回屋"）。</summary>
+        public int PlayersInWorld;
+
         /// <summary>已连接但未加入房间的客户端数。</summary>
         public int ConnectedPlayerCount;
 

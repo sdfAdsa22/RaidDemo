@@ -20,7 +20,7 @@ namespace RaidDemo.UI
     /// 面板类元素用奶油纸面——两者都是主题层里的既有配方，这里不再自造颜色。</para>
     /// </remarks>
     [DisallowMultipleComponent]
-    public sealed class SafeHouseUI : MonoBehaviour
+    public sealed partial class SafeHouseUI : MonoBehaviour
     {
         /// <summary>地图选择面板尺寸（参考像素）。</summary>
         private static readonly Vector2 MapPanelSize = new Vector2(660f, 420f);
@@ -37,6 +37,38 @@ namespace RaidDemo.UI
         private GameObject m_MapScreen;
         private float m_HintRemaining;
         private bool m_AuxiliaryPanelOpen;
+
+        /// <summary>联机房间角标（房间名 + 人数 + 身份）；为空表示单机或不在房间里。</summary>
+        private RectTransform m_RoomBadgeRoot;
+        private TextMeshProUGUI m_RoomBadgeLabel;
+
+        /// <summary>上一次写进角标的文本，用于避免每帧重建 TMP 文本。</summary>
+        private string m_RoomBadgeText = string.Empty;
+
+        /// <summary>地图面板里会随联机状态变化的三个文本。</summary>
+        private TextMeshProUGUI m_MapRuleLabel;
+        private TextMeshProUGUI m_MapActionLabel;
+        private TextMeshProUGUI m_MapFootnoteLabel;
+
+        /// <summary>
+        /// 联机房间状态快照（P4.5-b）；<see cref="m_RoomBadgeRoot"/> 为空时表示单机。
+        /// </summary>
+        private struct RoomBadgeState
+        {
+            /// <summary>房间名。</summary>
+            public string RoomName;
+
+            /// <summary>房间人数。</summary>
+            public int MemberCount;
+
+            /// <summary>自己是不是房主（只有房主能出击）。</summary>
+            public bool IsHost;
+
+            /// <summary>是否有人还在战局里（门禁：全员回屋才能出发）。</summary>
+            public bool RaidRunning;
+        }
+
+        private RoomBadgeState m_RoomBadge;
 
         /// <summary>
         /// 是否有任何界面正在占据安全屋。
@@ -62,9 +94,70 @@ namespace RaidDemo.UI
             var canvas = UiFactory.CreateCanvas(transform, "SafeHouseCanvas", 150);
 
             BuildMoneyChip(canvas);
+            BuildRoomBadge(canvas);
             BuildPrompt(canvas);
             BuildHint(canvas);
             BuildMapPanel(canvas);
+        }
+
+        /// <summary>
+        /// 显示联机房间角标（房间名 + 人数 + 身份）。
+        /// </summary>
+        /// <param name="roomName">房间名。</param>
+        /// <param name="memberCount">房间人数。</param>
+        /// <param name="maxPlayers">房间人数上限。</param>
+        /// <param name="isHost">自己是不是房主。</param>
+        /// <param name="raidRunning">是否有人还在战局里（门禁）。</param>
+        /// <remarks>
+        /// <para>联机时房间界面会收起（§25.3），这个小角标是玩家"我还在房间里"的唯一凭据；
+        /// 它同时把门禁说清楚：只有房主能出击，而且必须全员都在屋里。</para>
+        ///
+        /// <para>每帧调用是安全的：文本没变时直接返回，不会反复重建 TMP 网格。</para>
+        /// </remarks>
+        public void ShowRoomBadge(string roomName, int memberCount, int maxPlayers, bool isHost, bool raidRunning)
+        {
+            m_RoomBadge = new RoomBadgeState
+            {
+                RoomName = roomName ?? string.Empty,
+                MemberCount = memberCount,
+                IsHost = isHost,
+                RaidRunning = raidRunning,
+            };
+
+            if (m_RoomBadgeRoot == null)
+            {
+                return;
+            }
+
+            var role = isHost ? "房主" : "队员";
+            var gate = raidRunning ? "· 队友在战局中" : "· 全员在屋";
+            var text = $"房间「{m_RoomBadge.RoomName}」· {memberCount}/{maxPlayers} 人 · {role} {gate}";
+
+            if (text == m_RoomBadgeText && m_RoomBadgeRoot.gameObject.activeSelf)
+            {
+                return;
+            }
+
+            m_RoomBadgeText = text;
+            m_RoomBadgeLabel.text = text;
+            m_RoomBadgeRoot.gameObject.SetActive(true);
+            RefreshMapPanelTexts();
+        }
+
+        /// <summary>收起联机房间角标（离开房间 / 断开连接时调用）。</summary>
+        public void HideRoomBadge()
+        {
+            if (m_RoomBadgeRoot == null || !m_RoomBadgeRoot.gameObject.activeSelf)
+            {
+                return;
+            }
+
+            m_RoomBadgeText = string.Empty;
+            m_RoomBadgeRoot.gameObject.SetActive(false);
+
+            // 角标收起说明已经不在联机房间里：地图面板回到单机规则。
+            m_RoomBadge = default;
+            RefreshMapPanelTexts();
         }
 
         /// <summary>
@@ -124,6 +217,8 @@ namespace RaidDemo.UI
         {
             if (m_MapScreen != null && !m_MapScreen.activeSelf)
             {
+                // 面板打开前刷一次门禁文案：它可能在面板关闭期间变过（队友回来了 / 有人走了）。
+                RefreshMapPanelTexts();
                 m_MapScreen.SetActive(true);
                 UiAudio.Play(UiCue.PanelOpen);
             }
@@ -154,6 +249,32 @@ namespace RaidDemo.UI
                 22f,
                 TextAlignmentOptions.Center,
                 UiPalette.Money);
+        }
+
+        /// <summary>
+        /// 左上角房间角标（联机专用）：房间名 + 人数 + 身份 + 门禁状态。
+        /// </summary>
+        /// <remarks>
+        /// 与金币条左右对称：安全屋的左上角本来就是空的，且它不会与
+        /// 屏幕下方的交互提示、右侧的仓库界面抢位置。
+        /// </remarks>
+        private void BuildRoomBadge(RectTransform canvas)
+        {
+            var chip = UiFactory.CreateAnchored(
+                canvas, "RoomBadge", UiSprites.Chip,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -24f), new Vector2(520f, 50f));
+
+            m_RoomBadgeLabel = UiFactory.CreateLabel(
+                chip,
+                string.Empty,
+                new Vector2(12f, 0f),
+                new Vector2(496f, 50f),
+                20f,
+                TextAlignmentOptions.Center,
+                UiPalette.Ink);
+
+            m_RoomBadgeRoot = chip;
+            m_RoomBadgeRoot.gameObject.SetActive(false);
         }
 
         /// <summary>屏幕下方的交互提示：一条深色底板 + 白字，保证压在草地上也读得清。</summary>
@@ -196,77 +317,7 @@ namespace RaidDemo.UI
             m_HintRoot.SetActive(false);
         }
 
-        /// <summary>地图选择面板：1 个可用 + 2 个上锁。</summary>
-        private void BuildMapPanel(RectTransform canvas)
-        {
-            // 遮罩与面板同一个根一起显隐：遮罩单独挂在画布上的话，
-            // 关掉面板后世界会一直暗着（这批已经踩过一次，见排障记录）。
-            var screen = UiFactory.CreateRect(canvas, "MapScreen");
-            UiFactory.Stretch(screen);
-            UiFactory.CreateVeil(screen, "Veil");
-
-            var panel = UiFactory.CreateCenteredPanel(screen, "MapPanel", MapPanelSize, UiSprites.Card);
-            var width = MapPanelSize.x - 56f;
-
-            UiFactory.CreatePanel(
-                panel, "TitleBar", new Vector2(MapPanelSize.x, 72f), UiSprites.CardDim, Vector2.zero);
-            UiFactory.CreateLabel(
-                panel, "选择出击地图", new Vector2(28f, 18f), new Vector2(360f, 36f),
-                26f, TextAlignmentOptions.Left, UiPalette.Ink);
-            UiFactory.CreateLabel(
-                panel, "1 可用 · 2 上锁", new Vector2(MapPanelSize.x - 328f, 26f), new Vector2(300f, 24f),
-                UiPalette.SmallSize, TextAlignmentOptions.Right, UiPalette.InkSoft);
-
-            BuildMapRow(panel, 0, "1", "工业区与集装箱仓库", "可用 · 已解锁", true, 92f, width);
-            BuildMapRow(panel, 1, "2", "港口", "未开放", false, 170f, width);
-            BuildMapRow(panel, 2, "3", "农场", "未开放", false, 248f, width);
-
-            UiFactory.CreateLabel(
-                panel, "按 1 出击　·　按 Esc 返回",
-                new Vector2(28f, 344f), new Vector2(width, 30f),
-                UiPalette.BodySize, TextAlignmentOptions.Center, UiPalette.InkSoft);
-
-            m_MapScreen = screen.gameObject;
-            m_MapScreen.SetActive(false);
-        }
-
-        /// <summary>地图列表的一行：按键胶囊 + 名称 + 状态（可用的那行右侧给出出击提示）。</summary>
-        private static void BuildMapRow(
-            RectTransform panel,
-            int index,
-            string key,
-            string name,
-            string state,
-            bool unlocked,
-            float top,
-            float width)
-        {
-            var row = UiFactory.CreatePanel(
-                panel, $"MapRow{index}", new Vector2(width, 66f), UiSprites.CardDim, new Vector2(28f, top));
-
-            var chip = UiFactory.CreateAnchored(
-                row, "KeyChip", UiSprites.Chip,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(10f, -10f), new Vector2(46f, 46f));
-            UiFactory.CreateLabel(
-                chip, key, Vector2.zero, new Vector2(46f, 46f),
-                22f, TextAlignmentOptions.Center, unlocked ? UiPalette.Ink : UiPalette.InkDisabled);
-
-            UiFactory.CreateLabel(
-                row, name, new Vector2(72f, 12f), new Vector2(320f, 24f),
-                20f, TextAlignmentOptions.Left, unlocked ? UiPalette.Ink : UiPalette.InkDisabled);
-            UiFactory.CreateLabel(
-                row, state, new Vector2(72f, 36f), new Vector2(320f, 20f),
-                UiPalette.SmallSize, TextAlignmentOptions.Left, unlocked ? UiPalette.Ok : UiPalette.InkDisabled);
-
-            if (unlocked)
-            {
-                UiFactory.CreateLabel(
-                    row, "按 1 出击", new Vector2(width - 228f, 22f), new Vector2(200f, 24f),
-                    17f, TextAlignmentOptions.Right, UiPalette.Teal);
-            }
-        }
-
-        /// <summary>处理地图选择与提示计时。</summary>
+        /// <summary>处理提示计时与地图面板的键盘输入。</summary>
         private void Update()
         {
             if (m_HintRemaining > 0f)
@@ -285,32 +336,7 @@ namespace RaidDemo.UI
                 return;
             }
 
-            var keyboard = Keyboard.current;
-            if (keyboard == null)
-            {
-                return;
-            }
-
-            if (keyboard.escapeKey.wasPressedThisFrame)
-            {
-                UiAudio.Play(UiCue.Cancel);
-                HideMap();
-                return;
-            }
-
-            if (keyboard.digit1Key.wasPressedThisFrame)
-            {
-                UiAudio.Play(UiCue.Confirm);
-                HideMap();
-                m_OnDeploy?.Invoke();
-                return;
-            }
-
-            if (keyboard.digit2Key.wasPressedThisFrame || keyboard.digit3Key.wasPressedThisFrame)
-            {
-                UiAudio.Play(UiCue.Locked);
-                ShowHint("这张地图还没有开放");
-            }
+            HandleMapPanelKeys();
         }
     }
 }

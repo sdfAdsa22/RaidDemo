@@ -23,9 +23,6 @@ namespace RaidDemo.Bootstrap
         /// <summary>本帧是否扣着扳机（待上报）。</summary>
         private bool m_NetworkTriggerHeld;
 
-        /// <summary>是否有待上报的换弹请求（边沿触发）。</summary>
-        private bool m_NetworkReloadRequested;
-
         private bool m_CombatChannelRegistered;
         private bool m_LastReportedTrigger;
         private bool m_TriggerPressLogged;
@@ -81,7 +78,9 @@ namespace RaidDemo.Bootstrap
 
             if (wantsToReload)
             {
-                m_NetworkReloadRequested = true;
+                // 换弹是边沿事件：交给移动链路锁存，由真正发出去的那个固定步清掉
+                // （见 MultiplayerMovementLink.RequestReload 的说明）。
+                m_MovementLink?.RequestReload();
             }
         }
 
@@ -132,7 +131,7 @@ namespace RaidDemo.Bootstrap
                     //
                     // 别人的弹道不改：他们的位置本来就是服务器给的，起点与画面天然一致。
                     var origin = message.Origin;
-                    if (message.SourceId == m_LocalPlayerId
+                    if (message.SourceId == LocalNetworkPlayerId
                         && m_WeaponView != null
                         && m_WeaponView.IsEquipped)
                     {
@@ -152,7 +151,7 @@ namespace RaidDemo.Bootstrap
 
                     // 服务器在开火事件里带回了结算后的弹匣数：本地不推进武器，
                     // 不应用这个值，HUD 的弹药数会停在收到装备时的那一刻。
-                    if (message.SourceId == m_LocalPlayerId)
+                    if (message.SourceId == LocalNetworkPlayerId)
                     {
                         ApplyLocalMagazineAmmo(message.MagazineAmmo);
                     }
@@ -175,7 +174,7 @@ namespace RaidDemo.Bootstrap
                     // 挨打的是我：用服务器给的剩余生命刷新 HUD。
                     // 联机模式下本地没有生命模拟（那是服务器的权威），
                     // 少这一步玩家会发现自己掉血、界面却一直显示满血。
-                    if (message.TargetId == m_LocalPlayerId)
+                    if (message.TargetId == LocalNetworkPlayerId)
                     {
                         ApplyLocalHealthFromServer(message.RemainingHealth, !message.WasKilled);
                     }
@@ -188,7 +187,7 @@ namespace RaidDemo.Bootstrap
                         message.IsReloading,
                         message.MagazineAmmo));
 
-                    if (message.SourceId == m_LocalPlayerId)
+                    if (message.SourceId == LocalNetworkPlayerId)
                     {
                         ApplyLocalMagazineAmmo(message.MagazineAmmo);
                     }

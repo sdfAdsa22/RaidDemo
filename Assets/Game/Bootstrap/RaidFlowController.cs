@@ -45,11 +45,11 @@ namespace RaidDemo.Bootstrap
 
         private static RaidFlowController s_Instance;
 
-        /// <summary>安全屋场景名。启动与结算后都回到这里。</summary>
-        private const string SafeHouseSceneName = "SafeHouse";
+        /// <summary>安全屋场景名。启动、联机进房与结算后都回到这里。</summary>
+        private const string SafeHouseSceneName = GameScenes.SafeHouse;
 
-        /// <summary>战局场景名。</summary>
-        private const string RaidSceneName = "GreyboxRaid";
+        /// <summary>战局场景名（单机出击用；联机的地图由服务器指定）。</summary>
+        private const string RaidSceneName = GameScenes.DefaultRaid;
 
         private MainMenuScreen m_MenuScreen;
         private RaidResultScreen m_ResultScreen;
@@ -190,7 +190,34 @@ namespace RaidDemo.Bootstrap
             State = FlowState.SafeHouse;
             HideScreens();
             Time.timeScale = 1f;
-            SceneManager.LoadScene(SafeHouseSceneName);
+
+            // 已经在安全屋里就不重复加载：联机"战后回屋"是先由服务器通知切场景、
+            // 玩家再关掉结算面板，此时场景已经是安全屋——再 LoadScene 一次会把
+            // 刚建立的共享世界拆掉重建（表现为队友瞬间消失又出现）。
+            if (SceneManager.GetActiveScene().name != SafeHouseSceneName)
+            {
+                SceneManager.LoadScene(SafeHouseSceneName);
+            }
+        }
+
+        /// <summary>
+        /// 直接进入安全屋状态，不重新加载场景。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么联机需要它：</b>联机首站是共享安全屋，而安全屋本来就是启动场景——
+        /// 玩家的"进入"只发生在流程状态上。主菜单那一层如果不收起来，它会把
+        /// <c>Time.timeScale</c> 压成 0，网络栈与移动链路都会停摆（连接建不起来、人也走不动）。</para>
+        ///
+        /// <para>与 <see cref="EnterSafeHouse"/> 的区别：后者会检查活动场景并在必要时加载安全屋，
+        /// 本方法假定"场景已经是安全屋"，只调整流程状态。</para>
+        /// </remarks>
+        public void EnterSafeHouseDirectly()
+        {
+            HidePauseMenu();
+            State = FlowState.SafeHouse;
+            HideScreens();
+            Time.timeScale = 1f;
+            UnlockCursor();
         }
 
         /// <summary>返回主菜单：重载场景，让新场景以主菜单状态启动。</summary>

@@ -66,7 +66,7 @@ namespace RaidDemo.Bootstrap
             var message = default(RaidLifeEventMessage);
             reader.ReadValueSafe(out message);
 
-            var isLocal = message.PlayerId == m_LocalPlayerId;
+            var isLocal = message.PlayerId == LocalNetworkPlayerId;
 
             switch (message.Kind)
             {

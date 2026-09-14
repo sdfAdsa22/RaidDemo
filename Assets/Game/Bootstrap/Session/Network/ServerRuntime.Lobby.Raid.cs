@@ -16,31 +16,68 @@ namespace RaidDemo.Bootstrap
     public sealed partial class ServerRuntime
     {
         /// <summary>
-        /// 房间 → 战局：把成员放进权威世界，重置战局世界，然后通知所有人加载地图。
+        /// 安全屋 → 战局：门禁通过后切换服务器世界，世界就绪时把成员放进图并通知所有人加载地图。
         /// </summary>
         /// <remarks>
-        /// 顺序不能颠倒：先放人再重置，重置才能把所有人一并复位到出生点；
-        /// 先通知客户端加载地图、服务器这边却还没准备好，客户端一进来就什么也看不到。
+        /// <para><b>顺序不能颠倒：</b>先放人再重置，重置才能把所有人一并复位到出生点；
+        /// 先让世界就绪再通知客户端，客户端一进来才不会看到一张空地图。</para>
+        ///
+        /// <para><b>为什么是两阶段（P4.5-b）：</b>服务器此刻还在安全屋场景里，
+        /// 战局地图要等 <c>LoadScene</c> 真正生效才能放人（碰撞体、地面高度、导航都在那张场景里）。
+        /// 因此本方法只负责"门禁 + 切世界"，真正开局的动作交给世界就绪回调
+        /// <see cref="BeginRaidRound"/>。</para>
         /// </remarks>
-        internal void StartRaidFromLobby()
+        /// <param name="requesterId">发起出击的玩家编号（房主）；自动开局时传房主编号。</param>
+        /// <param name="mapSceneName">房主选择的地图场景名；为空时用服务器参数 / 默认地图。</param>
+        /// <param name="failure">失败原因（可直接显示给玩家的中文）。</param>
+        /// <returns>门禁与状态机都通过、世界切换已发起时返回 true。</returns>
+        internal bool TryStartRaidFromSafeHouse(int requesterId, string mapSceneName, out string failure)
         {
             m_AutoStartDeadline = -1f;
+            failure = string.Empty;
+
+            // 门禁先于状态机：门禁不过时房间不该进入"战局中"——
+            // 否则房间会卡在"正在打"而地图上一个人都没有，玩家只能重启服务器。
+            if (!AreAllMembersInSafeHouse(out var gateReason))
+            {
+                failure = gateReason;
+                m_Session?.Log.Warning($"[服务器] 出击被门禁拦下：{gateReason}");
+                return false;
+            }
 
             // 任何调用路径都必须先让房间进入"战局中"。这里兜底而不是依赖调用方：
             // 自动开局（-autostart）曾经直接调本方法，结果房间停在"等待中"而玩家已经进了图——
             // 那会让房间在战局期间继续接受加入，而且全员的结算不会被判为"这一局结束"。
             if (m_Room.Phase != LobbyPhase.InRaid
-                && !m_Room.TryStartRaid(m_Room.HostClientId, out var startError))
+                && !m_Room.TryStartRaid(requesterId, out var startError))
             {
-                m_Session?.Log.Warning($"[服务器] 开局被状态机拒绝：{DescribeRoomError(startError)}");
-                return;
+                failure = DescribeRoomError(startError);
+                m_Session?.Log.Warning($"[服务器] 开局被状态机拒绝：{failure}");
+                return false;
             }
 
+            var scene = ResolveRaidSceneName(mapSceneName);
+            m_Session?.Log.Info($"[服务器] 房主确认出击：切换到战局地图「{scene}」。");
+
+            EnterRaidWorld(scene, BeginRaidRound);
+            return true;
+        }
+
+        /// <summary>
+        /// 战局世界就绪：把成员放进图、重置这一局，然后通知客户端加载地图。
+        /// </summary>
+        private void BeginRaidRound()
+        {
             var memberIds = new List<int>(m_Room.MemberCount);
             for (var i = 0; i < m_Room.Members.Count; i++)
             {
                 memberIds.Add(m_Room.Members[i].ClientId);
             }
+
+            // 撤离点必须先收集：它们的惰性收集原本发生在切图之后的第一帧，
+            // 而"把玩家放进图"就在这一刻——验收钩子 -spawnzone（出生在撤离区）
+            // 和将来的"出生点校验"都依赖这份数据已经就位（P4.5-b）。
+            TryCollectExtractionZones();
 
             for (var i = 0; i < memberIds.Count; i++)
             {
@@ -50,7 +87,8 @@ namespace RaidDemo.Bootstrap
             RestartRaid();
             m_RaidStartedAt = Time.realtimeSinceStartup;
 
-            BroadcastRaidStart(m_Options.MapSceneName);
+            // 地图名以"服务器实际托管的场景"为准：它是这一次门禁与切换的最终结果。
+            BroadcastRaidStart(m_WorldSceneName);
             BroadcastRoomState();
 
             m_Session?.Log.Info(
@@ -58,22 +96,18 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
-        /// 战局 → 等待：把成员移出世界，房间保留（房主可以再开一局）。
+        /// 战局 → 安全屋：房间回到等待，服务器切回安全屋并让所有人一起回屋。
         /// </summary>
-        /// <remarks>房间若已经解散（最后一人离开），这里只负责清场，不把房间"复活"成等待中。</remarks>
+        /// <remarks>
+        /// <para>房间若已经解散（最后一人离开），这里只负责清场，不把房间"复活"成等待中；
+        /// 但世界仍然切回安全屋——服务器要在那里等下一批玩家。</para>
+        ///
+        /// <para>顺序：先让房间回到等待（这样门禁看到的就是"大家都回来了"），
+        /// 再切世界；世界就绪之后才通知客户端回屋——客户端加载安全屋场景时，
+        /// 服务器这边已经准备好接住他的移动输入。</para>
+        /// </remarks>
         internal void EndRaidToLobby()
         {
-            var memberIds = new List<int>(m_Room.MemberCount);
-            for (var i = 0; i < m_Room.Members.Count; i++)
-            {
-                memberIds.Add(m_Room.Members[i].ClientId);
-            }
-
-            for (var i = 0; i < memberIds.Count; i++)
-            {
-                RemovePlayerFromWorld(memberIds[i]);
-            }
-
             m_RaidProgress.Clear();
             m_RaidStartedAt = -1f;
             m_Room.EndRaid();
@@ -82,7 +116,13 @@ namespace RaidDemo.Bootstrap
 
             m_Session?.Log.Info(
                 $"[服务器] 本局结束：全员已结算，{(m_Room.Exists ? "房间回到等待状态" : "房间已解散")}"
-                + $"（等待中的成员 {m_Room.MemberCount} 人）。");
+                + $"（等待中的成员 {m_Room.MemberCount} 人），正在返回共享安全屋。");
+
+            EnterSafeHouseWorld(() =>
+            {
+                SpawnMembersIntoSafeHouse();
+                BroadcastRaidEnd();
+            });
         }
 
         /// <summary>
@@ -157,7 +197,11 @@ namespace RaidDemo.Bootstrap
 
             m_AutoStartDeadline = -1f;
             m_Session?.Log.Info("[服务器] 验收辅助 -autostart 到点：自动开始战局。");
-            StartRaidFromLobby();
+
+            if (!TryStartRaidFromSafeHouse(m_Room.HostClientId, null, out var failure))
+            {
+                m_Session?.Log.Warning($"[服务器] -autostart 开局失败：{failure}");
+            }
         }
 
         /// <summary>把当前房间整理成局域网发现用的公告。</summary>

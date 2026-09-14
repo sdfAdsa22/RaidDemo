@@ -81,11 +81,22 @@ namespace RaidDemo.Bootstrap
             RaidStarting?.Invoke(mapSceneName);
         }
 
-        /// <summary>战局结束回到等待：房间保留。</summary>
-        internal void ReturnFromRaid()
+        /// <summary>
+        /// 收到"本局结束"通知：回到房间状态，并要求装配层加载安全屋。
+        /// </summary>
+        /// <param name="sceneName">要返回的场景名；空则用安全屋。</param>
+        /// <remarks>
+        /// 房间保留（只是回到等待阶段），因此玩家可以再开一局——这就是 P4.5-b 的"战后回屋循环"。
+        /// </remarks>
+        internal void ReturnFromRaid(string sceneName)
         {
             m_RaidStartSeen = false;
             SetPhase(MultiplayerClientPhase.InRoom);
+            StatusText = "已回到安全屋";
+
+            var target = string.IsNullOrEmpty(sceneName) ? GameScenes.SafeHouse : sceneName;
+            UnityEngine.Debug.Log($"[联机] 服务器通知本局结束，返回场景：{target}");
+            RaidEnding?.Invoke(target);
         }
 
         /// <summary>拆分"主机[:端口]"。</summary>

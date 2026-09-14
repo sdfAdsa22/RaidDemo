@@ -168,7 +168,8 @@ namespace RaidDemo.Bootstrap
                     break;
 
                 case LobbyRequestKind.StartRaid:
-                    HandleLobbyStartRaid(client);
+                    // 字段 A 携带房主选择的地图场景名（P4.5-b：出口选图之后才开局）。
+                    HandleLobbyStartRaid(client, fieldA);
                     break;
 
                 case LobbyRequestKind.LeaveRoom:

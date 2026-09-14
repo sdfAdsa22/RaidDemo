@@ -218,4 +218,28 @@ namespace RaidDemo.Bootstrap
             serializer.SerializeValue(ref MapSceneName);
         }
     }
+
+    /// <summary>
+    /// 服务器 → 房间成员：这一局结束，请回到共享安全屋（P4.5-b）。
+    /// </summary>
+    /// <remarks>
+    /// <para><b>为什么需要一条独立消息：</b>它与"开局"是两次方向相反的场景切换，
+    /// 客户端要做的事也不同——回屋要收起战局 HUD、重新装配安全屋（相机、设施、共享世界）。
+    /// 复用开局消息（把场景名写成长度为零或写成安全屋）会让"这是开局还是收尾"变成一个猜谜，
+    /// 而猜错的代价正好是最难查的两类故障：进了图却以为是安全屋、或者相反。</para>
+    ///
+    /// <para>本局结果已经在此之前逐人下发（<c>RaidOutcomeMessage</c>），
+    /// 因此这条消息不带任何数据——它只表达"大家都打完了，回屋"。</para>
+    /// </remarks>
+    public struct RaidEndMessage : INetworkSerializable
+    {
+        /// <summary>回到的场景名（当前固定为安全屋；留字段是为了将来支持"回港口/回其它大厅"）。</summary>
+        public FixedString64Bytes SceneName;
+
+        /// <inheritdoc />
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref SceneName);
+        }
+    }
 }

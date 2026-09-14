@@ -57,6 +57,9 @@ namespace RaidDemo.Bootstrap
             // 服务器进程不装配客户端世界：安全屋是纯客户端场景（相机、界面、设施交互）。
             if (ServerMode.IsActive)
             {
+                // 但服务器要**托管**这间屋子（P4.5-b）：把场景里的出生点交给它，
+                // 服务器据此决定"玩家回到安全屋时站在哪"——与客户端进场景时站的位置完全一致。
+                ServerMode.AcceptSafeHouseSpawn(m_PlayerSpawnPosition);
                 Destroy(gameObject);
                 return;
             }
@@ -64,7 +67,13 @@ namespace RaidDemo.Bootstrap
             Application.runInBackground = true;
 
             // 与战局一致：会话作用域负责服务，场景只负责装配内容。
-            m_Session = SessionScope.CreateLocal();
+            // 联机时把创建者标签与日志等级对齐到客户端参数——排障时"这条日志来自哪个场景、
+            // 哪个角色"要能一眼看出来（安全屋与战局是两个各自装配的客户端场景）。
+            m_Session = IsMultiplayerProcess
+                ? new SessionScope(
+                    "联机客户端·安全屋",
+                    ClientMode.Options != null ? ClientMode.Options.MinimumLogLevel : LogLevel.Info)
+                : SessionScope.CreateLocal();
             m_EventBus = m_Session.Events;
             m_CommandRouter = m_Session.Commands;
 
@@ -111,7 +120,16 @@ namespace RaidDemo.Bootstrap
             // 启动时先显示极简主菜单（开始 / 退出）；从战局回来时直接进安全屋。
             var flow = RaidFlowController.Ensure();
             m_Flow = flow;
-            if (flow.State == RaidFlowController.FlowState.MainMenu)
+
+            // 联机进程（-connect 或大厅会话）：安全屋就是"进房之后的第一站"，
+            // 主菜单那一层绝不能盖上来——它会把 timeScale 压成 0，而连接握手、
+            // 自动进房、移动链路全都依赖时间推进（第一次联调就卡在这里）。
+            if (IsMultiplayerProcess)
+            {
+                flow.EnterSafeHouseDirectly();
+                m_InputCollector?.SetCursorLock(true);
+            }
+            else if (flow.State == RaidFlowController.FlowState.MainMenu)
             {
                 flow.ShowMainMenu();
             }
@@ -151,6 +169,9 @@ namespace RaidDemo.Bootstrap
                 m_Progress.Changed -= RefreshCodexBoardText;
             }
 
+            // 联机：退订连接回调并释放移动链路（不清干净会在下一场景留下悬挂引用）。
+            DetachMultiplayer();
+
             // 释放订阅：场景重载后旧总线会被丢弃，但不释放会在退出播放模式时留下悬挂引用。
             m_ChangedSubscription?.Dispose();
             m_ChangedSubscription = null;
@@ -166,10 +187,25 @@ namespace RaidDemo.Bootstrap
             m_Ui?.SetMoney(m_Progress != null ? m_Progress.Money : 0);
         }
 
-        /// <summary>出战：切到战局场景。</summary>
+        /// <summary>出战：单机直接切战局场景；联机走服务器的门禁与开局。</summary>
         private void StartRaid()
         {
-            RaidFlowController.Ensure().StartRaid();
+            TryDeployFromSafeHouse();
+        }
+
+        /// <summary>
+        /// 清空移动意图。
+        /// </summary>
+        /// <remarks>
+        /// 本地模拟与"待上行意图"必须一起清：只清前者的话，联机客户端仍会把上一帧的移动方向
+        /// 发给服务器，表现是"翻着背包人还在往前走"。朝向不清——那只是"看着哪"，
+        /// 界面打开时保持朝向不会让角色移动。
+        /// </remarks>
+        private void ClearMovementIntent()
+        {
+            m_MoveHandler?.ClearIntent();
+            m_PendingMove = Vector2F.Zero;
+            m_PendingSprint = false;
         }
 
         private void Update()
@@ -178,6 +214,10 @@ namespace RaidDemo.Bootstrap
             {
                 return;
             }
+
+            // 联机会话可能在本场景 Awake 之后才建立（命令行 -connect 路径），
+            // 因此每帧检查一次"该不该接上共享世界"。
+            EnsureMultiplayerAttached();
 
             var flow = m_Flow != null ? m_Flow : RaidFlowController.Ensure();
             var escapePressed = m_InputCollector != null && m_InputCollector.ReadPauseIntent();
@@ -248,7 +288,10 @@ namespace RaidDemo.Bootstrap
 
             if (uiBlocking)
             {
-                m_MoveHandler.ClearIntent();
+                // 界面挡住操作时必须连"待上行意图"一起清掉：
+                // 只清本地意图的话，客户端仍会把上一帧的移动方向发给服务器——
+                // 表现是"翻着背包人还在往前走"（战局侧同一处也已按这条规则处理）。
+                ClearMovementIntent();
                 m_WeaponController?.SetTriggerHeld(false);
             }
             else
@@ -257,7 +300,16 @@ namespace RaidDemo.Bootstrap
                 UpdateWeapon();
             }
 
-            m_MoveHandler.Tick(Time.deltaTime);
+            // 联机：固定步预测 + 上行 + 快照对账（与战局同一条链路）。
+            // 单机：按帧推进本地模拟。
+            if (IsMultiplayerSafeHouse)
+            {
+                TickMultiplayerSafeHouse(Time.deltaTime, Time.unscaledDeltaTime);
+            }
+            else
+            {
+                m_MoveHandler.Tick(Time.deltaTime);
+            }
 
             if (m_InputCollector != null && m_PlayerMotor != null)
             {

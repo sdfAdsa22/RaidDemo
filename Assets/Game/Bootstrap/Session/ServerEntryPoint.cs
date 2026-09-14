@@ -35,6 +35,26 @@ namespace RaidDemo.Bootstrap
         /// <summary>场景里的表现层目录（武器模型、音效等）。服务器用不到，保留给调试工具。</summary>
         public static RaidDemo.Presentation.PresentationCatalog ScenePresentationCatalog { get; private set; }
 
+        /// <summary>
+        /// 安全屋场景里的玩家出生点（平面坐标）。
+        /// </summary>
+        /// <remarks>
+        /// <para>由安全屋装配根在服务器模式下交接（与 <see cref="SceneItemCatalog"/> 同一机制）。
+        /// 服务器要托管安全屋，就必须知道"把玩家放进屋里的哪个位置"，
+        /// 而这个位置本来就写在场景里——交接一份数据胜过在服务器代码里抄一个坐标常量
+        /// （抄了就会在下次改场景时对不上）。</para>
+        ///
+        /// <para>默认值与场景生成器里的出生点一致，供不加载安全屋的 EditMode 测试使用。</para>
+        /// </remarks>
+        public static RaidDemo.Shared.Vector2F SafeHouseSpawnPosition { get; private set; } =
+            new RaidDemo.Shared.Vector2F(0f, -5f);
+
+        /// <summary>由安全屋装配根交接出生点。</summary>
+        internal static void AcceptSafeHouseSpawn(UnityEngine.Vector2 position)
+        {
+            SafeHouseSpawnPosition = new RaidDemo.Shared.Vector2F(position.x, position.y);
+        }
+
         /// <summary>由客户端装配根在服务器模式下交接场景内容。</summary>
         internal static void AcceptSceneContent(
             RaidDemo.Data.ItemCatalog itemCatalog,
