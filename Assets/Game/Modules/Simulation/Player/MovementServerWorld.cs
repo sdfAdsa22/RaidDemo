@@ -21,7 +21,7 @@ namespace RaidDemo.Simulation
     ///
     /// <para>本类不依赖 Unity 与网络库：NGO 那一层只负责把字节搬进搬出。</para>
     /// </remarks>
-    public sealed class MovementServerWorld
+    public sealed partial class MovementServerWorld
     {
         /// <summary>服务器仿真步长：60 Hz。</summary>
         public const float FixedStepSeconds = 1f / 60f;
@@ -44,9 +44,23 @@ namespace RaidDemo.Simulation
             public int PlayerId;
             public PlayerMovementSimulator Simulator;
 
-            /// <summary>已接收但尚未被固定步消费的输入。</summary>
-            public PlayerMoveIntent PendingInput;
-            public bool HasPendingInput;
+            /// <summary>
+            /// 已接收但尚未被固定步消费的输入，**按序排队**。
+            /// </summary>
+            /// <remarks>
+            /// <para><b>为什么必须是队列而不是"只留最新一条"：</b>客户端按固定 60 Hz 步进，
+            /// 帧率低于 60 时一帧会补齐多步、连发多条输入。旧实现只有一个槽位，
+            /// 更新的输入直接覆盖旧的——被覆盖的那些输入在客户端**已经算过并记入预测**，
+            /// 于是"已处理序号"与"实际执行步数"错开，客户端位置稳定领先服务器一步。
+            /// 超过对账容差后客户端每次快照都硬吸附一次，表现就是"移动一卡一卡、时不时瞬移"。</para>
+            ///
+            /// <para>排队之后每条被接受的输入都恰好被一个固定步消费一次，
+            /// "序号 ↔ 步数"重新一一对应（2026-09-14 实测：低帧率客户端每秒被覆盖 12~13 条）。</para>
+            /// </remarks>
+            public readonly Queue<PlayerMoveIntent> PendingInputs = new Queue<PlayerMoveIntent>(8);
+
+            /// <summary>队列里最新一条输入的序号（= 已接收的最新序号）。用于拒绝乱序包。</summary>
+            public uint NewestQueuedSequence;
 
             /// <summary>上一条被消费的输入。没有新输入时继续沿用，避免「松手即停」。</summary>
             public PlayerMoveIntent AppliedInput;
@@ -55,19 +69,14 @@ namespace RaidDemo.Simulation
             public uint LastProcessedSequence;
 
             /// <summary>
-            /// 被"更新的输入直接覆盖"掉的**未消费**输入条数（诊断计数）。
+            /// 被丢弃的输入条数（诊断计数）：队列溢出时拒收新输入，或收到重复 / 乱序包。
             /// </summary>
             /// <remarks>
-            /// <para>这不是"重复包被拒绝"，而是客户端在一帧里补了多步、连发多条输入时，
-            /// 服务器只留最新一条：被覆盖的那几条在客户端都已经记过预测，
-            /// 于是"已处理序号"与"实际执行步数"会错开同样多的步数——表现为
-            /// **客户端位置比服务器稳定地领先一步**，超过对账容差后每次快照都硬吸附一次。</para>
-            ///
-            /// <para>实测（2026-09-14，编辑器当客户端）：客户端 60 FPS 时该计数为 0；
-            /// 同一客户端降到 20 FPS 时每秒被覆盖 12~13 条——与"房主一卡一卡、
-            /// 加进来的玩家正常"的现象完全对上（低帧率那一端才会在一帧里补多步）。</para>
+            /// <para>正常游玩时它应当**恒为 0**：队列容量够大，重复 / 乱序包本身就该被拒。
+            /// 它一旦开始增长，说明对端在灌输入（丢包重传、脚本刷包或时间被拉快），
+            /// 而"丢输入"正是让客户端与服务器位置错开一步的来源，因此必须可见。</para>
             /// </remarks>
-            public int CoalescedInputs;
+            public int DroppedInputs;
         }
 
         private readonly PlayerMovementProfile m_Profile;
@@ -174,7 +183,10 @@ namespace RaidDemo.Simulation
 
             var look = facing.IsNearlyZero ? Vector2F.Up : facing;
             slot.Simulator.Reset(position, look);
-            slot.HasPendingInput = false;
+            // 传送把玩家搬到了别处：排队中的输入描述的是"旧位置上的操作"，
+            // 继续执行它们会让角色从新位置按旧输入乱走，因此一并丢弃。
+            slot.PendingInputs.Clear();
+            slot.NewestQueuedSequence = slot.LastProcessedSequence;
             return true;
         }
 
@@ -197,68 +209,6 @@ namespace RaidDemo.Simulation
             {
                 results.Add(slot.PlayerId);
             }
-        }
-
-        /// <summary>
-        /// 接收一条客户端输入。
-        /// </summary>
-        /// <param name="intent">输入内容。</param>
-        /// <param name="rejection">被拒绝时的原因；接受时为 null。</param>
-        /// <remarks>
-        /// 序号必须严格大于已处理序号：重复包与乱序包在这里丢掉，
-        /// 否则一次重传就能让角色倒退回去。
-        /// </remarks>
-        public bool TrySubmitInput(in PlayerMoveIntent intent, out string rejection)
-        {
-            rejection = null;
-
-            var slot = Find(intent.PlayerId);
-            if (slot == null)
-            {
-                rejection = $"玩家 {intent.PlayerId} 不在世界内，输入被丢弃。";
-                return false;
-            }
-
-            if (intent.Sequence <= slot.LastProcessedSequence)
-            {
-                rejection = $"输入序号 {intent.Sequence} 不大于已处理序号 {slot.LastProcessedSequence}，按重复包丢弃。";
-                return false;
-            }
-
-            if (slot.HasPendingInput && intent.Sequence <= slot.PendingInput.Sequence)
-            {
-                rejection = $"输入序号 {intent.Sequence} 不晚于待处理序号 {slot.PendingInput.Sequence}，按重复或乱序包丢弃。";
-                return false;
-            }
-
-            if (slot.HasPendingInput)
-            {
-                // 临时诊断：上一条还没被固定步消费就被这条覆盖了 —— 等于少执行了一步。
-                slot.CoalescedInputs++;
-            }
-
-            slot.PendingInput = intent;
-            slot.HasPendingInput = true;
-            return true;
-        }
-
-        /// <summary>
-        /// 取一名玩家的输入诊断计数。临时接口，用于定位"固定一步偏差"的来源。
-        /// </summary>
-        /// <param name="playerId">玩家标识。</param>
-        /// <param name="coalescedInputs">被覆盖丢弃的未消费输入条数。</param>
-        /// <returns>玩家在世界内返回 true。</returns>
-        public bool TryGetInputDiagnostics(int playerId, out int coalescedInputs)
-        {
-            var slot = Find(playerId);
-            if (slot == null)
-            {
-                coalescedInputs = 0;
-                return false;
-            }
-
-            coalescedInputs = slot.CoalescedInputs;
-            return true;
         }
 
         /// <summary>
@@ -352,11 +302,12 @@ namespace RaidDemo.Simulation
         {
             foreach (var slot in m_Slots)
             {
-                if (slot.HasPendingInput)
+                if (slot.PendingInputs.Count > 0)
                 {
-                    slot.AppliedInput = slot.PendingInput;
-                    slot.LastProcessedSequence = slot.PendingInput.Sequence;
-                    slot.HasPendingInput = false;
+                    // 每个固定步只消费一条：排队的输入按序、一条不多一条不少地被执行，
+                    // "已处理序号"因此始终等于"已执行的输入步数"。
+                    slot.AppliedInput = slot.PendingInputs.Dequeue();
+                    slot.LastProcessedSequence = slot.AppliedInput.Sequence;
                 }
 
                 slot.Simulator.Step(

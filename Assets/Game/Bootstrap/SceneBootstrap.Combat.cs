@@ -152,15 +152,8 @@ namespace RaidDemo.Bootstrap
 
             m_InputCollector.ReadCombatIntent(out var wantsToFire, out var wantsToReload);
 
-            // 瞄准方向每帧都要同步给武器，而不是只在开火时同步。
-            // 武器模型的朝向靠它驱动，而玩家不开火时朝向一样在变——
-            // 只更新开火帧的话，枪会一直停在最后一次开火的方向上。
+            SyncAimToWeapon();
             var aim = m_InputCollector.LookDirection;
-            m_WeaponController.SetAimDirection(aim);
-
-            // 瞄准点也要一并交给武器：弹道要指向准星所在的那一点，
-            // 只给方向的话，射线只能水平打出去，与准星对不上。
-            m_WeaponController.SetAimWorldPoint(m_InputCollector.AimWorldPosition);
 
             if (!wantsToFire)
             {
@@ -187,6 +180,29 @@ namespace RaidDemo.Bootstrap
                     m_CombatHud?.ShowHint(hint);
                 }
             }
+        }
+
+        /// <summary>
+        /// 把当前瞄准方向与瞄准点同步给武器控制器（**表现用**的天线）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么单机与联机都必须每帧调用：</b>武器模型的朝向由
+        /// <c>m_WeaponController.AimDegrees</c> 驱动，而瞄准点决定弹道与枪口位置。
+        /// 只在"开火那一刻"更新的话，枪会停在最后一次开火的方向；
+        /// 只在单机分支更新的话，联机时枪从头到尾都不会转（P-46 就是这样复现的）。</para>
+        ///
+        /// <para>联机时它**不产生任何玩法效果**：扣扳机与命中依旧由服务器结算，
+        /// 这里只负责让"我看到的枪"对准"我在瞄的地方"。</para>
+        /// </remarks>
+        private void SyncAimToWeapon()
+        {
+            if (m_InputCollector == null || m_WeaponController == null)
+            {
+                return;
+            }
+
+            m_WeaponController.SetAimDirection(m_InputCollector.LookDirection);
+            m_WeaponController.SetAimWorldPoint(m_InputCollector.AimWorldPosition);
         }
 
         /// <summary>派发一次射击意图。</summary>

@@ -32,8 +32,6 @@ namespace RaidDemo.Bootstrap
         private const int MaxNetworkStepsPerFrame = 4;
 
         /// <summary>位置误差超过该值（米）才回滚重放。</summary>
-        private const float ReconciliationTolerance = 0.08f;
-
         private NetworkManager m_NetworkClient;
 
         /// <summary>
@@ -250,6 +248,18 @@ namespace RaidDemo.Bootstrap
                 StepAndSendInput();
             }
 
+            // 卡顿之后**不要**把攒下的时间全部补回来：一帧最多补 MaxNetworkStepsPerFrame 步，
+            // 多出来的时间直接丢掉（欠账上限就是一帧的量）。
+            //
+            // 为什么必须丢：服务器每个固定步只消费一条输入（60 条/秒）。若客户端把一次
+            // 场景加载卡顿攒下的半秒时间在几帧里补完，就会瞬间连发几十条输入，
+            // 服务器消费不过来 → 待处理队列积压 → 触发丢弃 → 两端位置错开（P-45）。
+            var maxDebt = NetworkFixedStep * MaxNetworkStepsPerFrame;
+            if (m_NetworkStepAccumulator > maxDebt)
+            {
+                m_NetworkStepAccumulator = maxDebt;
+            }
+
             UpdateRemoteViews(deltaTime);
             UpdateRemoteEnemyViews(deltaTime);
         }
@@ -325,76 +335,6 @@ namespace RaidDemo.Bootstrap
                     writer);
             }
         }
-
-        /// <summary>
-        /// 收到一批快照：本机玩家对账，其他玩家进插值缓冲。
-        /// </summary>
-        private void OnSnapshotBatch(ulong senderId, FastBufferReader reader)
-        {
-            var batch = default(PlayerSnapshotBatchMessage);
-            reader.ReadValueSafe(out batch);
-
-            if (batch.Players == null)
-            {
-                return;
-            }
-
-            NoteServerClock(batch.ServerTime);
-
-            foreach (var entry in batch.Players)
-            {
-                if (entry.PlayerId == m_LocalPlayerId)
-                {
-                    ApplyAuthoritativeSnapshot(entry);
-                    continue;
-                }
-
-                PushRemoteSnapshot(entry, batch.ServerTime);
-            }
-        }
-
-        /// <summary>
-        /// 用服务器快照校正本机预测。
-        /// </summary>
-        /// <remarks>
-        /// 误差在容差内就什么都不做——每次都回滚会让玩家看到持续的微小抖动。
-        /// 超过容差才回滚重放，并把修正后的位置立刻贴到表现上（否则要等下一帧才追上）。
-        /// </remarks>
-        private void ApplyAuthoritativeSnapshot(in PlayerStateMessage entry)
-        {
-            var authoritative = entry.ToMovementSnapshot();
-            var result = m_Prediction.Reconcile(entry.Sequence, authoritative, ReconciliationTolerance);
-
-            if (!result.NeedsRollback)
-            {
-                return;
-            }
-
-            m_Prediction.Replay(Movement, authoritative);
-
-            var state = Movement.State;
-            m_PlayerMotor?.SnapTo(
-                new Vector2(state.Position.X, state.Position.Y),
-                new Vector2(state.Facing.X, state.Facing.Y));
-
-            Debug.Log(
-                $"[联机] 回滚重放：误差 {result.PositionError:F3} 米，" +
-                $"重放 {m_Prediction.PendingCount} 条输入（seq={entry.Sequence}）。");
-
-            m_RollbackCount++;
-        }
-
-        /// <summary>本局因对账超差而回滚重放的次数（诊断与验收用）。</summary>
-        /// <remarks>
-        /// 把它做成可读的计数而不是只丢在日志里：判读"移动手感是否有问题"时，
-        /// "一局回滚了几次"是最直接的量化指标（P4.5 实机定位"一卡一卡"时用过）。
-        /// </remarks>
-        public int RollbackCount
-        {
-            get { return m_RollbackCount; }
-        }
-
-        private int m_RollbackCount;
 
     }
 }

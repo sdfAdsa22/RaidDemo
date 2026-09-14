@@ -60,13 +60,58 @@ namespace RaidDemo.Tests.EditMode
                 "同序号的重复包应被拒绝。");
             StringAssert.Contains("重复或乱序", duplicate);
 
-            // 更新的输入可以顶掉尚未被消费的旧输入：网络抖动下先到的旧包不该阻塞新包。
+            // 更新的输入照常入队（与旧输入并列排队，而不是把旧输入顶掉——
+            // 顶掉等于少执行一步，会让客户端位置稳定领先服务器一步）。
             Assert.IsTrue(m_World.TrySubmitInput(Input(PlayerId, 7u, new Vector2F(0f, 1f)), out var newer), newer);
 
             Assert.IsFalse(
                 m_World.TrySubmitInput(Input(PlayerId, 6u, new Vector2F(0f, 1f)), out var stale),
                 "晚于已处理、早于待处理的包应被拒绝。");
             StringAssert.Contains("重复或乱序", stale);
+        }
+
+        /// <summary>
+        /// 一帧内补齐多步（低帧率客户端）时，连续提交的多条输入必须**逐条按序消费**，一条都不能丢。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>它防的是哪一类缺陷：</b>P-45。旧实现每个玩家只有一个待处理槽位，
+        /// 更新的输入直接覆盖旧的：客户端一帧补 3 步就连发 3 条，服务器只留最新那条，
+        /// 于是"已处理序号"与"实际执行步数"错开一步——客户端位置稳定领先服务器一步，
+        /// 超过对账容差后每次快照都硬吸附一次，玩家看到的就是"移动一卡一卡、时不时瞬移"。</para>
+        ///
+        /// <para>断言分三层：序号逐条推进、丢弃计数为 0、位移等于"三条各一步"的距离。
+        /// 只查序号会漏掉"虽然没有跳号、但少走了一步"这种情况。</para>
+        /// </remarks>
+        [Test]
+        public void 一帧内补多步时输入逐条消费不丢步()
+        {
+            m_World.TryAddPlayer(PlayerId, Vector2F.Zero, Vector2F.Right, out _);
+
+            // 模拟"客户端一帧补了三步"：三条输入在服务器推进之前到达。
+            for (var sequence = 1u; sequence <= 3u; sequence++)
+            {
+                Assert.IsTrue(
+                    m_World.TrySubmitInput(Input(PlayerId, sequence, new Vector2F(1f, 0f)), out var rejection),
+                    $"第 {sequence} 条输入应当被接受：{rejection}");
+            }
+
+            // 每个固定步消费一条：第一条之后序号就是 1，而不是直接跳到 3。
+            m_World.Advance(Step);
+            m_World.TryGetSnapshot(PlayerId, out var afterFirstStep);
+            Assert.AreEqual(1u, afterFirstStep.LastProcessedSequence, "一个固定步只应消费一条输入。");
+
+            m_World.Advance(Step * 2f);
+            m_World.TryGetSnapshot(PlayerId, out var afterThirdStep);
+            Assert.AreEqual(3u, afterThirdStep.LastProcessedSequence, "三条输入应当逐条被消费完。");
+
+            Assert.IsTrue(m_World.TryGetInputDiagnostics(PlayerId, out var dropped, out var pending));
+            Assert.AreEqual(0, dropped, "正常到达的输入一条都不该丢。");
+            Assert.AreEqual(0, pending, "三条输入都已被消费，队列里不该还有积压。");
+
+            // 三步走路的总位移：3 × 3.5 m/s × (1/60 s) ≈ 0.175 米。
+            var expected = 3f * 3.5f * Step;
+            Assert.AreEqual(expected, afterThirdStep.State.Position.X, 0.005f,
+                "少执行一步会让位移明显偏小，这一步偏差就是对账时被硬吸附的来源。");
         }
 
         /// <summary>推进按固定步长进行，仿真时间随之增长。</summary>

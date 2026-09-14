@@ -131,6 +131,33 @@ namespace RaidDemo.Presentation
             ApplyTransform(instant: true);
         }
 
+        /// <summary>
+        /// 把模拟状态改成新值，但**不**把模型瞬移到那里——让每帧的跟随自己贴上去。
+        /// </summary>
+        /// <param name="position">新的模拟位置。</param>
+        /// <param name="facing">新的朝向（零向量表示保持原朝向）。</param>
+        /// <remarks>
+        /// <para><b>它和 <see cref="SnapTo"/> 的分工：</b>服务器对账修正必须先改模拟状态
+        /// （否则下一步预测的起点就是错的），但"改状态"和"把模型瞬移过去"是两件事：
+        /// 一步级的修正（零点几米以内）直接瞬移会让画面一顿，交给跟随吸收则看不出接缝。
+        /// 传送、重开这种大跨度位移仍然走 <see cref="SnapTo"/>。</para>
+        ///
+        /// <para>不改 <c>m_LastGroundHeight</c>：小修正没有跨越高度差，
+        /// 而每帧的 <see cref="FollowSimulatedPosition"/> 本来就会重新采样脚下地面。</para>
+        /// </remarks>
+        public void FollowTo(Vector2 position, Vector2 facing)
+        {
+            SimulatedPosition = position;
+
+            if (facing.sqrMagnitude > 1e-6f)
+            {
+                FacingDegrees = Mathf.Atan2(facing.y, facing.x) * Mathf.Rad2Deg;
+            }
+
+            // 位置与朝向都只写进"模拟状态"，模型会在接下来的几帧里追上去。
+            ApplyRotation();
+        }
+
         private void OnMovementChanged(PlayerMovementChanged evt)
         {
             if (evt.PlayerId != m_PlayerId)

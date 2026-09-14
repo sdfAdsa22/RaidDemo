@@ -44,6 +44,10 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 瞄准方向与瞄准点每帧同步（纯表现）：武器模型的朝向由 AimDegrees 驱动，
+            // 不更新的话枪会一直指着出生方向——联机分支以前只在单机里做这件事。
+            SyncAimToWeapon();
+
             m_InputCollector.ReadCombatIntent(out var wantsToFire, out var wantsToReload);
 
             // 验收模式下一律扣着扳机：无头进程没有键盘，但要让"开火 → 命中 → 掉血"
