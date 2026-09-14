@@ -18,7 +18,7 @@ namespace RaidDemo.Meta
     /// 于是界面与命令层照常按容器 ID 访问，而网格里的物品跨局保留。
     /// 这也是为什么不需要给「仓库」写一套独立的物品搬迁逻辑。</para>
     /// </remarks>
-    public sealed class MetaProgress
+    public sealed partial class MetaProgress
     {
         /// <summary>
         /// 新存档的启动资金。
@@ -41,11 +41,25 @@ namespace RaidDemo.Meta
         /// <summary>默认角色 ID，与 PlayerCharacterBuilder 的 male-a 保持一致。</summary>
         public const string DefaultCharacterId = "male-a";
 
-        /// <summary>创建一个空的局外进度。</summary>
-        public MetaProgress(int startingMoney = StartingMoney)
+        /// <summary>
+        /// 创建一个空的局外进度。
+        /// </summary>
+        /// <param name="startingMoney">初始金币。</param>
+        /// <param name="sharedStash">
+        /// 共享仓库网格；为 null 时自己建一个（单机与客户端）。
+        /// </param>
+        /// <remarks>
+        /// <para><b>为什么允许注入仓库网格（P5）：</b>联机时仓库是**房间级**的——
+        /// 同一间安全屋里的所有玩家看的是同一个仓库，而金币、任务、随身装备仍然是各自账号的。
+        /// 服务器因此需要"一份共享网格 + 每账号一份 MetaProgress"，让两者指向同一个对象，
+        /// 而不是给服务端另写一套仓库逻辑（那会立刻出现两套放置规则）。</para>
+        ///
+        /// <para>单机与联机客户端都传 null，行为与以前完全一致。</para>
+        /// </remarks>
+        public MetaProgress(int startingMoney = StartingMoney, InventoryGrid sharedStash = null)
         {
             Money = startingMoney > 0 ? startingMoney : 0;
-            Stash = new InventoryGrid(StashWidth, StashHeight, "仓库");
+            Stash = sharedStash ?? new InventoryGrid(StashWidth, StashHeight, "仓库");
 
             // 随身物也放在这里：出击准备就是在它上面做的，
             // 而「每局重载场景」意味着随身物必须跨局存活，否则准备完一按出击就白准备了。
@@ -108,34 +122,6 @@ namespace RaidDemo.Meta
 
                 return total;
             }
-        }
-
-        /// <summary>增加金币。</summary>
-        /// <remarks>
-        /// 这里只改数值，不广播变化。一次交易可能同时改余额与物品，
-        /// 广播必须等两件事都完成后由调用方统一发出，否则自动存档可能
-        /// 在"钱已扣、物品还没放进去"的中间状态写盘。
-        /// </remarks>
-        public void AddMoney(int amount)
-        {
-            if (amount <= 0)
-            {
-                return;
-            }
-
-            Money += amount;
-        }
-
-        /// <summary>尝试扣除金币。余额不足时不做任何改变。</summary>
-        public bool TrySpend(int amount)
-        {
-            if (amount <= 0 || Money < amount)
-            {
-                return false;
-            }
-
-            Money -= amount;
-            return true;
         }
 
         /// <summary>注入物品目录，供任务奖励与上交检查使用。</summary>
@@ -234,14 +220,6 @@ namespace RaidDemo.Meta
                     yield return item.Definition.Id;
                 }
             }
-        }
-
-        /// <summary>
-        /// 存档还原专用：直接写入余额，不触发"变化"事件。
-        /// </summary>
-        internal void RestoreMoney(int money)
-        {
-            Money = money > 0 ? money : 0;
         }
 
         /// <summary>广播一次局外变化。</summary>

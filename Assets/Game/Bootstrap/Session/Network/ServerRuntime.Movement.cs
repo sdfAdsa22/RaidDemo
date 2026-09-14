@@ -129,6 +129,9 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 记下"这名客户端还在说话"：快照只发给还在说话的客户端（见 ServerRuntime.SilentClients）。
+            NoteClientInput((int)clientId);
+
             var intent = new PlayerMoveIntent(
                 (int)clientId,
                 new Vector2F(message.Move.x, message.Move.y),
@@ -257,12 +260,24 @@ namespace RaidDemo.Bootstrap
                 Players = players,
             };
 
-            using (var writer = new FastBufferWriter(64 + (players.Length * 64), Allocator.Temp))
+            // 逐个发而不是广播：需要跳过"静默客户端"（见 ServerRuntime.SilentClients）。
+            // 对已经不存在的端点持续发包会招来操作系统的 ICMP 回应，而实测表明那会让
+            // 服务器的接收路径整体失效（所有客户端一起被 ProtocolTimeout 踢掉，P-48）。
+            var delivered = 0;
+            foreach (var clientId in manager.ConnectedClientsIds)
             {
+                if (IsClientSilent((int)clientId))
+                {
+                    continue;
+                }
+
+                using var writer = new FastBufferWriter(64 + (players.Length * 64), Allocator.Temp);
                 writer.WriteValueSafe(batch);
-                manager.CustomMessagingManager.SendNamedMessageToAll(
+                manager.CustomMessagingManager.SendNamedMessage(
                     MovementNetworkChannel.SnapshotMessageName,
+                    clientId,
                     writer);
+                delivered++;
             }
 
             // 每 100 批（约 5 秒）留一条 Verbose 痕迹：联机掉线排查时要能区分
@@ -272,7 +287,8 @@ namespace RaidDemo.Bootstrap
             if (m_SnapshotBroadcastCount % 100 == 0)
             {
                 m_Session?.Log.Verbose(
-                    $"[服务器] 快照批次已广播 {m_SnapshotBroadcastCount} 批（最近一批 {players.Length} 人，在线 {manager.ConnectedClientsIds.Count}）。");
+                    $"[服务器] 快照批次已广播 {m_SnapshotBroadcastCount} 批"
+                    + $"（最近一批 {players.Length} 人，在线 {manager.ConnectedClientsIds.Count}，实发 {delivered}）。");
             }
         }
 

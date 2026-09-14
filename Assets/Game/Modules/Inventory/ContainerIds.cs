@@ -50,6 +50,22 @@ namespace RaidDemo.Inventory
         /// </remarks>
         public const int EquipmentMirror = 4;
 
+        /// <summary>
+        /// 服务器侧的**房间共享仓库**容器编号（P5）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>它为什么存在：</b>联机时仓库是房间级的——同一间安全屋里的所有玩家看的是同一份。
+        /// 客户端说的"3 号容器"在服务器上必须落到**同一个**仓库，而不是"每人一份"。
+        /// 因此服务器用这个固定编号注册共享仓库，收到 3 号容器的命令时翻译成它
+        /// （见 <c>ServerRuntime.Inventory.Commands.TranslateContainerId</c>）。</para>
+        ///
+        /// <para><b>为什么是 5：</b>1~99 段是"客户端认识的编号"，1/2/3/4 已分别为
+        /// 背包 / 弹药挂 / 仓库 / 装备镜像；服务器侧的容器用段内空位，且**必须避开
+        /// 100~999 的场景容器段**——那一段会在切图时被整段注销（见 `UnregisterSceneContainers`），
+        /// 共享仓库显然不该跟着地图一起消失。</para>
+        /// </remarks>
+        public const int ServerSharedStash = 5;
+
         /// <summary>场景容器的起始编号。留出前面的区间给玩家侧容器。</summary>
         public const int SceneBase = 100;
 

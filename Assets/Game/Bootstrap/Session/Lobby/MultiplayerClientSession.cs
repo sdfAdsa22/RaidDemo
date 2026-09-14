@@ -187,6 +187,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>每帧推进：连接超时与自动进房。</summary>
         private void Update()
         {
+            // 客户端同样要看门狗：客户端卡顿会让*服务器*判定它掉线（P-48 的排查教训）。
+            FrameStallWatchdog.Tick("客户端");
+
             TickConnectTimeout();
             TickAutoRoom();
         }

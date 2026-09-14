@@ -32,6 +32,25 @@ namespace RaidDemo.Bootstrap
 
             /// <summary>是否已通过登录。未登录的连接只能发登录请求。</summary>
             public bool LoggedIn;
+
+            /// <summary>
+            /// 掉线宽限的截止时刻（<c>Time.realtimeSinceStartup</c>）；&lt;= 0 表示连接正常。
+            /// </summary>
+            /// <remarks>
+            /// <para><b>为什么要有它（P5 / 排障手册 P-48）：</b>以前的实现是"连接一断就把人从
+            /// 房间与世界里清掉"，而实测发现那一刻会把**其余玩家的上行链路**一起打断
+            /// （服务器收不到他们的包，10 秒后按协议超时把他们也踢掉，表现为"队友掉线，房间解散"）。</para>
+            ///
+            /// <para>现在改为：断线的人保留在名册与世界里的位置，等宽限到期才真正清场；
+            /// 这段时间里他可以重连回来接管原来的位置与背包。</para>
+            /// </remarks>
+            public float GraceDeadline;
+
+            /// <summary>是否处于掉线宽限中。</summary>
+            public bool InGrace
+            {
+                get { return GraceDeadline > 0f; }
+            }
         }
 
         private readonly Dictionary<int, LobbyClient> m_LobbyClients = new Dictionary<int, LobbyClient>();
@@ -103,31 +122,44 @@ namespace RaidDemo.Bootstrap
                 $"[服务器] 客户端 {id} 已接入服务（未登录），在线连接 {m_LobbyClients.Count} 个。");
         }
 
-        /// <summary>客户端断开：退出房间并检查战局是否因此结束。</summary>
+        /// <summary>
+        /// 客户端断开：在房间里的人进入宽限，其他人直接清理（P5）。
+        /// </summary>
         /// <param name="clientId">连接编号。</param>
-        /// <remarks>把他从世界移除的动作在移动部分（断开事件的第一订阅者）里做，两处互不重复。</remarks>
+        /// <remarks>
+        /// <para><b>这里不再立刻清场。</b>P-48 的实测结论是：在"队友被硬杀"的那一刻立即清理，
+        /// 会把其余玩家的上行链路一起打断。现在把清理推迟到宽限到期
+        /// （<see cref="TickDisconnectGrace"/>），期间他的位置、背包与战局进度都留在服务器上。</para>
+        ///
+        /// <para>不立刻移除世界里的身体：那由断开路径上的移动部分判断
+        /// （见 <c>ServerRuntime.Players.OnClientDisconnected</c>）——同样是"在房间里就保留"。</para>
+        /// </remarks>
         private void OnLobbyClientDisconnected(ulong clientId)
         {
             var id = (int)clientId;
-            m_LobbyClients.Remove(id);
 
             var member = m_Room.Find(id);
             if (member == null)
             {
+                // 还没进房间（只是挂在服务器列表上、或登录到一半）：没有可保留的东西，直接清理。
+                m_LobbyClients.Remove(id);
                 return;
             }
 
-            if (m_Room.TryLeave(id, out var roomEnded))
+            var grace = m_Options != null ? m_Options.ReconnectGraceSeconds : LaunchOptions.DefaultReconnectGraceSeconds;
+            if (!m_LobbyClients.TryGetValue(id, out var client))
             {
-                m_Session?.Log.Info(
-                    roomEnded
-                        ? $"[服务器] 玩家 {id}「{member.Nickname}」断开，房间已解散。"
-                        : $"[服务器] 玩家 {id}「{member.Nickname}」断开，已退出房间（剩余 {m_Room.MemberCount} 人）。");
-
-                BroadcastRoomState();
+                // 兜底：名册记录缺失时补一条，否则宽限逻辑没有可标记的对象。
+                client = new LobbyClient { ClientId = id, Nickname = member.Nickname, LoggedIn = true };
+                m_LobbyClients[id] = client;
             }
 
-            CheckRaidCompletion();
+            client.GraceDeadline = Time.realtimeSinceStartup + grace;
+
+            m_Session?.Log.Info(
+                $"[服务器] 玩家 {id}「{member.Nickname}」连接断开：保留其位置与背包 {grace:F0} 秒"
+                + "（宽限期内可重连回局）。");
+            BroadcastRoomState();
         }
 
         /// <summary>收到一条大厅请求。</summary>

@@ -95,7 +95,13 @@ namespace RaidDemo.Bootstrap
 
                 CreatePlayerBody(playerId);
                 RegisterLifeState(playerId);
-                AddPlayerToCombat(playerId);
+
+                // P5：重开一局也要按**账号自己的装备**配发。
+                // 这里曾经传 null（退回默认 AK 配发），结果是"第一帧按账号装备、重开之后变回默认套"——
+                // 玩家在安全屋里准备的枪在开局的第二次装配时被悄悄换掉了。
+                AddPlayerToCombat(
+                    playerId,
+                    m_WorldKind == ServerWorldKind.Raid ? ResolveProfileForPlayer(playerId)?.Loadout : null);
                 RegisterPlayerContainers(playerId);
                 SendContainerContentsTo(playerId);
             }

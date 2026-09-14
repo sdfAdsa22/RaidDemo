@@ -53,7 +53,12 @@ namespace RaidDemo.Bootstrap
 
             m_Session?.Log.Info($"[服务器] 玩家 {playerId} 已进入战局（在局 {m_World.PlayerCount} 人）。");
             RegisterLifeState(playerId);
-            AddPlayerToCombat(playerId);
+
+            // P5：战局按**账号在安全屋里准备好的那套装备**配发（背包 / 装备槽 / 弹药挂），
+            // 而不是统一发一把 AK——§25.9 里"服务器不知道玩家带进来了什么"那条边界到此关闭。
+            // 安全屋世界不需要它：那里没有战斗判定，人物只是站着走动。
+            var loadout = m_WorldKind == ServerWorldKind.Raid ? ResolveProfileForPlayer(playerId)?.Loadout : null;
+            AddPlayerToCombat(playerId, loadout);
             BindPlayerHitTarget(playerId);
 
             // 背包命令通道要在参战之后建（需要随身装备）；容器内容随入图下发。
@@ -77,6 +82,9 @@ namespace RaidDemo.Bootstrap
             m_PlayerBodies.Remove(playerId);
             m_PlayerGroundHeights.Remove(playerId);
 
+            // 上行记录也要清：编号会被后续连接复用，留着旧时间戳会让新玩家一进来就被判成静默。
+            ForgetClientInput(playerId);
+
             // 载体对象必须显式销毁：它带着胶囊碰撞体与命中标识，留在场景里就是"幽灵玩家"——
             // 射线会打到它，命中判定会把伤害算到一个已经离场的编号上。
             if (m_PlayerColliders.TryGetValue(playerId, out var body) && body != null)
@@ -96,10 +104,22 @@ namespace RaidDemo.Bootstrap
             }
         }
 
-        /// <summary>客户端断开：从权威世界移除（若他在里面）。</summary>
+        /// <summary>
+        /// 客户端断开：从权威世界移除（若他在里面）。
+        /// </summary>
+        /// <remarks>
+        /// <b>在房间里的玩家不在这里移除</b>：他们进入掉线宽限（P5），位置与背包要留到他重连
+        /// 或者宽限到期——立刻移除会让宽限期变成空话（名册上还有他，世界里的身体却没了）。
+        /// </remarks>
         private void OnClientDisconnected(ulong clientId)
         {
-            RemovePlayerFromWorld((int)clientId);
+            var id = (int)clientId;
+            if (m_Room != null && m_Room.Find(id) != null)
+            {
+                return;
+            }
+
+            RemovePlayerFromWorld(id);
         }
     }
 }

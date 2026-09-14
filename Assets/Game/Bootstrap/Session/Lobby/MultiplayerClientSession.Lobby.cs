@@ -30,6 +30,12 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public event System.Action<string> RaidEnding;
 
+        /// <summary>
+        /// 服务器下发了金币（P5）。参数是权威余额。
+        /// </summary>
+        /// <remarks>物品那一半不需要事件：它们走容器批次，界面本来就会跟着容器内容刷新。</remarks>
+        public event System.Action<int> MoneyChanged;
+
         /// <summary>注册大厅下行消息处理器。</summary>
         private void RegisterHandlers()
         {
@@ -50,6 +56,9 @@ namespace RaidDemo.Bootstrap
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
                 LobbyChannel.RaidEndMessageName,
                 OnRaidEndReceived);
+            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
+                ProfileNetworkChannel.StateMessageName,
+                OnProfileStateReceived);
 
             m_HandlersRegistered = true;
         }
@@ -69,6 +78,7 @@ namespace RaidDemo.Bootstrap
                 messaging.UnregisterNamedMessageHandler(LobbyChannel.RoomStateMessageName);
                 messaging.UnregisterNamedMessageHandler(LobbyChannel.RaidStartMessageName);
                 messaging.UnregisterNamedMessageHandler(LobbyChannel.RaidEndMessageName);
+                messaging.UnregisterNamedMessageHandler(ProfileNetworkChannel.StateMessageName);
             }
 
             m_HandlersRegistered = false;
@@ -213,6 +223,22 @@ namespace RaidDemo.Bootstrap
             var message = default(RaidEndMessage);
             reader.ReadValueSafe(out message);
             ReturnFromRaid(message.SceneName.ToString());
+        }
+
+        /// <summary>
+        /// 收到服务器权威的局外进度（P5：金币）。
+        /// </summary>
+        /// <remarks>
+        /// 客户端只把它贴到本地那份"用于画界面的镜像"上；真正的数值在服务器，
+        /// 下一次下发会覆盖它——因此这里不做任何本地经济判断。
+        /// </remarks>
+        private void OnProfileStateReceived(ulong senderId, FastBufferReader reader)
+        {
+            var message = default(ProfileStateMessage);
+            reader.ReadValueSafe(out message);
+
+            UnityEngine.Debug.Log($"[联机] 收到服务器进度：金币 {message.Money}（原因 {message.Reason}）。");
+            MoneyChanged?.Invoke(message.Money);
         }
 
         /// <summary>

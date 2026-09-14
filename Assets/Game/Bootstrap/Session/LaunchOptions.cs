@@ -51,6 +51,18 @@ namespace RaidDemo.Bootstrap
         /// <summary>服务器状态页（Dashboard）的默认端口。0 表示关闭。</summary>
         public const int DefaultDashboardPort = 8080;
 
+        /// <summary>
+        /// 掉线宽限的默认时长（秒）。
+        /// </summary>
+        /// <remarks>与 <c>ServerRuntime.DefaultReconnectGraceSeconds</c> 保持一致（那里是权威默认值）。</remarks>
+        public const float DefaultReconnectGraceSeconds = 60f;
+
+        /// <summary>宽限时长的下界（秒）。低于它等于没有宽限，重连必然失败。</summary>
+        public const float MinReconnectGraceSeconds = 5f;
+
+        /// <summary>宽限时长的上界（秒）。太长会让队友长时间少一个人。</summary>
+        public const float MaxReconnectGraceSeconds = 600f;
+
         /// <summary>局域网发现（UDP 广播）的默认端口。0 表示关闭。</summary>
         public const int DefaultDiscoveryPort = LanDiscoveryConstants.DefaultPort;
 
@@ -123,6 +135,17 @@ namespace RaidDemo.Bootstrap
         public int DiscoveryPort { get; private set; } = DefaultDiscoveryPort;
 
         /// <summary>
+        /// 掉线宽限时长（<c>-grace</c>，秒）；默认 <see cref="DefaultReconnectGraceSeconds"/>。
+        /// </summary>
+        /// <remarks>
+        /// <para>连接断开后，服务器保留该玩家的房间席位、位置与背包多久。期间同一账号可以重连回局。</para>
+        ///
+        /// <para>做成启动参数是为了验收：自动化脚本需要把 60 秒压到十几秒来跑"断线 → 宽限到期 → 清场"
+        /// 这条完整链路；线上则保留默认值。</para>
+        /// </remarks>
+        public float ReconnectGraceSeconds { get; private set; } = DefaultReconnectGraceSeconds;
+
+        /// <summary>
         /// 服务器启动后要加载的场景名；为 null 表示不额外加载（用构建列表的第一个场景）。
         /// </summary>
         /// <remarks>
@@ -183,6 +206,7 @@ namespace RaidDemo.Bootstrap
             {
                 description += $" ｜ 状态页 {(DashboardPort == 0 ? "关闭" : DashboardPort.ToString())}";
                 description += $" ｜ 发现 {(DiscoveryPort == 0 ? "关闭" : DiscoveryPort.ToString())}";
+                description += $" ｜ 掉线宽限 {ReconnectGraceSeconds:F0} 秒";
             }
 
             return description;

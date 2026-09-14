@@ -96,6 +96,19 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // P5：联机会话期间不写单机存档。
+            //
+            // 联机时本地这份 Progress 是**服务器进度的镜像**（仓库、随身装备、金币都由服务器下发），
+            // 把它写进单机存档等于"用联机的账覆盖单机的账"——玩家下一次单机开局会发现
+            // 仓库被联机内容替换了，而这是验收里明确要求隔离的一条（"联机刷到的装备不能带回单机"）。
+            //
+            // 这条路是单向的：离开联机会话（断开连接）之后，SaveNow 恢复正常，
+            // 单机那一份仍然是他自己的存档。
+            if (MultiplayerClientSession.IsActive)
+            {
+                return;
+            }
+
             var data = MetaSaveMapper.Capture(Progress, m_RaidInProgress);
             if (!m_SaveStore.Save(data, out var error))
             {

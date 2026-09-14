@@ -185,6 +185,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>每帧推进大厅：目前只有自动开局的到点判断。</summary>
         private void TickLobby()
         {
+            // 掉线宽限的到期判定（P5）：宽限结束才真正清场。
+            TickDisconnectGrace();
+
             if (m_AutoStartDeadline < 0f || m_Room.Phase != LobbyPhase.Waiting)
             {
                 return;

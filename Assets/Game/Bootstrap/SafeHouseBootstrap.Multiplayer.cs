@@ -27,6 +27,15 @@ namespace RaidDemo.Bootstrap
         /// <summary>大厅会话持有的网络管理器（跨场景存活，这里只是借用）。</summary>
         private NetworkManager m_NetworkClient;
 
+        /// <summary>
+        /// 共享的容器链路（P5）：背包 / 弹药挂 / 共享仓库 / 装备槽全部由服务器权威。
+        /// </summary>
+        /// <remarks>
+        /// 与战局用的是同一个类：安全屋里的"把枪从仓库拖进主武器槽"和战局里的"把战利品拖进背包"
+        /// 是同一种命令、同一套放置规则、同一条上行通道。
+        /// </remarks>
+        private MultiplayerContainerLink m_ContainerLink;
+
         /// <summary>本机是否处于联机安全屋模式。</summary>
         public bool IsMultiplayerSafeHouse
         {
@@ -94,6 +103,13 @@ namespace RaidDemo.Bootstrap
                 ResolveLocalCharacterId,
                 autoWalk);
 
+            m_ContainerLink = new MultiplayerContainerLink(
+                m_Session, m_Registry, m_ItemCatalog, m_EventBus, m_Loadout);
+
+            // 本地处理器已在 InitializeInventory 里注册过：这里用"只上行"的版本覆盖它们，
+            // 界面的乐观更新照旧，真正的结果由服务器回发的容器内容纠正（U-75 的规则）。
+            m_ContainerLink.InstallCommandHandlers(m_CommandRouter);
+
             m_NetworkClient = session.Network;
             m_NetworkClient.OnClientDisconnectCallback += OnSafeHouseDisconnected;
 
@@ -121,6 +137,10 @@ namespace RaidDemo.Bootstrap
 
             m_MovementLink?.Detach();
             m_MovementLink = null;
+
+            m_ContainerLink?.Detach();
+            m_ContainerLink = null;
+
             m_NetworkClient = null;
         }
 
@@ -135,6 +155,7 @@ namespace RaidDemo.Bootstrap
         {
             Debug.Log($"[联机] 安全屋已接管连接，玩家标识 {playerId}。");
             m_MovementLink?.Attach(m_NetworkClient, playerId);
+            m_ContainerLink?.Attach(m_NetworkClient);
         }
 
         /// <summary>与服务器断开：清掉远端玩家，避免留下不会动的假队友。</summary>

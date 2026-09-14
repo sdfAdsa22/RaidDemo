@@ -55,6 +55,29 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 把"战局开始"发给单个客户端（重连回局时用，P5）。
+        /// </summary>
+        /// <param name="clientId">目标客户端。</param>
+        /// <remarks>与广播同源同格式，只是收件人只有一个：重连的人需要立刻回到地图上。</remarks>
+        private void SendRaidStartTo(int clientId)
+        {
+            var manager = m_Network;
+            if (manager == null || manager.CustomMessagingManager == null || !IsClientConnected((ulong)clientId))
+            {
+                return;
+            }
+
+            var message = new RaidStartMessage { MapSceneName = m_WorldSceneName ?? string.Empty };
+            using var writer = new FastBufferWriter(80, Allocator.Temp);
+            writer.WriteValueSafe(message);
+            manager.CustomMessagingManager.SendNamedMessage(
+                LobbyChannel.RaidStartMessageName,
+                (ulong)clientId,
+                writer,
+                NetworkDelivery.ReliableSequenced);
+        }
+
+        /// <summary>
         /// 通知房间成员"这一局结束，回共享安全屋"。
         /// </summary>
         /// <remarks>

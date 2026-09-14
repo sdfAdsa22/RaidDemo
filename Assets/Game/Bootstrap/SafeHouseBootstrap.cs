@@ -57,6 +57,11 @@ namespace RaidDemo.Bootstrap
             // 服务器进程不装配客户端世界：安全屋是纯客户端场景（相机、界面、设施交互）。
             if (ServerMode.IsActive)
             {
+                // 服务器需要物品目录：安全屋里的仓库界面要用它，而服务端的进度存档（P5）
+                // 也要靠它把存档里的物品 ID 还原成定义。战局场景加载时会再交接一次
+                // （同一份目录资产），因此后到的交接不会造成分叉。
+                ServerMode.AcceptSceneContent(m_ItemCatalog, m_PresentationCatalog);
+
                 // 但服务器要**托管**这间屋子（P4.5-b）：把场景里的出生点交给它，
                 // 服务器据此决定"玩家回到安全屋时站在哪"——与客户端进场景时站的位置完全一致。
                 ServerMode.AcceptSafeHouseSpawn(m_PlayerSpawnPosition);
@@ -191,21 +196,6 @@ namespace RaidDemo.Bootstrap
         private void StartRaid()
         {
             TryDeployFromSafeHouse();
-        }
-
-        /// <summary>
-        /// 清空移动意图。
-        /// </summary>
-        /// <remarks>
-        /// 本地模拟与"待上行意图"必须一起清：只清前者的话，联机客户端仍会把上一帧的移动方向
-        /// 发给服务器，表现是"翻着背包人还在往前走"。朝向不清——那只是"看着哪"，
-        /// 界面打开时保持朝向不会让角色移动。
-        /// </remarks>
-        private void ClearMovementIntent()
-        {
-            m_MoveHandler?.ClearIntent();
-            m_PendingMove = Vector2F.Zero;
-            m_PendingSprint = false;
         }
 
         private void Update()

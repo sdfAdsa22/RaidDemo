@@ -55,6 +55,15 @@ namespace RaidDemo.Bootstrap
                     break;
 
                 case SafeHouseInteractable.Kind.Merchant:
+                    // P5：商人的一次交易要同时改"共享仓库"和"我的金币"，而这两者现在都在服务器上。
+                    // 在它服务端权威化（P5.5）之前，联机里打开它只会显示一份与服务器不一致的账——
+                    // 买到的物品下一帧就被权威内容覆盖回去，比"暂时打不开"更让人困惑。
+                    if (IsMultiplayerSafeHouse)
+                    {
+                        m_Ui?.ShowHint("联机商店将在后续批次开放（仓库与金币已由服务器权威）");
+                        break;
+                    }
+
                     m_InventoryScreen?.Close();
                     if (m_InventoryScreen != null)
                     {

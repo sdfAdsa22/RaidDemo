@@ -254,6 +254,28 @@ namespace RaidDemo.Bootstrap
                         result.DiscoveryPort = discoveryPort;
                         break;
 
+                    case "-grace":
+                        if (!TryReadValue(list, ref i, arg, out var graceText, out error))
+                        {
+                            return false;
+                        }
+
+                        if (!float.TryParse(
+                                graceText,
+                                System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                out var graceSeconds)
+                            || graceSeconds < LaunchOptions.MinReconnectGraceSeconds
+                            || graceSeconds > LaunchOptions.MaxReconnectGraceSeconds)
+                        {
+                            error = $"参数 {arg} 需要 {LaunchOptions.MinReconnectGraceSeconds:F0}~"
+                                    + $"{LaunchOptions.MaxReconnectGraceSeconds:F0} 秒之间的时长，实际收到「{graceText}」。";
+                            return false;
+                        }
+
+                        result.ReconnectGraceSeconds = graceSeconds;
+                        break;
+
                     case "-autoroom":
                         result.AutoRoom = true;
                         break;

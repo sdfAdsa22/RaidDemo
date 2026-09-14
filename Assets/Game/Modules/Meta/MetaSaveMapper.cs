@@ -65,7 +65,8 @@ namespace RaidDemo.Meta
         public static MetaProgress Restore(
             MetaSaveData data,
             IItemDefinitionLookup catalog,
-            out List<string> problems)
+            out List<string> problems,
+            InventoryGrid sharedStash = null)
         {
             problems = new List<string>();
             if (data == null)
@@ -90,7 +91,7 @@ namespace RaidDemo.Meta
 
             Migrate(data, problems);
 
-            var progress = new MetaProgress(0);
+            var progress = new MetaProgress(0, sharedStash);
             progress.AttachCatalog(catalog);
             progress.RestoreMoney(data.money);
             progress.RestoreSelectedCharacter(data.selectedCharacterId);
@@ -102,10 +103,44 @@ namespace RaidDemo.Meta
             RestoreEquipment(progress.Loadout.Equipment, data.equipment, catalog, problems);
             RestoreGrid(progress.Loadout.AmmoPouch, data.ammoPouch, catalog, problems, "弹药挂");
             RestoreGrid(progress.Loadout.Backpack, data.backpack, catalog, problems, "主背包");
-            RestoreGrid(progress.Stash, data.stash, catalog, problems, "仓库");
+            // 房间共享仓库（服务端）由调用方单独读写：账号档案里的 stash 字段为空，
+            // 照着它还原会把整间屋子的仓库清空。
+            if (sharedStash == null)
+            {
+                RestoreGrid(progress.Stash, data.stash, catalog, problems, "仓库");
+            }
+
             progress.Quests.RestoreState(data.quests, data.trackedQuestId, problems);
             progress.Codex.Restore(data.discoveredItemIds);
             return progress;
+        }
+
+        /// <summary>
+        /// 把房间共享仓库整理成存档记录（服务端 P5 专用）。
+        /// </summary>
+        /// <remarks>
+        /// 复用单机那套网格快照格式，好处是两端共用同一份物品记录契约：
+        /// 服务端的共享仓库与客户端的本地仓库在磁盘上是同一种格式，
+        /// 出问题时可以用同一套工具读。
+        /// </remarks>
+        public static ItemStackSave[] CaptureSharedStash(InventoryGrid stash)
+        {
+            return CaptureGrid(stash);
+        }
+
+        /// <summary>把存档记录铺回房间共享仓库（服务端 P5 专用）。</summary>
+        /// <param name="stash">共享仓库网格。</param>
+        /// <param name="records">存档记录。</param>
+        /// <param name="catalog">物品目录。</param>
+        /// <param name="problems">无法还原的条目说明。</param>
+        public static void RestoreSharedStash(
+            InventoryGrid stash,
+            IReadOnlyList<ItemStackSave> records,
+            IItemDefinitionLookup catalog,
+            out List<string> problems)
+        {
+            problems = new List<string>();
+            RestoreGrid(stash, records, catalog, problems, "共享仓库");
         }
 
         /// <summary>把旧版本结构补齐到当前版本。</summary>

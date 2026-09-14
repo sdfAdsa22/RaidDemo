@@ -277,9 +277,11 @@ namespace RaidDemo.Bootstrap
                 var containerId = ids[i];
                 var isSceneContainer = containerId >= ContainerIds.SceneBase
                                        && containerId < ContainerIds.ServerPlayerBase;
+                // 共享仓库是房间级的：每个人都该看到（P5）。
+                var isSharedStash = containerId == ContainerIds.ServerSharedStash;
                 var isOwnContainer = containerId == backpackId || containerId == pouchId;
 
-                if (!isSceneContainer && !isOwnContainer)
+                if (!isSceneContainer && !isOwnContainer && !isSharedStash)
                 {
                     continue;
                 }
@@ -294,7 +296,10 @@ namespace RaidDemo.Bootstrap
                     ? ContainerIds.PlayerBackpack
                     : containerId == pouchId
                         ? ContainerIds.AmmoPouch
-                        : containerId;
+                        : isSharedStash
+                            // 共享仓库在客户端仍然是"3 号容器（仓库）"。
+                            ? ContainerIds.Stash
+                            : containerId;
 
                 entries.Add(BuildContainerContents(wireId, grid));
             }

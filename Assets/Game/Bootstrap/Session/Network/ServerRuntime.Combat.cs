@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using RaidDemo.Combat;
+using RaidDemo.Inventory;
 using RaidDemo.Presentation;
 using RaidDemo.Shared;
 using Unity.Collections;
@@ -157,14 +158,25 @@ namespace RaidDemo.Bootstrap
             targetView.Initialize(combatantId, colorFeedback: false);
         }
 
-        private void AddPlayerToCombat(int playerId)
+        /// <summary>
+        /// 让一名玩家参战。
+        /// </summary>
+        /// <param name="playerId">玩家编号。</param>
+        /// <param name="loadout">
+        /// 随身装备；传 null 时按默认规格配发。
+        /// </param>
+        /// <remarks>
+        /// P5 起战局会传入账号在安全屋里准备好的那一份装备（见 <c>ServerRuntime.Players</c>），
+        /// 因此"我带什么进图"由玩家决定而不由服务器统一配发；没有进度时退回默认配发。
+        /// </remarks>
+        private void AddPlayerToCombat(int playerId, PlayerLoadout loadout = null)
         {
             if (!EnsureCombat())
             {
                 return;
             }
 
-            if (m_Combat.TryAddPlayer(playerId, out var error))
+            if (m_Combat.TryAddPlayer(playerId, loadout, out var error))
             {
                 // 命中标识必须紧跟"参战"这一步：目标编号是参战时才分配的，
                 // 而 AI 的视线判定就是靠射线命中的 CombatTargetView 去认人。
@@ -174,7 +186,8 @@ namespace RaidDemo.Bootstrap
 
                 var combatantId = m_Combat.GetCombatantId(playerId);
                 m_Session?.Log.Info(
-                    $"[服务器] 玩家 {playerId} 已进入战斗（配发武器与备弹，命中标识={combatantId}）。");
+                    $"[服务器] 玩家 {playerId} 已进入战斗"
+                    + $"（{(loadout != null ? "按账号装备" : "默认配发")}，命中标识={combatantId}）。");
             }
             else
             {

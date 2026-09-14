@@ -124,6 +124,10 @@ namespace RaidDemo.Bootstrap
 
             // 大厅必须先于移动世界建立：连接事件的第一订阅者是大厅——
             // "客户端接入"在大厅里只是登记登录态，真正进入地图发生在开局（P4）。
+            // 进度存档（P5）先建：登录时就要按昵称取账号进度，此时只建空仓库，
+            // 真正读盘要等物品目录交接完成（见 ServerRuntime.Profiles）。
+            m_Profiles = new ServerProfileStore(options.SaveDirectory);
+
             InitializeLobby();
 
             InitializeMovement();
@@ -141,6 +145,9 @@ namespace RaidDemo.Bootstrap
         /// </summary>
         private void Update()
         {
+            // 主线程卡顿看门狗：卡顿会让客户端心跳超时（表现为"玩家掉线"），必须留证据。
+            FrameStallWatchdog.Tick("服务器");
+
             if (m_Network == null || m_Session == null || !m_Network.IsListening)
             {
                 return;
@@ -148,6 +155,7 @@ namespace RaidDemo.Bootstrap
 
             // 权威世界的推进独立于心跳：每帧都要走，心跳只是周期性日志。
             TickWorld();
+            TickProfiles(Time.deltaTime);
             TickLobby();
             TickServerIntegrations();
             TickNavigation();
@@ -181,6 +189,10 @@ namespace RaidDemo.Bootstrap
             }
 
             m_ShutdownRequested = true;
+
+            // 进度先落盘再断网：撤离结算写的钱与物品必须落定，
+            // 而断开连接的回调里还会用到会话服务（见下一条注释）。
+            m_Profiles?.SaveAll();
 
             if (m_Network != null && m_Network.IsListening)
             {

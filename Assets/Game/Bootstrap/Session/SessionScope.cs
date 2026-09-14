@@ -57,7 +57,9 @@ namespace RaidDemo.Bootstrap
             Events = new EventBus();
             Services = new ServiceLocator();
             Commands = new CommandRouter();
-            Log = new LogService(minimumLogLevel);
+            // 时间戳与内存缓冲都打开：排障时"两条日志相差多少秒"是最常用的证据
+            // （P-48/P-50 的时间线分析就卡在没有时间戳上）；状态页也依赖这份内存缓冲。
+            Log = new LogService(minimumLogLevel, includeTimestamp: true, recentCapacity: 300);
 
             Services.Register(Events);
             Services.Register(Commands);

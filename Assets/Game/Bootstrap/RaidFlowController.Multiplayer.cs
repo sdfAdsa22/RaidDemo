@@ -123,16 +123,37 @@ namespace RaidDemo.Bootstrap
                 m_Session.Changed -= OnSessionChanged;
                 m_Session.RaidStarting -= OnRaidStarting;
                 m_Session.RaidEnding -= OnRaidEnding;
+                m_Session.MoneyChanged -= OnMoneyChanged;
             }
 
             m_Session = session;
             m_Session.Changed += OnSessionChanged;
             m_Session.RaidStarting += OnRaidStarting;
             m_Session.RaidEnding += OnRaidEnding;
+            m_Session.MoneyChanged += OnMoneyChanged;
 
             // 会话可能在我们订阅之前就已经走到了某个阶段（例如命令行直接连接），
             // 因此订阅之后立刻按当前状态刷一次界面。
             OnSessionChanged();
+        }
+
+        /// <summary>
+        /// 服务器下发了金币：贴到本地这份镜像上并刷新界面（P5）。
+        /// </summary>
+        /// <remarks>
+        /// <para>联机时金币的权威在服务器：买卖、任务奖励、撤离结算都由它算并落库。
+        /// 客户端这一份只用于画右上角的余额，下一次下发会覆盖它。</para>
+        ///
+        /// <para>不写单机存档：联机进度与单机存档是两套账（见 <c>SaveNow</c> 的隔离规则）。</para>
+        /// </remarks>
+        private void OnMoneyChanged(int money)
+        {
+            if (Progress == null)
+            {
+                return;
+            }
+
+            Progress.ApplyServerMoney(money);
         }
 
         /// <summary>把当前会话状态映射到界面。</summary>

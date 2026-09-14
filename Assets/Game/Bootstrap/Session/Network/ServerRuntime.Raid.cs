@@ -225,6 +225,11 @@ namespace RaidDemo.Bootstrap
                 ElapsedSeconds = elapsed,
             });
 
+            // P5：结果落到服务端存档（撤离入库 / 阵亡清空）并立刻写盘。
+            // 放在广播之后：客户端先看到结算面板，服务器再落库——顺序反了的话，
+            // 落库失败会让玩家看到"界面说带出来了、仓库里没有"，而这是最难解释的一类问题。
+            ApplyOutcomeToProfile(playerId, outcome, carriedValue);
+
             // 全员结算完就收尾回大厅（P4）：这里是"这一局什么时候算结束"的唯一判定入口。
             CheckRaidCompletion();
         }

@@ -274,6 +274,48 @@ namespace RaidDemo.Bootstrap
             Phase = LobbyPhase.Waiting;
         }
 
+        /// <summary>
+        /// 掉线重连：把一名成员的名册身份从旧连接换到新连接（P5）。
+        /// </summary>
+        /// <param name="oldClientId">掉线前的连接编号。</param>
+        /// <param name="newClientId">重连后的连接编号。</param>
+        /// <param name="error">失败原因。</param>
+        /// <returns>换绑成功返回 true。</returns>
+        /// <remarks>
+        /// <para><b>为什么需要换绑而不是"退出再进"：</b>玩家在掉线期间**仍然是房间成员**——
+        /// 他的位置、背包、战局进度都留在服务器上（这正是"队友不受影响"的前提）。
+        /// 重连只是换了一个连接编号，房间名册必须跟着改，否则服务器会认为进来的是陌生人。</para>
+        ///
+        /// <para>房主掉线又重连时，房主身份一起带过来：否则房间会落到"没人能开局"的状态。</para>
+        /// </remarks>
+        public bool TryRebind(int oldClientId, int newClientId, out LobbyError error)
+        {
+            error = LobbyError.None;
+
+            var member = Find(oldClientId);
+            if (member == null)
+            {
+                error = LobbyError.NotInRoom;
+                return false;
+            }
+
+            if (oldClientId != newClientId && Find(newClientId) != null)
+            {
+                error = LobbyError.AlreadyInRoom;
+                return false;
+            }
+
+            member.ClientId = newClientId;
+
+            if (HostClientId == oldClientId)
+            {
+                HostClientId = newClientId;
+                member.IsHost = true;
+            }
+
+            return true;
+        }
+
         /// <summary>按网络标识查找成员；不存在返回 null。</summary>
         /// <param name="clientId">网络标识。</param>
         public LobbyMember Find(int clientId)

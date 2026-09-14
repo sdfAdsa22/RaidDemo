@@ -66,8 +66,9 @@ namespace RaidDemo.Bootstrap
             m_CommandRouter.Register<PlayerSwitchWeaponIntent>(
                 new WeaponSwitchCommandHandler(m_Loadout.Equipment, m_EventBus));
 
-            // 联机时把背包移动命令换成上行（服务器裁定物归谁）；单机保持本地执行。
-            OverrideInventoryCommandsForMultiplayer();
+            // 联机时把这几条命令换成上行（服务器裁定物归谁）；单机保持本地执行。
+            // P5 起这件事由共享的容器链路统一接管：装配末尾创建链路时调
+            // MultiplayerContainerLink.InstallCommandHandlers（见 SceneBootstrap.Multiplayer）。
 
             var uiHost = new GameObject("InventoryScreen");
             uiHost.transform.SetParent(transform, worldPositionStays: false);

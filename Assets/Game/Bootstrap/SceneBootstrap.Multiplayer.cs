@@ -25,6 +25,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>共享的移动链路（上行输入 / 快照对账 / 远端玩家插值）。</summary>
         private MultiplayerMovementLink m_MovementLink;
 
+        /// <summary>共享的容器链路（内容下行 / 背包与装备命令上行，P5 起两场景共用）。</summary>
+        private MultiplayerContainerLink m_ContainerLink;
+
         private bool m_AutoWalk;
         private double m_NextNetworkReportTime;
 
@@ -120,6 +123,13 @@ namespace RaidDemo.Bootstrap
             m_MovementLink.Attached += OnMovementLinkAttached;
             m_MovementLink.Disconnected += OnMovementLinkDisconnected;
 
+            m_ContainerLink = new MultiplayerContainerLink(
+                m_Session, m_ContainerRegistry, m_ItemCatalog, m_EventBus, m_Loadout);
+
+            // 本地处理器已在 InitializeInventory 里注册过：这里用"只上行"的版本覆盖它们
+            // （命令路由支持覆盖注册，因此不动命令层本身）。
+            m_ContainerLink.InstallCommandHandlers(m_CommandRouter);
+
             m_NetworkClient = session.Network;
             m_NetworkClient.OnClientDisconnectCallback += OnNetworkDisconnected;
 
@@ -165,9 +175,11 @@ namespace RaidDemo.Bootstrap
             m_MovementLink.Detach();
             m_MovementLink = null;
 
+            m_ContainerLink?.Detach();
+            m_ContainerLink = null;
+
             UnregisterCombatChannel();
             UnregisterEnemyChannel();
-            UnregisterContainerChannel();
             UnregisterRaidOutcomeChannel();
             UnregisterLifeChannel();
 
@@ -200,7 +212,7 @@ namespace RaidDemo.Bootstrap
         {
             RegisterCombatChannel();
             RegisterEnemyChannel();
-            RegisterContainerChannel();
+            m_ContainerLink?.Attach(m_NetworkClient);
             RegisterRaidOutcomeChannel();
             RegisterLifeChannel();
 

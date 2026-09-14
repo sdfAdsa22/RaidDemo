@@ -167,7 +167,9 @@ namespace RaidDemo.Bootstrap
                 case ContainerIds.AmmoPouch:
                     return ContainerIds.ServerPlayerContainer(playerId, ContainerIds.PlayerSlot.AmmoPouch);
                 case ContainerIds.Stash:
-                    return ContainerIds.ServerPlayerContainer(playerId, ContainerIds.PlayerSlot.Stash);
+                    // P5：仓库是**房间共享**的，不再按玩家分。所有玩家的 3 号容器
+                    // 都落到同一个共享仓库网格上，两个人同时搬东西时由服务器串行执行。
+                    return ContainerIds.ServerSharedStash;
                 default:
                     // 场景容器两端编号一致，原样返回。
                     return clientContainerId;

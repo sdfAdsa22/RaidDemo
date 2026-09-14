@@ -42,6 +42,32 @@ namespace RaidDemo.Bootstrap
 
             var displayName = (nickname ?? string.Empty).Trim();
 
+            // 重连接管（P5）：如果这个昵称正处在掉线宽限里，本次登录就是"回来接管自己"，
+            // 而不是一次新的登录。必须排在"昵称是否在线"之前判断——宽限中的那条记录
+            // 在名册上仍然是 LoggedIn，不区分的话会被判成"昵称已被占用"。
+            var graced = FindGracedClient(displayName, client.ClientId);
+            if (graced != null)
+            {
+                client.Nickname = displayName;
+                client.LoggedIn = true;
+
+                if (TryResumeGracedSession(graced, client))
+                {
+                    SendLobbyResult(
+                        client.ClientId,
+                        LobbyRequestKind.Login,
+                        true,
+                        LobbyError.None,
+                        "已重连回原来的房间。",
+                        token);
+                    return;
+                }
+
+                // 接管失败（例如房间已经解散）：按普通登录继续走下面的流程。
+                client.Nickname = null;
+                client.LoggedIn = false;
+            }
+
             if (IsNicknameOnline(displayName, client.ClientId))
             {
                 SendLobbyResult(client.ClientId, LobbyRequestKind.Login, false,
@@ -62,6 +88,23 @@ namespace RaidDemo.Bootstrap
 
             m_Session?.Log.Info(
                 $"[服务器] 玩家 {client.ClientId} 以「{displayName}」登录{(created ? "（新建账号）" : "（老账号）")}。");
+
+            // 登录即把该账号的进度（金币 / 任务 / 随身装备）从服务端存档里取出来（P5）。
+            // 仓库是房间级共享的，不在这里取。
+            var profile = ResolveProfile(displayName);
+            if (profile != null)
+            {
+                m_Session?.Log.Info(
+                    $"[服务器] 账号「{displayName}」的进度已就绪：金币 {profile.Money}，"
+                    + $"随身背包 {profile.Loadout.Backpack.Items.Count} 件，"
+                    + $"共享仓库 {profile.Stash.Items.Count} 件。");
+            }
+            else
+            {
+                // 目录还没交接到（极早期登录）：不阻塞登录，进度会在后续操作里按需补上。
+                m_Session?.Log.Warning(
+                    $"[服务器] 账号「{displayName}」的进度暂不可用（物品目录或存档未就绪），稍后重试。");
+            }
 
             // 登录成功后才点对点发房间状态：此时对方的处理器一定已经注册好了（P-20）。
             SendRoomStateTo(client.ClientId);
@@ -90,6 +133,9 @@ namespace RaidDemo.Bootstrap
             // 进房即进屋（P4.5-b）：联机首站是共享安全屋，房主在这里等队友、整备、从出口出击。
             SpawnMemberIntoSafeHouse(client.ClientId);
 
+            // P5：把该账号的进度摘要（金币）发给他本人，右上角余额立刻是服务器那份。
+            SendProfileStateTo(client.ClientId, ProfileStateReasons.Join);
+
             BroadcastRoomState();
             ScheduleAutoStart();
         }
@@ -116,6 +162,8 @@ namespace RaidDemo.Bootstrap
 
             // 与建房同一条规则：加入房间就把人放进共享安全屋，队友立刻能看见他。
             SpawnMemberIntoSafeHouse(client.ClientId);
+
+            SendProfileStateTo(client.ClientId, ProfileStateReasons.Join);
 
             BroadcastRoomState();
         }
@@ -199,6 +247,13 @@ namespace RaidDemo.Bootstrap
             foreach (var pair in m_LobbyClients)
             {
                 if (pair.Key == exceptClientId || !pair.Value.LoggedIn)
+                {
+                    continue;
+                }
+
+                // 掉线宽限中的人不算"在线"：他并没有占着这条连接在玩，
+                // 而把他算作在线会让"自己的重连"被判成"昵称被占用"（P5）。
+                if (pair.Value.InGrace)
                 {
                     continue;
                 }

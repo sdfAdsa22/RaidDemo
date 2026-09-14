@@ -31,15 +31,6 @@ namespace RaidDemo.Bootstrap
         /// <summary>默认生命上限。</summary>
         public const float DefaultMaxHealth = 100f;
 
-        /// <summary>P2-1 的配发武器与弹药。</summary>
-        private const string DefaultWeaponId = "weapon.rifle.ak74";
-        private const string DefaultAmmoId = "ammo.5.45.standard";
-        private const int DefaultReserveRounds = 120;
-        private const int AmmoPouchWidth = 5;
-        private const int AmmoPouchHeight = 1;
-        private const int BackpackWidth = 5;
-        private const int BackpackHeight = 5;
-
         /// <summary>取玩家世界坐标的回调：服务器用它决定子弹从哪发出。</summary>
         private readonly Func<int, Vector3> m_OriginProvider;
 
@@ -54,6 +45,9 @@ namespace RaidDemo.Bootstrap
             public Vector2F AimDirection = Vector2F.Right;
             public bool TriggerHeld;
             public bool IsAlive = true;
+
+            /// <summary>本局是否挨过打（撤离任务的"无伤撤离"判定，P5 起由服务器记录）。</summary>
+            public bool TookDamage;
         }
 
         private readonly ItemCatalog m_Catalog;
@@ -101,52 +95,30 @@ namespace RaidDemo.Bootstrap
         /// <param name="error">失败原因。</param>
         public bool TryAddPlayer(int playerId, out string error)
         {
-            error = null;
+            return TryAddPlayer(playerId, loadout: null, out error);
+        }
 
-            if (m_Participants.ContainsKey(playerId))
-            {
-                error = $"玩家 {playerId} 已参战。";
-                return false;
-            }
-
-            if (m_Catalog == null || !m_Catalog.TryGet(DefaultWeaponId, out var weaponDefinition))
-            {
-                error = $"物品目录里找不到配发武器 {DefaultWeaponId}。";
-                return false;
-            }
-
-            var loadout = BuildDefaultLoadout(weaponDefinition);
-            var weapon = new PlayerWeapon(new DeterministicRandom((uint)(0x5EED0000 + playerId)));
-
-            // 战斗单位先建：控制器的事件里带的是**战斗单位编号**，
-            // 而它必须与 AI 的事件编号处在同一个空间里（否则玩家 1 的子弹会被记成敌人 0 开的火，
-            // 因为两者的战斗世界编号恰好都是 1）。
-            var combatantId = m_World.Create(DefaultMaxHealth);
-            m_CombatantToPlayer[combatantId] = playerId;
-
-            var controller = new PlayerWeaponController(
-                weapon,
-                loadout,
-                m_Probe,
-                m_World,
-                m_Tuning,
-                m_Events,
-                ammoPouchContainerId: 0,
-                playerId: playerId);
-
-            controller.BindCombatant(combatantId);
-            controller.SyncEquippedWeapon(weaponDefinition.WeaponStats);
-
-            m_Participants[playerId] = new Participant
-            {
-                PlayerId = playerId,
-                Loadout = loadout,
-                Weapon = weapon,
-                Controller = controller,
-                CombatantId = combatantId,
-            };
-
-            return true;
+        /// <summary>
+        /// 让一名玩家参战；可以指定他的随身装备（P5：来自服务端存档的那一份）。
+        /// </summary>
+        /// <param name="playerId">玩家标识。</param>
+        /// <param name="loadout">
+        /// 随身装备（背包 / 装备槽 / 弹药挂）。传 null 时按默认规格配发——
+        /// 那是没有存档时的兜底，也是自动化验收里"从零开始"的路径。
+        /// </param>
+        /// <param name="error">失败原因。</param>
+        /// <remarks>
+        /// <para><b>为什么要能指定装备：</b>P5 之前服务器只会按统一规格配发 AK，
+        /// 玩家在安全屋里精心准备的枪、甲、子弹到了服务器上等于不存在（§25.9 的已知边界）。
+        /// 现在服务器拿的是该账号在安全屋里整理好的那一份装备对象本身，
+        /// 因此"我背着什么进图"在两端是同一份数据。</para>
+        ///
+        /// <para>实现放在装备部分（<c>ServerCombatCoordinator.Loadout.cs</c>）：
+        /// 那一半管"拿什么武器、备弹多少、背包多大"，与开火命中流程是两件事。</para>
+        /// </remarks>
+        public bool TryAddPlayer(int playerId, PlayerLoadout loadout, out string error)
+        {
+            return TryAddPlayerCore(playerId, loadout, out error);
         }
 
         /// <summary>让一名玩家退出战斗。</summary>
@@ -299,6 +271,14 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public void OnDamageApplied(in DamageAppliedEvent damage)
         {
+            // 先记"这一局他挨过打"：撤离类任务里有一条"无伤撤离"，
+            // 而下面那条提前 return 会在"没被打死"时跳过——那恰好是最常见的情况。
+            if (m_CombatantToPlayer.TryGetValue(damage.TargetId, out var damagedPlayerId)
+                && m_Participants.TryGetValue(damagedPlayerId, out var damaged))
+            {
+                damaged.TookDamage = true;
+            }
+
             if (!damage.WasKilled)
             {
                 return;
@@ -311,6 +291,17 @@ namespace RaidDemo.Bootstrap
                 participant.Controller.SetAlive(false);
                 participant.TriggerHeld = false;
             }
+        }
+
+        /// <summary>
+        /// 这名玩家本局是否挨过打。
+        /// </summary>
+        /// <param name="playerId">玩家标识。</param>
+        /// <remarks>撤离结算里的"无伤撤离"任务目标读它；服务器不知道这件事时，
+        /// 那条任务会被永远判成"完成"，等于送分。</remarks>
+        public bool PlayerTookDamage(int playerId)
+        {
+            return m_Participants.TryGetValue(playerId, out var participant) && participant.TookDamage;
         }
 
         /// <summary>
@@ -360,33 +351,5 @@ namespace RaidDemo.Bootstrap
             return true;
         }
 
-        /// <summary>
-        /// 构造配发装备：主武器槽一把 AK、弹药挂里一叠备弹、一个空背包。
-        /// </summary>
-        /// <remarks>
-        /// 背包与弹药挂都是真实容器：换弹会真的从这里扣子弹，
-        /// 因此"服务器说没子弹了"与"玩家背包里还显示有子弹"这两件事必然一致。
-        /// </remarks>
-        private PlayerLoadout BuildDefaultLoadout(ItemDefinition weaponDefinition)
-        {
-            var backpack = new InventoryGrid(BackpackWidth, BackpackHeight, "服务端配发背包");
-            var ammoPouch = new InventoryGrid(
-                AmmoPouchWidth,
-                AmmoPouchHeight,
-                "服务端配发弹药挂",
-                acceptedCategory: ItemCategory.Ammo);
-
-            var equipment = new EquipmentLoadout();
-            var weaponItem = m_Factory.Create(weaponDefinition);
-            equipment.Equip(weaponItem, EquipmentSlot.PrimaryWeapon);
-
-            if (m_Catalog.TryGet(DefaultAmmoId, out var ammoDefinition))
-            {
-                var ammoItem = m_Factory.Create(ammoDefinition, DefaultReserveRounds);
-                ammoPouch.Place(ammoItem, new GridPoint(0, 0), rotated: false);
-            }
-
-            return new PlayerLoadout(backpack, equipment, ammoPouch);
-        }
     }
 }

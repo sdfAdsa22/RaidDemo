@@ -77,11 +77,19 @@ namespace RaidDemo.Bootstrap
             };
 
             var capacity = 64 + (entries.Length * EnemySnapshotBytesEstimate);
-            using (var writer = new FastBufferWriter(capacity, Allocator.Temp))
+            // 与玩家快照同一条规则：跳过静默客户端（见 ServerRuntime.SilentClients）。
+            foreach (var clientId in manager.ConnectedClientsIds)
             {
+                if (IsClientSilent((int)clientId))
+                {
+                    continue;
+                }
+
+                using var writer = new FastBufferWriter(capacity, Allocator.Temp);
                 writer.WriteValueSafe(batch);
-                manager.CustomMessagingManager.SendNamedMessageToAll(
+                manager.CustomMessagingManager.SendNamedMessage(
                     EnemyNetworkChannel.SnapshotMessageName,
+                    clientId,
                     writer);
             }
         }
