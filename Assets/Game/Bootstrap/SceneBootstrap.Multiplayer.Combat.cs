@@ -89,6 +89,20 @@ namespace RaidDemo.Bootstrap
             m_CombatChannelRegistered = true;
         }
 
+        /// <summary>退订战斗事件通道（战局场景销毁时调用，见 <c>DetachFromServer</c>）。</summary>
+        private void UnregisterCombatChannel()
+        {
+            if (!m_CombatChannelRegistered || m_NetworkClient == null
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            m_NetworkClient.CustomMessagingManager.UnregisterNamedMessageHandler(
+                CombatNetworkChannel.EventMessageName);
+            m_CombatChannelRegistered = false;
+        }
+
         /// <summary>处理服务器下发的战斗事件：还原成本地事件发布出去。</summary>
         private void OnCombatEventReceived(ulong senderId, FastBufferReader reader)
         {

@@ -66,6 +66,20 @@ namespace RaidDemo.Bootstrap
             m_EnemyChannelRegistered = true;
         }
 
+        /// <summary>退订敌人快照通道（战局场景销毁时调用）。</summary>
+        private void UnregisterEnemyChannel()
+        {
+            if (!m_EnemyChannelRegistered || m_NetworkClient == null
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            m_NetworkClient.CustomMessagingManager.UnregisterNamedMessageHandler(
+                EnemyNetworkChannel.SnapshotMessageName);
+            m_EnemyChannelRegistered = false;
+        }
+
         /// <summary>
         /// 处理服务器下发的敌人快照：位置进插值缓冲，状态与生死直接覆盖。
         /// </summary>

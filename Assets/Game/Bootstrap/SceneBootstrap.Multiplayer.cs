@@ -35,7 +35,6 @@ namespace RaidDemo.Bootstrap
         private const float ReconciliationTolerance = 0.08f;
 
         private NetworkManager m_NetworkClient;
-        private UnityTransport m_NetworkTransport;
         private MovementPredictionBuffer m_Prediction;
         private float m_NetworkStepAccumulator;
         private uint m_NetworkSequence;
@@ -45,22 +44,43 @@ namespace RaidDemo.Bootstrap
         private double m_NextNetworkReportTime;
 
         /// <summary>是否处于联机客户端模式。</summary>
-        public bool IsMultiplayerClient => ClientMode.IsActive && m_NetworkClient != null;
+        public bool IsMultiplayerClient => m_NetworkClient != null;
+
+        /// <summary>
+        /// 本进程是否以联机客户端身份运行。
+        /// </summary>
+        /// <remarks>
+        /// <para>两条来源都要认：命令行 <c>-connect</c>（<see cref="ClientMode"/>）与
+        /// 大厅界面建立的会话（<see cref="MultiplayerClientSession"/>）。
+        /// 单机流程两者都为假。</para>
+        ///
+        /// <para><b>为什么用"进程级"判断而不是"网络是否连上"：</b>装配顺序上，
+        /// 判断"要不要生成 AI、要不要显示主菜单"发生在网络接管之前，
+        /// 那时候连接可能还在建立中——用后者会把联机局当成单机局来装配。</para>
+        /// </remarks>
+        private static bool IsMultiplayerProcess => ClientMode.IsActive || MultiplayerClientSession.IsActive;
 
         /// <summary>本机玩家的标识；未连接时为 -1。</summary>
         public int LocalNetworkPlayerId => m_LocalPlayerId;
 
         /// <summary>
-        /// 若以联机客户端启动，则建立网络连接与预测缓冲。
+        /// 若本次运行是联机客户端，则接管大厅会话已经建立的连接，并装配预测缓冲。
         /// </summary>
         /// <remarks>
-        /// 在装配末尾调用：此时移动模拟器、玩家表现与事件订阅都已就绪，
-        /// 网络层只需要接管"谁是权威"这件事。
+        /// <para><b>P4 的改动：网络连接不再由战局场景创建。</b>联机流程现在是
+        /// 大厅（安全屋场景）→ 服务器通知开局 → 加载地图场景，连接必须先于战局存在、
+        /// 并且活过这次场景切换。因此网络管理器由大厅会话持有（跨场景存活），
+        /// 战局装配只是<b>借用</b>它，并在这里挂上战局专属的快照与表现通道。</para>
+        ///
+        /// <para><b>必须在装配末尾调用</b>：此时移动模拟器、玩家表现与事件订阅都已就绪，
+        /// 网络层只需要接管"谁是权威"这件事。</para>
         /// </remarks>
         private void InitializeMultiplayerClientIfNeeded()
         {
-            if (!ClientMode.IsActive)
+            var session = MultiplayerClientSession.Current;
+            if (session == null || session.Network == null)
             {
+                // 既不是联机客户端，也没有会话：单机路径，什么都不用接。
                 return;
             }
 
@@ -74,34 +94,53 @@ namespace RaidDemo.Bootstrap
                 Debug.Log("[联机] 已开启自动行走（-autowalk），用于无头验收。");
             }
 
-            var host = new GameObject("NetworkClient");
-            DontDestroyOnLoad(host);
-
-            m_NetworkClient = host.AddComponent<NetworkManager>();
-            m_NetworkTransport = host.AddComponent<UnityTransport>();
-
-            // 与服务器对称：verbose 时打开 NGO 开发者日志，便于定位连接问题。
-            m_NetworkClient.LogLevel = ClientMode.Options != null
-                                       && ClientMode.Options.MinimumLogLevel == Kernel.LogLevel.Verbose
-                ? Unity.Netcode.LogLevel.Developer
-                : Unity.Netcode.LogLevel.Normal;
-
-            var (address, port) = SplitAddress(ClientMode.Address);
-            m_NetworkTransport.SetConnectionData(address, port);
-
-            // 与服务器共用同一份配置工厂：任何一处差异都会让 NGO 在握手阶段断开连接。
-            m_NetworkClient.NetworkConfig = NetworkConfigFactory.Create(m_NetworkTransport);
-
-            m_NetworkClient.OnClientConnectedCallback += OnNetworkConnected;
+            m_NetworkClient = session.Network;
             m_NetworkClient.OnClientDisconnectCallback += OnNetworkDisconnected;
 
-            if (!m_NetworkClient.StartClient())
+            if (m_NetworkClient.IsConnectedClient)
             {
-                Debug.LogError($"[联机] 连接失败：{address}:{port}");
+                // 大厅已经连上了：直接挂战局通道，不等下一次连接回调。
+                AttachToServer(session.LocalClientId);
                 return;
             }
 
-            Debug.Log($"[联机] 正在连接 {address}:{port} …");
+            m_NetworkClient.OnClientConnectedCallback += OnNetworkConnected;
+            Debug.Log("[联机] 战局场景已就绪，等待大厅会话连接完成。");
+        }
+
+        /// <summary>
+        /// 退订战局专属通道与连接回调。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须做：</b>网络管理器现在由大厅会话持有、跨场景存活，
+        /// 而注册的处理器指向的是**本场景的对象**。场景销毁后若不退订，
+        /// 下一局开局时（第二次加载战局场景）会注册不上（同名处理器已存在），
+        /// 表现为"第二局看不到队友、看不到敌人、箱子是空的"——而日志里只有一条警告。</para>
+        ///
+        /// <para>由 <c>SceneBootstrap.OnDestroy</c> 统一调用（一个类只能有一个 OnDestroy）。</para>
+        /// </remarks>
+        private void DetachFromServer()
+        {
+            if (m_NetworkClient != null)
+            {
+                m_NetworkClient.OnClientConnectedCallback -= OnNetworkConnected;
+                m_NetworkClient.OnClientDisconnectCallback -= OnNetworkDisconnected;
+
+                var messaging = m_NetworkClient.CustomMessagingManager;
+                if (messaging != null && m_NetworkSnapshotHandlerRegistered)
+                {
+                    messaging.UnregisterNamedMessageHandler(MovementNetworkChannel.SnapshotMessageName);
+                }
+            }
+
+            UnregisterCombatChannel();
+            UnregisterEnemyChannel();
+            UnregisterContainerChannel();
+            UnregisterRaidOutcomeChannel();
+            UnregisterLifeChannel();
+
+            m_NetworkSnapshotHandlerRegistered = false;
+            m_NetworkClient = null;
         }
 
         /// <summary>
@@ -110,7 +149,16 @@ namespace RaidDemo.Bootstrap
         /// <param name="clientId">本机在服务器上的连接标识（等于自己的玩家标识）。</param>
         private void OnNetworkConnected(ulong clientId)
         {
-            m_LocalPlayerId = (int)clientId;
+            AttachToServer((int)clientId);
+        }
+
+        /// <summary>
+        /// 挂上战局通道（连接已建立时调用）。
+        /// </summary>
+        /// <param name="playerId">本机在服务器上的玩家编号。</param>
+        private void AttachToServer(int playerId)
+        {
+            m_LocalPlayerId = playerId;
             Debug.Log($"[联机] 已连接，玩家标识 {m_LocalPlayerId}。");
 
             if (m_NetworkSnapshotHandlerRegistered || m_NetworkClient.CustomMessagingManager == null)
@@ -305,25 +353,5 @@ namespace RaidDemo.Bootstrap
                 $"重放 {m_Prediction.PendingCount} 条输入（seq={entry.Sequence}）。");
         }
 
-        /// <summary>
-        /// 拆分"主机[:端口]"。
-        /// </summary>
-        /// <remarks>
-        /// 只写主机时用 <c>-port</c> 的值（默认 7777）；显式写了端口则以地址里的为准。
-        /// 这样"本机联机"只需一个 <c>-connect 127.0.0.1</c>。
-        /// </remarks>
-        private (string Address, ushort Port) SplitAddress(string raw)
-        {
-            var text = string.IsNullOrEmpty(raw) ? "127.0.0.1" : raw;
-            var separator = text.LastIndexOf(':');
-
-            if (separator > 0 && ushort.TryParse(text.Substring(separator + 1), out var explicitPort))
-            {
-                return (text.Substring(0, separator), explicitPort);
-            }
-
-            var fallback = ClientMode.Options != null ? ClientMode.Options.Port : 7777;
-            return (text, (ushort)fallback);
-        }
     }
 }

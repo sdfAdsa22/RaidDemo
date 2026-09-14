@@ -31,7 +31,7 @@ namespace RaidDemo.Bootstrap
         /// <remarks>在 <c>InitializeInventory</c> 注册完本地处理器之后调用。</remarks>
         private void OverrideInventoryCommandsForMultiplayer()
         {
-            if (!ClientMode.IsActive || m_CommandRouter == null)
+            if (!IsMultiplayerProcess || m_CommandRouter == null)
             {
                 return;
             }

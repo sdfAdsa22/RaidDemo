@@ -46,6 +46,20 @@ namespace RaidDemo.Bootstrap
             m_LifeChannelRegistered = true;
         }
 
+        /// <summary>退订生命事件通道（战局场景销毁时调用）。</summary>
+        private void UnregisterLifeChannel()
+        {
+            if (!m_LifeChannelRegistered || m_NetworkClient == null
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            m_NetworkClient.CustomMessagingManager.UnregisterNamedMessageHandler(
+                ContainerNetworkChannel.LifeMessageName);
+            m_LifeChannelRegistered = false;
+        }
+
         /// <summary>处理倒地 / 被救起 / 流血死亡。</summary>
         private void OnLifeEventReceived(ulong senderId, FastBufferReader reader)
         {

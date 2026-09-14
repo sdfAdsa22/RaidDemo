@@ -165,15 +165,22 @@ namespace RaidDemo.Bootstrap
             ServerRuntime.Create(ServerMode.Options);
         }
 
+        /// <summary>自动化验收用的默认昵称（未传 <c>-nickname</c> 时）。</summary>
+        private const string DefaultAutoNickname = "测试员";
+
+        /// <summary>自动化验收用的默认口令（未传 <c>-passphrase</c> 时）。</summary>
+        private const string DefaultAutoPassphrase = "123456";
+
         /// <summary>
-        /// 场景加载后：联机客户端按参数切到地图场景。
+        /// 场景加载后：联机客户端建立大厅会话并连接（<c>-connect</c> 路径）。
         /// </summary>
         /// <remarks>
-        /// <para><b>P1~P3 的临时行为：</b>客户端从命令行直接进入战局地图，跳过安全屋。
-        /// P4 的大厅会让玩家在安全屋里点"出击"再进战局，届时这条路径只服务于自动化测试。</para>
+        /// <para><b>P4 的行为变化：</b>客户端不再"按参数直接进地图"。它先建立会话、登录，
+        /// 进房（若带 <c>-autoroom</c>），等服务器通知开局后才加载地图——
+        /// 与手点大厅界面走的是同一条路径，只是把界面那一侧的输入换成了命令行参数。</para>
         ///
-        /// <para>之所以要在这里切场景，是因为联机客户端的装配发生在战局场景的启动类里：
-        /// 构建列表的第一个场景是安全屋，那里没有联机装配。</para>
+        /// <para><b>为什么要在这里建会话：</b>构建列表的第一个场景是安全屋，
+        /// 大厅界面就叠在它上面；会话必须早于界面存在，界面才有东西可显示。</para>
         /// </remarks>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void StartClientRuntime()
@@ -183,14 +190,30 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            var mapScene = ClientMode.Options != null ? ClientMode.Options.MapSceneName : null;
-            if (string.IsNullOrEmpty(mapScene) || SceneManager.GetActiveScene().name == mapScene)
+            var options = ClientMode.Options;
+            var session = MultiplayerClientSession.Ensure();
+
+            session.AutoRoom = options != null && options.AutoRoom;
+            session.AutoRoomPassword = options != null ? options.RoomPassword : string.Empty;
+
+            var nickname = options != null && !string.IsNullOrEmpty(options.Nickname)
+                ? options.Nickname
+                : DefaultAutoNickname;
+            var passphrase = options != null && !string.IsNullOrEmpty(options.Passphrase)
+                ? options.Passphrase
+                : DefaultAutoPassphrase;
+
+            if (options != null && string.IsNullOrEmpty(options.Nickname) && options.AutoRoom)
             {
-                return;
+                Debug.Log(
+                    $"[启动] 未指定 -nickname，使用默认昵称「{nickname}」：" +
+                    "同一台服务器上的多个客户端必须用不同的 -nickname，否则会被判为昵称冲突。");
             }
 
-            Debug.Log($"[启动] 联机客户端加载地图：{mapScene}");
-            SceneManager.LoadScene(mapScene);
+            if (!session.Connect(ClientMode.Address, nickname, passphrase))
+            {
+                Debug.LogError("[启动] 联机客户端连接失败：地址、昵称或口令不合法。");
+            }
         }
     }
 }

@@ -1,0 +1,389 @@
+using System.Collections.Generic;
+using RaidDemo.UI;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace RaidDemo.Bootstrap
+{
+    /// <summary>
+    /// 流程控制器的联机部分：主菜单 ↔ 联机界面 ↔ 房间界面 ↔ 战局。
+    /// </summary>
+    /// <remarks>
+    /// <para><b>它在联机里扮演什么：</b>界面只负责"画"与"点"，会话只负责"协议与状态"，
+    /// 这个文件负责把两者接起来，并且决定"什么时候切场景"。
+    /// 场景切换放在这里而不是会话里，是因为只有装配层同时认识流程状态、界面与场景加载。</para>
+    ///
+    /// <para><b>屏幕的对应关系：</b></para>
+    /// <list type="bullet">
+    /// <item><description>未连接 / 连接中 / 登录中 → 联机界面（地址、昵称、口令、局域网扫描）；</description></item>
+    /// <item><description>已登录（不在房间）→ 房间界面（创建 / 加入表单）；</description></item>
+    /// <item><description>已在房间 → 房间界面（成员列表、房主开局）；</description></item>
+    /// <item><description>战局中 → 两个界面都收起，由服务器通知加载地图。</description></item>
+    /// </list>
+    /// </remarks>
+    public sealed partial class RaidFlowController
+    {
+        private MultiplayerMenuScreen m_MultiplayerScreen;
+        private LobbyScreen m_LobbyScreen;
+        private MultiplayerClientSession m_Session;
+
+        /// <summary>传给房间界面的成员列表（复用同一份，避免每帧分配）。</summary>
+        private readonly List<LobbyRoomMember> m_RoomMembers = new List<LobbyRoomMember>(LobbyLimits.MaxPlayers);
+
+        /// <summary>局域网扫描的收尾时刻；-1 表示当前没有扫描。</summary>
+        private float m_ScanDeadline = -1f;
+
+        /// <summary>联机相关的界面当前是否处于显示状态（用于判断"断开后要不要回到联机界面"）。</summary>
+        private bool m_MultiplayerUiActive;
+
+        /// <summary>局域网扫描窗口（秒）。直接取发现模块的常量，避免两处数值不一致。</summary>
+        private const float ScanWindowSeconds = LanDiscoveryScanner.ScanWindowSeconds;
+
+        /// <summary>创建联机界面与会话订阅。由 Awake 调用一次。</summary>
+        private void InitializeMultiplayerFlow()
+        {
+            m_MultiplayerScreen = gameObject.AddComponent<MultiplayerMenuScreen>();
+            m_MultiplayerScreen.Initialize(new MultiplayerMenuActions
+            {
+                Connect = OnMultiplayerConnect,
+                Scan = OnMultiplayerScan,
+                JoinFound = OnMultiplayerJoinFound,
+                Back = ReturnToMainMenuFromMultiplayer,
+            });
+
+            m_LobbyScreen = gameObject.AddComponent<LobbyScreen>();
+            m_LobbyScreen.Initialize(new LobbyRoomActions
+            {
+                CreateRoom = OnMultiplayerCreateRoom,
+                JoinRoom = OnMultiplayerJoinRoom,
+                StartRaid = OnMultiplayerStartRaid,
+                LeaveRoom = OnMultiplayerLeaveRoom,
+            });
+        }
+
+        /// <summary>
+        /// 主菜单 → 联机界面。
+        /// </summary>
+        /// <remarks>
+        /// 这里把 <c>Time.timeScale</c> 恢复为 1：主菜单是"暂停"语义，而联机流程依赖帧推进
+        /// （连接握手、超时判定都在 Update 里），停在暂停状态会表现为"一直连不上"。
+        /// </remarks>
+        public void ShowMultiplayerMenu()
+        {
+            HidePauseMenu();
+            State = FlowState.MainMenu;
+            Time.timeScale = 1f;
+            m_MenuScreen.SetVisible(false);
+            m_ResultScreen.SetVisible(false);
+            m_LobbyScreen.SetVisible(false);
+
+            ShowServersScreen(null, null);
+            UnlockCursor();
+            EnsureSessionSubscription();
+        }
+
+        /// <summary>每帧推进：会话订阅与局域网扫描收尾。</summary>
+        private void Update()
+        {
+            EnsureSessionSubscription();
+            TickScanWindow();
+        }
+
+        /// <summary>会话第一次出现时挂上事件订阅（会话可能在界面创建之后才建立）。</summary>
+        private void EnsureSessionSubscription()
+        {
+            var session = MultiplayerClientSession.Current;
+            if (session == null || session == m_Session)
+            {
+                return;
+            }
+
+            if (m_Session != null)
+            {
+                m_Session.Changed -= OnSessionChanged;
+                m_Session.RaidStarting -= OnRaidStarting;
+            }
+
+            m_Session = session;
+            m_Session.Changed += OnSessionChanged;
+            m_Session.RaidStarting += OnRaidStarting;
+
+            // 会话可能在我们订阅之前就已经走到了某个阶段（例如命令行直接连接），
+            // 因此订阅之后立刻按当前状态刷一次界面。
+            OnSessionChanged();
+        }
+
+        /// <summary>把当前会话状态映射到界面。</summary>
+        private void OnSessionChanged()
+        {
+            if (m_Session == null || m_MultiplayerScreen == null)
+            {
+                return;
+            }
+
+            switch (m_Session.Phase)
+            {
+                case MultiplayerClientPhase.Connecting:
+                case MultiplayerClientPhase.LoggingIn:
+                    m_LobbyScreen.SetVisible(false);
+                    m_MultiplayerScreen.SetVisible(true);
+                    m_MultiplayerScreen.SetBusy(true);
+                    m_MultiplayerScreen.SetStatus(m_Session.StatusText, false);
+                    break;
+
+                case MultiplayerClientPhase.InLobby:
+                case MultiplayerClientPhase.InRoom:
+                    ApplyLobbyScreen();
+                    break;
+
+                case MultiplayerClientPhase.InRaid:
+                    m_MultiplayerScreen.SetVisible(false);
+                    m_LobbyScreen.SetVisible(false);
+                    break;
+
+                default:
+                    // 未连接：如果界面正开着（说明玩家来过联机），把失败原因显示出来。
+                    if (m_MultiplayerUiActive)
+                    {
+                        ShowServersScreen(m_Session.LastError, m_Session.LastError == null ? "连接已断开。" : null);
+                    }
+
+                    break;
+            }
+        }
+
+        /// <summary>显示联机界面（服务器地址、昵称、口令、扫描结果）。</summary>
+        private void ShowServersScreen(string error, string status)
+        {
+            var nickname = string.Empty;
+            var address = "127.0.0.1";
+            var port = LaunchOptions.DefaultPort;
+
+            if (ClientAccountStore.TryLoad(out var data))
+            {
+                nickname = data.Nickname ?? string.Empty;
+                if (!string.IsNullOrEmpty(data.LastAddress))
+                {
+                    ParseAddress(data.LastAddress, out address, out port);
+                }
+            }
+
+            if (string.IsNullOrEmpty(nickname))
+            {
+                nickname = LobbyText.SuggestNickname();
+            }
+
+            m_MultiplayerScreen.SetDefaults(nickname, DefaultPassphrase, address, port);
+            m_MultiplayerScreen.SetBusy(false);
+            m_MultiplayerScreen.SetScanning(false);
+            m_MultiplayerScreen.SetStatus(
+                string.IsNullOrEmpty(error) ? (status ?? string.Empty) : error,
+                !string.IsNullOrEmpty(error));
+            m_MultiplayerScreen.SetVisible(true);
+            m_LobbyScreen.SetVisible(false);
+            m_MultiplayerUiActive = true;
+        }
+
+        /// <summary>默认口令：与命令行验收用的默认值一致，方便第一次联机的人直接连上。</summary>
+        private const string DefaultPassphrase = "123456";
+
+        /// <summary>显示房间界面（创建 / 加入 / 成员列表）。</summary>
+        private void ApplyLobbyScreen()
+        {
+            m_MultiplayerScreen.SetVisible(false);
+            m_LobbyScreen.SetVisible(true);
+            m_MultiplayerUiActive = true;
+            m_LobbyScreen.SetBusy(false);
+            m_LobbyScreen.SetStatus(m_Session.LastError, !string.IsNullOrEmpty(m_Session.LastError));
+            m_LobbyScreen.SetNickname(m_Session.Nickname);
+
+            m_RoomMembers.Clear();
+            if (m_Session.SelfInRoom)
+            {
+                ResetRoomMemberBuffer();
+            }
+
+            // 只有在房间里才显示成员列表；不在房间里时传空房间名，界面会回到"创建 / 加入"表单。
+            var roomName = m_Session.SelfInRoom ? m_Session.RoomName : string.Empty;
+            m_LobbyScreen.SetRoom(
+                roomName,
+                m_Session.RoomHasPassword,
+                m_Session.IsHost,
+                m_Session.RoomPhase == LobbyPhase.InRaid,
+                m_RoomMembers);
+        }
+
+        /// <summary>把会话里的成员列表映射成界面结构。</summary>
+        private void ResetRoomMemberBuffer()
+        {
+            var members = m_Session.RoomMembers;
+            for (var i = 0; i < members.Count; i++)
+            {
+                m_RoomMembers.Add(new LobbyRoomMember
+                {
+                    Nickname = members[i].Nickname,
+                    IsHost = members[i].IsHost,
+                    IsSelf = members[i].ClientId == m_Session.LocalClientId,
+                });
+            }
+        }
+
+        /// <summary>点「连接」：建立会话并登录。</summary>
+        private void OnMultiplayerConnect(string address, int port, string nickname, string passphrase)
+        {
+            var session = MultiplayerClientSession.Ensure();
+            EnsureSessionSubscription();
+            session.AutoRoom = false;
+
+            m_MultiplayerScreen.SetBusy(true);
+            m_MultiplayerScreen.SetStatus($"正在连接 {address}:{port} …", false);
+
+            if (!session.Connect(address, port, nickname, passphrase))
+            {
+                m_MultiplayerScreen.SetBusy(false);
+                m_MultiplayerScreen.SetStatus(session.LastError, true);
+            }
+        }
+
+        /// <summary>点「局域网扫描」或点某一行扫描结果：把地址填进界面。</summary>
+        private void OnMultiplayerJoinFound(string address, int port)
+        {
+            m_MultiplayerScreen.SetDefaults(null, null, address, port);
+            m_MultiplayerScreen.SetStatus($"已选择 {address}:{port}，点「连接」加入。", false);
+        }
+
+        /// <summary>点「扫描」：开始一轮局域网发现。</summary>
+        private void OnMultiplayerScan()
+        {
+            m_ScanDeadline = Time.realtimeSinceStartup + ScanWindowSeconds;
+            m_MultiplayerScreen.SetScanning(true);
+            m_MultiplayerScreen.SetStatus("正在搜索局域网房间…", false);
+            StartLanScan();
+        }
+
+        /// <summary>扫描窗口结束：收起"扫描中"状态。</summary>
+        private void TickScanWindow()
+        {
+            if (m_ScanDeadline < 0f)
+            {
+                return;
+            }
+
+            // 扫描期间每帧收包：回包可能随时到达（服务器是被动应答），
+            // 只在窗口结束时收一次会把这 1.2 秒里的包堆在系统缓冲里，容易丢。
+            m_LanScanner?.Poll();
+
+            if (Time.realtimeSinceStartup < m_ScanDeadline)
+            {
+                return;
+            }
+
+            m_ScanDeadline = -1f;
+            m_MultiplayerScreen.SetScanning(false);
+            FinishLanScan();
+        }
+
+        /// <summary>点「创建房间」。</summary>
+        private void OnMultiplayerCreateRoom(string roomName, string password)
+        {
+            if (m_Session == null)
+            {
+                return;
+            }
+
+            m_LobbyScreen.SetBusy(true);
+            m_LobbyScreen.SetStatus("正在创建房间…", false);
+            m_Session.CreateRoom(roomName, password);
+        }
+
+        /// <summary>点「加入房间」。</summary>
+        private void OnMultiplayerJoinRoom(string password)
+        {
+            if (m_Session == null)
+            {
+                return;
+            }
+
+            m_LobbyScreen.SetBusy(true);
+            m_LobbyScreen.SetStatus("正在加入房间…", false);
+            m_Session.JoinRoom(password);
+        }
+
+        /// <summary>房主点「开始战局」。</summary>
+        private void OnMultiplayerStartRaid()
+        {
+            if (m_Session == null)
+            {
+                return;
+            }
+
+            m_LobbyScreen.SetBusy(true);
+            m_LobbyScreen.SetStatus("正在开始战局…", false);
+            m_Session.StartRaid();
+        }
+
+        /// <summary>点「离开房间」：回到联机界面（连接与登录保持）。</summary>
+        private void OnMultiplayerLeaveRoom()
+        {
+            if (m_Session == null)
+            {
+                return;
+            }
+
+            m_Session.LeaveRoom();
+        }
+
+        /// <summary>
+        /// 服务器通知开局：收起界面并加载地图。
+        /// </summary>
+        /// <param name="mapSceneName">服务器指定的地图场景名。</param>
+        private void OnRaidStarting(string mapSceneName)
+        {
+            if (string.IsNullOrEmpty(mapSceneName))
+            {
+                Debug.LogError("[联机] 服务器通知开局，但没有给出地图名。");
+                return;
+            }
+
+            m_MultiplayerScreen.SetVisible(false);
+            m_LobbyScreen.SetVisible(false);
+            m_MultiplayerUiActive = false;
+            State = FlowState.InRaid;
+            Time.timeScale = 1f;
+
+            if (SceneManager.GetActiveScene().name == mapSceneName)
+            {
+                return;
+            }
+
+            Debug.Log($"[联机] 加载战局地图：{mapSceneName}");
+            SceneManager.LoadScene(mapSceneName);
+        }
+
+        /// <summary>联机界面点「返回主菜单」：断开连接并回到主菜单。</summary>
+        private void ReturnToMainMenuFromMultiplayer()
+        {
+            m_Session?.Disconnect();
+            ShowMainMenu();
+        }
+
+        /// <summary>拆分"主机[:端口]"（用于把上次地址回填到界面）。</summary>
+        private static void ParseAddress(string raw, out string address, out int port)
+        {
+            address = string.IsNullOrWhiteSpace(raw) ? "127.0.0.1" : raw.Trim();
+            port = LaunchOptions.DefaultPort;
+
+            var separator = address.LastIndexOf(':');
+            if (separator <= 0)
+            {
+                return;
+            }
+
+            if (int.TryParse(address.Substring(separator + 1), out var parsed) && parsed > 0 && parsed <= 65535)
+            {
+                port = parsed;
+                address = address.Substring(0, separator);
+            }
+        }
+    }
+}

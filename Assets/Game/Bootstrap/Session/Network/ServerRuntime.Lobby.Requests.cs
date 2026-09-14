@@ -1,0 +1,203 @@
+using System;
+
+namespace RaidDemo.Bootstrap
+{
+    /// <summary>
+    /// 服务器运行时的大厅请求处理：登录、建 / 加房、开局、离开。
+    /// </summary>
+    /// <remarks>
+    /// <para>每个处理器都是"校验 → 调用状态机 → 回结果 / 广播"这三步。规则本身在
+    /// <see cref="LobbyRoom"/> 与 <see cref="ServerIdentityStore"/> 里，
+    /// 这里只负责把它们串起来并翻译成人话。</para>
+    ///
+    /// <para><b>失败也要回消息</b>：客户端界面的每一句提示都来自这里的 detail，
+    /// 只记服务器日志不回消息的话，玩家看到的是"点了没反应"。</para>
+    /// </remarks>
+    public sealed partial class ServerRuntime
+    {
+        /// <summary>登录（不存在则建号），成功后把房间状态点对点发给他。</summary>
+        private void HandleLobbyLogin(LobbyClient client, string nickname, string secret)
+        {
+            if (client.LoggedIn)
+            {
+                SendLobbyResult(client.ClientId, LobbyRequestKind.Login, false,
+                    LobbyError.AlreadyLoggedIn, "这次连接已经登录过了。");
+                return;
+            }
+
+            if (!m_Identities.TryLogin(
+                    nickname,
+                    secret,
+                    out var error,
+                    out var detail,
+                    out var token,
+                    out var created))
+            {
+                var reason = string.IsNullOrEmpty(detail) ? DescribeLoginError(error) : detail;
+                SendLobbyResult(client.ClientId, LobbyRequestKind.Login, false, error, reason);
+                m_Session?.Log.Info(
+                    $"[服务器] 客户端 {client.ClientId} 登录失败（{(nickname ?? string.Empty).Trim()}）：{reason}");
+                return;
+            }
+
+            var displayName = (nickname ?? string.Empty).Trim();
+
+            if (IsNicknameOnline(displayName, client.ClientId))
+            {
+                SendLobbyResult(client.ClientId, LobbyRequestKind.Login, false,
+                    LobbyError.NicknameOnline, "该昵称已在服务器上游戏中，请换一个昵称。");
+                return;
+            }
+
+            client.Nickname = displayName;
+            client.LoggedIn = true;
+
+            SendLobbyResult(
+                client.ClientId,
+                LobbyRequestKind.Login,
+                true,
+                LobbyError.None,
+                string.IsNullOrEmpty(detail) ? "登录成功。" : detail,
+                token);
+
+            m_Session?.Log.Info(
+                $"[服务器] 玩家 {client.ClientId} 以「{displayName}」登录{(created ? "（新建账号）" : "（老账号）")}。");
+
+            // 登录成功后才点对点发房间状态：此时对方的处理器一定已经注册好了（P-20）。
+            SendRoomStateTo(client.ClientId);
+        }
+
+        /// <summary>创建房间（仅空闲阶段）。</summary>
+        private void HandleLobbyCreateRoom(LobbyClient client, string roomName, string password)
+        {
+            if (!RequireLobbyLogin(client, LobbyRequestKind.CreateRoom))
+            {
+                return;
+            }
+
+            var name = string.IsNullOrWhiteSpace(roomName) ? m_Options.RoomName : roomName.Trim();
+            if (!m_Room.TryCreate(client.ClientId, client.Nickname, name, password ?? string.Empty, out var error))
+            {
+                SendLobbyResult(client.ClientId, LobbyRequestKind.CreateRoom, false, error, DescribeRoomError(error));
+                return;
+            }
+
+            SendLobbyResult(client.ClientId, LobbyRequestKind.CreateRoom, true, LobbyError.None, "房间已创建。");
+            m_Session?.Log.Info(
+                $"[服务器] 房间「{m_Room.RoomName}」已创建：房主 {client.ClientId}「{client.Nickname}」"
+                + (m_Room.HasPassword ? "（设了密码）" : "（未设密码）"));
+
+            BroadcastRoomState();
+            ScheduleAutoStart();
+        }
+
+        /// <summary>加入房间。</summary>
+        private void HandleLobbyJoinRoom(LobbyClient client, string password)
+        {
+            if (!RequireLobbyLogin(client, LobbyRequestKind.JoinRoom))
+            {
+                return;
+            }
+
+            if (!m_Room.TryJoin(client.ClientId, client.Nickname, password ?? string.Empty, out var error))
+            {
+                SendLobbyResult(client.ClientId, LobbyRequestKind.JoinRoom, false, error, DescribeRoomError(error));
+                m_Session?.Log.Info(
+                    $"[服务器] 玩家 {client.ClientId}「{client.Nickname}」加入房间失败：{DescribeRoomError(error)}");
+                return;
+            }
+
+            SendLobbyResult(client.ClientId, LobbyRequestKind.JoinRoom, true, LobbyError.None, "已加入房间。");
+            m_Session?.Log.Info(
+                $"[服务器] 玩家 {client.ClientId}「{client.Nickname}」加入房间（{m_Room.MemberCount}/{LobbyLimits.MaxPlayers}）。");
+
+            BroadcastRoomState();
+        }
+
+        /// <summary>开始战局（仅房主、仅等待阶段）。</summary>
+        private void HandleLobbyStartRaid(LobbyClient client)
+        {
+            if (!RequireLobbyLogin(client, LobbyRequestKind.StartRaid))
+            {
+                return;
+            }
+
+            if (!m_Room.TryStartRaid(client.ClientId, out var error))
+            {
+                SendLobbyResult(client.ClientId, LobbyRequestKind.StartRaid, false, error, DescribeRoomError(error));
+                return;
+            }
+
+            SendLobbyResult(client.ClientId, LobbyRequestKind.StartRaid, true, LobbyError.None, "正在开始战局。");
+            StartRaidFromLobby();
+        }
+
+        /// <summary>离开房间。</summary>
+        private void HandleLobbyLeaveRoom(LobbyClient client)
+        {
+            if (m_Room.Find(client.ClientId) == null)
+            {
+                SendLobbyResult(client.ClientId, LobbyRequestKind.LeaveRoom, false,
+                    LobbyError.NotInRoom, "你不在任何房间里。");
+                return;
+            }
+
+            var wasInRaid = m_Room.Phase == LobbyPhase.InRaid;
+            if (!m_Room.TryLeave(client.ClientId, out var roomEnded))
+            {
+                return;
+            }
+
+            // 战局中离开等于退赛：把他从世界里撤掉，剩下的队友继续打。
+            if (wasInRaid)
+            {
+                RemovePlayerFromWorld(client.ClientId);
+                m_RaidProgress.Remove(client.ClientId);
+            }
+
+            SendLobbyResult(client.ClientId, LobbyRequestKind.LeaveRoom, true, LobbyError.None, "已离开房间。");
+            m_Session?.Log.Info(
+                roomEnded
+                    ? $"[服务器] 玩家 {client.ClientId}「{client.Nickname}」离开，房间已解散。"
+                    : $"[服务器] 玩家 {client.ClientId}「{client.Nickname}」离开房间（剩余 {m_Room.MemberCount} 人）。");
+
+            BroadcastRoomState();
+            CheckRaidCompletion();
+        }
+
+        /// <summary>登录检查：未登录时回一条明确的失败结果。</summary>
+        private bool RequireLobbyLogin(LobbyClient client, LobbyRequestKind kind)
+        {
+            if (client.LoggedIn)
+            {
+                return true;
+            }
+
+            SendLobbyResult(client.ClientId, kind, false, LobbyError.NotLoggedIn, "请先输入昵称与口令登录。");
+            return false;
+        }
+
+        /// <summary>昵称是否已被另一条在线连接占用。</summary>
+        /// <remarks>
+        /// 大小写敏感，与账号库的查找规则一致（`StringComparer.Ordinal`）：
+        /// 两边规则不同会出现"能登录、却被判在线重复"这种自相矛盾的结果。
+        /// </remarks>
+        private bool IsNicknameOnline(string nickname, int exceptClientId)
+        {
+            foreach (var pair in m_LobbyClients)
+            {
+                if (pair.Key == exceptClientId || !pair.Value.LoggedIn)
+                {
+                    continue;
+                }
+
+                if (string.Equals(pair.Value.Nickname, nickname, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+}

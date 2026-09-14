@@ -20,6 +20,7 @@
         "RaidDemo.UI",
         "RaidDemo.Bootstrap.Editor",
         "Unity.TextMeshPro",
+        "Unity.Collections",
         "Unity.Netcode.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

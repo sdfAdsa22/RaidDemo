@@ -165,6 +165,12 @@ namespace RaidDemo.Bootstrap
             m_CodexMarker?.Dispose();
             m_CodexMarker = null;
             m_AiDirector?.Dispose();
+
+            // 联机客户端：把战局专属的网络通道退订干净。
+            // 网络管理器由大厅会话持有、跨场景存活，这里不退订的话，
+            // 下一局加载战局场景时同名处理器注册不上（第二局会"看不到队友与敌人"）。
+            DetachFromServer();
+
             m_Session?.Dispose();
             m_Session = null;
         }
@@ -293,7 +299,7 @@ namespace RaidDemo.Bootstrap
             // 单机走的是「本机内嵌服务器」形态：权威逻辑与客户端同进程，但边界已经按服务器设计。
             // 联机客户端按启动参数决定日志等级：诊断联机问题时，
             // 客户端侧的证据（"我到底发了什么"）和服务器侧同样重要。
-            m_Session = ClientMode.IsActive && ClientMode.Options != null
+            m_Session = IsMultiplayerProcess && ClientMode.Options != null
                 ? new SessionScope("联机客户端", ClientMode.Options.MinimumLogLevel)
                 : SessionScope.CreateLocal();
             m_EventBus = m_Session.Events;
@@ -339,7 +345,7 @@ namespace RaidDemo.Bootstrap
 
             // 联机客户端：连上服务器就等于已经在战局里。停在主菜单不仅语义不对，
             // 还会把 timeScale 压成 0——网络栈依赖时间推进，那样连接永远建不起来。
-            if (ClientMode.IsActive && flow.State != RaidFlowController.FlowState.InRaid)
+            if (IsMultiplayerProcess && flow.State != RaidFlowController.FlowState.InRaid)
             {
                 flow.EnterRaidDirectly();
             }
@@ -350,7 +356,7 @@ namespace RaidDemo.Bootstrap
                 // 否则同一张地图上会有两套互相独立的 AI —— 位置、状态与伤害判定都不一致，
                 // 而且客户端那套并不权威（打死了服务器也不认）。
                 // 客户端要做的只是把服务器给的结果画出来，那部分在 20.5 接入。
-                if (!ClientMode.IsActive)
+                if (!IsMultiplayerProcess)
                 {
                     InitializeAi();
                 }

@@ -54,7 +54,7 @@ namespace RaidDemo.Bootstrap
         {
             m_World = new MovementServerWorld(collisionFactory: CreateCollisionWorld);
 
-            m_Network.OnClientConnectedCallback += OnClientConnected;
+            // 接入事件由大厅处理（P4）：连上不等于进图，只有开局才把人放进权威世界。
             m_Network.OnClientDisconnectCallback += OnClientDisconnected;
 
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
@@ -90,7 +90,6 @@ namespace RaidDemo.Bootstrap
         {
             if (m_Network != null)
             {
-                m_Network.OnClientConnectedCallback -= OnClientConnected;
                 m_Network.OnClientDisconnectCallback -= OnClientDisconnected;
 
                 m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
@@ -138,52 +137,6 @@ namespace RaidDemo.Bootstrap
 
             m_Session.Log.Info($"[服务器] 加载地图场景：{sceneName}");
             SceneManager.LoadScene(sceneName);
-        }
-
-        /// <summary>有新客户端接入：生成玩家对象并把它加入权威世界。</summary>
-        private void OnClientConnected(ulong clientId)
-        {
-            if (m_World == null)
-            {
-                m_Session?.Log.Warning($"[服务器] 权威世界未就绪，连接 {clientId} 未加入。");
-                return;
-            }
-
-            var playerId = (int)clientId;
-            CreatePlayerBody(playerId);
-
-            var position = SpawnPositionFor(playerId);
-            if (!m_World.TryAddPlayer(playerId, position, Vector2F.Up, out var error))
-            {
-                m_Session?.Log.Warning($"[服务器] 玩家 {playerId} 加入权威世界失败：{error}");
-                return;
-            }
-
-            m_Session?.Log.Info($"[服务器] 玩家 {playerId} 已加入（在线 {m_World.PlayerCount} 人）。");
-            RegisterLifeState(playerId);
-            AddPlayerToCombat(playerId);
-            BindPlayerHitTarget(playerId);
-
-            // 背包命令通道要在参战之后建（需要随身装备）；容器内容随接入下发。
-            RegisterPlayerContainers(playerId);
-            SendAllContainerContentsTo(clientId);
-        }
-
-        /// <summary>客户端断开：从权威世界移除。</summary>
-        private void OnClientDisconnected(ulong clientId)
-        {
-            var playerId = (int)clientId;
-            m_PlayerBodies.Remove(playerId);
-            m_PlayerGroundHeights.Remove(playerId);
-            UnregisterPlayerContainers(playerId);
-            UnregisterRaidProgress(playerId);
-            UnregisterLifeState(playerId);
-            RemovePlayerFromCombat(playerId);
-
-            if (m_World != null && m_World.RemovePlayer(playerId))
-            {
-                m_Session?.Log.Info($"[服务器] 玩家 {playerId} 已移除（在线 {m_World.PlayerCount} 人）。");
-            }
         }
 
         /// <summary>

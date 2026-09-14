@@ -122,6 +122,10 @@ namespace RaidDemo.Bootstrap
             log.Info(ServerAddressReporter.BuildReport(options.Port));
             log.Info($"[服务器] 存档目录：{options.SaveDirectory}（P5 起用于按账号隔离的进度落库）");
 
+            // 大厅必须先于移动世界建立：连接事件的第一订阅者是大厅——
+            // "客户端接入"在大厅里只是登记登录态，真正进入地图发生在开局（P4）。
+            InitializeLobby();
+
             InitializeMovement();
 
             // 导航装配必须排在移动装配之后：地图场景是在移动装配里加载的，
@@ -143,6 +147,8 @@ namespace RaidDemo.Bootstrap
             }
 
             // 权威世界的推进独立于心跳：每帧都要走，心跳只是周期性日志。
+            TickLobby();
+            TickServerIntegrations();
             TickNavigation();
             TickContainers();
             TickMovement(Time.deltaTime);
@@ -181,6 +187,7 @@ namespace RaidDemo.Bootstrap
                 m_Network.Shutdown();
             }
 
+            ShutdownLobby();
             ShutdownMovement();
 
             m_Session?.Dispose();

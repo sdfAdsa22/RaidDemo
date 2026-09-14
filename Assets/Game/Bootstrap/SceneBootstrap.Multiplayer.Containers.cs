@@ -49,6 +49,20 @@ namespace RaidDemo.Bootstrap
             RequestContainerContents();
         }
 
+        /// <summary>退订容器内容通道（战局场景销毁时调用）。</summary>
+        private void UnregisterContainerChannel()
+        {
+            if (!m_ContainerChannelRegistered || m_NetworkClient == null
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            m_NetworkClient.CustomMessagingManager.UnregisterNamedMessageHandler(
+                ContainerNetworkChannel.ContentsMessageName);
+            m_ContainerChannelRegistered = false;
+        }
+
         /// <summary>
         /// 向服务器要一次容器内容。
         /// </summary>

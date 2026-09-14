@@ -41,6 +41,20 @@ namespace RaidDemo.Bootstrap
             m_RaidOutcomeChannelRegistered = true;
         }
 
+        /// <summary>退订战局结果通道（战局场景销毁时调用）。</summary>
+        private void UnregisterRaidOutcomeChannel()
+        {
+            if (!m_RaidOutcomeChannelRegistered || m_NetworkClient == null
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            m_NetworkClient.CustomMessagingManager.UnregisterNamedMessageHandler(
+                ContainerNetworkChannel.OutcomeMessageName);
+            m_RaidOutcomeChannelRegistered = false;
+        }
+
         /// <summary>收到服务器裁定的战局结果。</summary>
         private void OnRaidOutcomeReceived(ulong senderId, FastBufferReader reader)
         {

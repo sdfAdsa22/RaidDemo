@@ -18,6 +18,7 @@
         "RaidDemo.Diagnostics",
         "RaidDemo.UI",
         "Unity.AI.Navigation",
+        "Unity.Collections",
         "Unity.Netcode.Runtime",
         "Unity.Networking.Transport"
     ],

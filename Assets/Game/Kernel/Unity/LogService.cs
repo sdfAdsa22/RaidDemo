@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -28,6 +29,36 @@ namespace RaidDemo.Kernel
     }
 
     /// <summary>
+    /// 一条被保留的日志（供状态页等只读消费者使用）。
+    /// </summary>
+    /// <remarks>
+    /// 与 <see cref="LogService"/> 的实时输出不同，这里是"最近发生过什么"的只读副本：
+    /// 服务器没有控制台窗口时，状态页是唯一能回看日志的地方。
+    /// </remarks>
+    public readonly struct RecentLogEntry
+    {
+        /// <summary>创建一条保留日志。</summary>
+        /// <param name="level">级别。</param>
+        /// <param name="timeSeconds">进程运行到该条日志时的秒数。</param>
+        /// <param name="message">正文（不含前缀）。</param>
+        public RecentLogEntry(LogLevel level, float timeSeconds, string message)
+        {
+            Level = level;
+            TimeSeconds = timeSeconds;
+            Message = message;
+        }
+
+        /// <summary>级别。</summary>
+        public LogLevel Level { get; }
+
+        /// <summary>进程运行秒数（比墙上时钟更容易与服务器日志对齐）。</summary>
+        public float TimeSeconds { get; }
+
+        /// <summary>日志正文。</summary>
+        public string Message { get; }
+    }
+
+    /// <summary>
     /// 日志服务。
     /// </summary>
     /// <remarks>
@@ -50,6 +81,17 @@ namespace RaidDemo.Kernel
         private readonly LogLevel m_MinimumLevel;
         private readonly bool m_IncludeTimestamp;
 
+        /// <summary>
+        /// 保留的最近日志（旧的在前面）。容量为 0 时完全不记录，一个字节也不多占。
+        /// </summary>
+        /// <remarks>
+        /// 默认关闭：客户端进程有控制台，日志直接输出即可；
+        /// 服务器进程没有窗口，启动时传入容量，状态页才有内容可看。
+        /// </remarks>
+        private readonly List<RecentLogEntry> m_Recent;
+
+        private readonly int m_RecentCapacity;
+
         private int m_VerboseCount;
         private int m_InfoCount;
         private int m_WarningCount;
@@ -69,10 +111,55 @@ namespace RaidDemo.Kernel
         /// </summary>
         /// <param name="minimumLevel">最低记录级别。低于该级别的调用会被直接丢弃。</param>
         /// <param name="includeTimestamp">是否在消息前附加时间戳。开发期建议开启，便于对齐事件发生时刻。</param>
-        public LogService(LogLevel minimumLevel = LogLevel.Info, bool includeTimestamp = false)
+        /// <param name="recentCapacity">
+        /// 在内存中保留的最近日志条数；0 表示不保留。
+        /// 服务器以非零值创建，供状态页回看（见"服务器状态页"）。
+        /// </param>
+        public LogService(LogLevel minimumLevel = LogLevel.Info, bool includeTimestamp = false, int recentCapacity = 0)
         {
             m_MinimumLevel = minimumLevel;
             m_IncludeTimestamp = includeTimestamp;
+            m_RecentCapacity = recentCapacity < 0 ? 0 : recentCapacity;
+            m_Recent = m_RecentCapacity > 0 ? new List<RecentLogEntry>(m_RecentCapacity) : null;
+        }
+
+        /// <summary>
+        /// 按"新的在前"的顺序取最近日志。
+        /// </summary>
+        /// <param name="maxCount">最多返回多少条；小于等于 0 表示全部。</param>
+        /// <returns>只读副本。调用方拿到的列表与内部缓冲无关，可以安全地在其他线程遍历。</returns>
+        public List<RecentLogEntry> SnapshotRecent(int maxCount = 0)
+        {
+            var result = new List<RecentLogEntry>();
+
+            if (m_Recent == null)
+            {
+                return result;
+            }
+
+            var take = maxCount <= 0 ? m_Recent.Count : Math.Min(maxCount, m_Recent.Count);
+            for (var i = 0; i < take; i++)
+            {
+                result.Add(m_Recent[m_Recent.Count - 1 - i]);
+            }
+
+            return result;
+        }
+
+        /// <summary>把一条日志放进保留缓冲（超过容量时丢弃最旧的一条）。</summary>
+        private void Keep(LogLevel level, string message)
+        {
+            if (m_Recent == null)
+            {
+                return;
+            }
+
+            if (m_Recent.Count >= m_RecentCapacity)
+            {
+                m_Recent.RemoveAt(0);
+            }
+
+            m_Recent.Add(new RecentLogEntry(level, Time.realtimeSinceStartup, message));
         }
 
         /// <summary>指定级别当前是否会被记录。高频日志应先判断再拼装消息，避免无谓的字符串分配。</summary>
@@ -92,6 +179,7 @@ namespace RaidDemo.Kernel
             }
 
             m_VerboseCount++;
+            Keep(LogLevel.Verbose, message);
             Debug.unityLogger.Log(LogType.Log, (object)Format(message), context);
         }
 
@@ -104,6 +192,7 @@ namespace RaidDemo.Kernel
             }
 
             m_InfoCount++;
+            Keep(LogLevel.Info, message);
             Debug.unityLogger.Log(LogType.Log, (object)Format(message), context);
         }
 
@@ -116,6 +205,7 @@ namespace RaidDemo.Kernel
             }
 
             m_WarningCount++;
+            Keep(LogLevel.Warning, message);
             Debug.unityLogger.Log(LogType.Warning, (object)Format(message), context);
         }
 
@@ -128,6 +218,7 @@ namespace RaidDemo.Kernel
             }
 
             m_ErrorCount++;
+            Keep(LogLevel.Error, message);
             Debug.unityLogger.Log(LogType.Error, (object)Format(message), context);
         }
 
@@ -140,6 +231,7 @@ namespace RaidDemo.Kernel
             }
 
             m_ErrorCount++;
+            Keep(LogLevel.Error, exception.Message);
             Debug.unityLogger.LogException(exception, context);
         }
 

@@ -114,6 +114,7 @@ namespace RaidDemo.Bootstrap
             m_ResultScreen = gameObject.AddComponent<RaidResultScreen>();
             m_ResultScreen.Initialize(GoToSafeHouse);
             InitializePauseMenu();
+            InitializeMultiplayerFlow();
             HookProgress(Progress);
         }
 
