@@ -37,5 +37,8 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>客户端 → 服务器：请求重开这一局（P4 会把它收进房主权限）。</summary>
         public const string RestartMessageName = "RaidDemo.Raid.Restart";
+
+        /// <summary>客户端 → 服务器：装备 / 卸下（P3 的装备权威化）。</summary>
+        public const string EquipCommandMessageName = "RaidDemo.Container.Equip";
     }
 }

@@ -43,13 +43,7 @@ namespace RaidDemo.Bootstrap
         private readonly Dictionary<int, GameObject> m_PlayerColliders = new Dictionary<int, GameObject>();
         private readonly HashSet<int> m_InputLogged = new HashSet<int>();
 
-        /// <summary>
-        /// 每名玩家上一次采样到的地面高度。
-        /// </summary>
-        /// <remarks>
-        /// 地面探测是无状态的，但"没命中时沿用上次结果"需要有人记住上次结果：
-        /// 否则玩家走过没有碰撞体的缝隙时会被判成站在 0 米，碰撞胶囊瞬间悬空。
-        /// </remarks>
+        /// <summary>每名玩家上一次采样到的地面高度（探测无状态，但"没命中就沿用上次"要有人记）。</summary>
         private readonly Dictionary<int, float> m_PlayerGroundHeights = new Dictionary<int, float>();
 
         /// <summary>服务器侧的移动权威世界。供测试与调试读取。</summary>
@@ -79,6 +73,9 @@ namespace RaidDemo.Bootstrap
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
                 ContainerNetworkChannel.RestartMessageName,
                 OnRaidRestartRequested);
+            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
+                ContainerNetworkChannel.EquipCommandMessageName,
+                OnInventoryEquipCommandReceived);
 
             m_Session.Log.Info("[服务器] 移动权威世界已就绪（60 Hz 仿真 / 20 Hz 快照）。");
 
@@ -104,6 +101,8 @@ namespace RaidDemo.Bootstrap
                     ContainerNetworkChannel.CommandMessageName);
                 m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
                     ContainerNetworkChannel.RestartMessageName);
+                m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
+                    ContainerNetworkChannel.EquipCommandMessageName);
             }
 
             m_PlayerBodies.Clear();

@@ -1,4 +1,5 @@
 using RaidDemo.Shared;
+using RaidDemo.Inventory;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -39,7 +40,122 @@ namespace RaidDemo.Bootstrap
                 new MultiplayerMoveCommandHandler(this),
                 overwrite: true);
 
-            Debug.Log("[联机] 背包移动命令已改为上行（服务器裁定）。");
+            // 装备：本地先执行（界面要即时反馈），同时把同一条意图上行，
+            // 让服务器的手持武器与客户端一致——否则会出现"我拿着手枪、服务器按步枪结算"。
+            m_CommandRouter.Register<InventoryEquipIntent>(
+                new MultiplayerEquipCommandHandler(this),
+                overwrite: true);
+            m_CommandRouter.Register<InventoryUnequipIntent>(
+                new MultiplayerUnequipCommandHandler(this),
+                overwrite: true);
+
+            Debug.Log("[联机] 背包移动改为上行；装备本地执行并同步给服务器。");
+        }
+
+        /// <summary>
+        /// 把一条装备 / 卸下意图发给服务器。
+        /// </summary>
+        /// <param name="containerId">来源容器编号（卸下时为 0）。</param>
+        /// <param name="cellX">来源格子 X。</param>
+        /// <param name="cellY">来源格子 Y。</param>
+        /// <param name="slot">装备槽。</param>
+        /// <param name="unequip">是卸下还是装备。</param>
+        private void SendEquipToServer(int containerId, int cellX, int cellY, EquipmentSlot slot, bool unequip)
+        {
+            if (m_NetworkClient == null || !m_NetworkClient.IsConnectedClient
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            var message = new InventoryEquipCommandMessage
+            {
+                Kind = unequip ? (byte)1 : (byte)0,
+                ContainerId = containerId,
+                CellX = cellX,
+                CellY = cellY,
+                Slot = (byte)slot,
+                Sequence = ++m_InventoryCommandSequence,
+            };
+
+            using (var writer = new FastBufferWriter(32, Allocator.Temp))
+            {
+                writer.WriteValueSafe(message);
+                m_NetworkClient.CustomMessagingManager.SendNamedMessage(
+                    ContainerNetworkChannel.EquipCommandMessageName,
+                    NetworkManager.ServerClientId,
+                    writer,
+                    NetworkDelivery.ReliableSequenced);
+            }
+        }
+
+        /// <summary>装备：先本地执行（界面即时反馈），再通知服务器。</summary>
+        internal CommandResult HandleEquipLocallyAndNotify(in InventoryEquipIntent command)
+        {
+            var handler = new InventoryEquipCommandHandler(
+                new InventoryContext(m_ContainerRegistry, m_Loadout, m_EventBus));
+            var result = handler.Execute(command);
+
+            if (result.Success)
+            {
+                SendEquipToServer(
+                    command.ContainerId, command.CellX, command.CellY, command.Slot, unequip: false);
+            }
+
+            return result;
+        }
+
+        /// <summary>卸下：先本地执行，再通知服务器。</summary>
+        internal CommandResult HandleUnequipLocallyAndNotify(in InventoryUnequipIntent command)
+        {
+            var handler = new InventoryUnequipCommandHandler(
+                new InventoryContext(m_ContainerRegistry, m_Loadout, m_EventBus));
+            var result = handler.Execute(command);
+
+            if (result.Success)
+            {
+                SendEquipToServer(0, 0, 0, command.Slot, unequip: true);
+            }
+
+            return result;
+        }
+
+        /// <summary>装备：本地执行 + 上行。</summary>
+        private sealed class MultiplayerEquipCommandHandler : ICommandHandler<InventoryEquipIntent>
+        {
+            private readonly SceneBootstrap m_Owner;
+
+            /// <summary>创建处理器。</summary>
+            /// <param name="owner">所属装配根。</param>
+            public MultiplayerEquipCommandHandler(SceneBootstrap owner)
+            {
+                m_Owner = owner;
+            }
+
+            /// <inheritdoc />
+            public CommandResult Execute(in InventoryEquipIntent command)
+            {
+                return m_Owner.HandleEquipLocallyAndNotify(command);
+            }
+        }
+
+        /// <summary>卸下：本地执行 + 上行。</summary>
+        private sealed class MultiplayerUnequipCommandHandler : ICommandHandler<InventoryUnequipIntent>
+        {
+            private readonly SceneBootstrap m_Owner;
+
+            /// <summary>创建处理器。</summary>
+            /// <param name="owner">所属装配根。</param>
+            public MultiplayerUnequipCommandHandler(SceneBootstrap owner)
+            {
+                m_Owner = owner;
+            }
+
+            /// <inheritdoc />
+            public CommandResult Execute(in InventoryUnequipIntent command)
+            {
+                return m_Owner.HandleUnequipLocallyAndNotify(command);
+            }
         }
 
         /// <summary>

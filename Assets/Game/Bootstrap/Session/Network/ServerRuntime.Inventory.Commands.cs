@@ -56,6 +56,9 @@ namespace RaidDemo.Bootstrap
             var context = new InventoryContext(m_Containers, loadout, m_Session.Events);
             var router = new CommandRouter();
             router.Register<InventoryMoveIntent>(new InventoryMoveCommandHandler(context));
+            // 装备与卸下用同一套 handler：服务器与客户端执行的规则完全一致。
+            router.Register<InventoryEquipIntent>(new InventoryEquipCommandHandler(context));
+            router.Register<InventoryUnequipIntent>(new InventoryUnequipCommandHandler(context));
             m_InventoryRouters[playerId] = router;
 
             m_Session?.Log.Info($"[服务器] 玩家 {playerId} 的背包命令通道已建立。");
@@ -150,6 +153,62 @@ namespace RaidDemo.Bootstrap
             BroadcastAllContainerContents();
 
             // 自己背包/弹药挂的变化只发给他一个人。
+            SendContainerContentsTo(playerId);
+        }
+
+        /// <summary>收到一条上行的装备 / 卸下命令。</summary>
+        /// <param name="senderId">发起命令的客户端。</param>
+        /// <param name="reader">消息体。</param>
+        private void OnInventoryEquipCommandReceived(ulong senderId, FastBufferReader reader)
+        {
+            var message = default(InventoryEquipCommandMessage);
+            reader.ReadValueSafe(out message);
+
+            var playerId = (int)senderId;
+            if (!m_InventoryRouters.TryGetValue(playerId, out var router))
+            {
+                return;
+            }
+
+            CommandResult result;
+            if (message.Kind == 0)
+            {
+                result = router.Dispatch(new InventoryEquipIntent(
+                    playerId,
+                    TranslateContainerId(playerId, message.ContainerId),
+                    message.CellX,
+                    message.CellY,
+                    (EquipmentSlot)message.Slot,
+                    message.Sequence));
+            }
+            else
+            {
+                result = router.Dispatch(new InventoryUnequipIntent(
+                    playerId,
+                    (EquipmentSlot)message.Slot,
+                    message.Sequence));
+            }
+
+            if (!result.Success)
+            {
+                // 客户端的界面已经"先动过了"：这里只记一笔，纠正通路留给 P5 的装备持久化。
+                m_Session?.Log.Warning(
+                    $"[服务器] 玩家 {playerId} 的装备命令被拒绝：{result.Code} - {result.Message}");
+                return;
+            }
+
+            // 手持武器变了就必须重新同步到战斗权威上：
+            // 射程、伤害、口径、换弹来源全按"当前武器"算，漏了这一步会出现
+            // "客户端拿着手枪、服务器按步枪结算"。
+            m_Combat?.SyncWeaponFromLoadout(playerId);
+
+            if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
+            {
+                m_Session.Log.Verbose(
+                    $"[服务器] 玩家 {playerId} 的装备命令已执行（槽 {message.Slot}，种类 {message.Kind}）。");
+            }
+
+            // 背包与装备的变化回发给本人（其他地方不会用到他的装备）。
             SendContainerContentsTo(playerId);
         }
     }

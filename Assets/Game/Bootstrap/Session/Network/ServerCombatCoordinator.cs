@@ -198,6 +198,38 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 按玩家当前手持的武器重新同步武器参数。
+        /// </summary>
+        /// <param name="playerId">玩家标识。</param>
+        /// <returns>同步成功返回 true。</returns>
+        /// <remarks>
+        /// <para>玩家换枪之后必须调用：射程、伤害、口径、弹匣容量全部来自"当前武器"，
+        /// 而权威侧的武器控制器是构造时按配发武器建好的。</para>
+        ///
+        /// <para>找不到装备或目录里没有对应条目时保持现状：宁可继续用手上那把，
+        /// 也不要让服务器变成"没有武器"。</para>
+        /// </remarks>
+        public bool SyncWeaponFromLoadout(int playerId)
+        {
+            if (!m_Participants.TryGetValue(playerId, out var participant) || m_Catalog == null)
+            {
+                return false;
+            }
+
+            var item = participant.Loadout?.Equipment?.Get(EquipmentSlot.PrimaryWeapon)
+                       ?? participant.Loadout?.Equipment?.Get(EquipmentSlot.SecondaryWeapon);
+
+            var definition = item?.Definition;
+            if (definition == null || definition.WeaponStats == null)
+            {
+                return false;
+            }
+
+            participant.Controller.SyncEquippedWeapon(definition.WeaponStats);
+            return true;
+        }
+
+        /// <summary>
         /// 接收一条战斗输入：扳机状态与瞄准方向。
         /// </summary>
         /// <remarks>
