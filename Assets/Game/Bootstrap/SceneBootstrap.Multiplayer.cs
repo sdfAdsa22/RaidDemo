@@ -380,7 +380,21 @@ namespace RaidDemo.Bootstrap
             Debug.Log(
                 $"[联机] 回滚重放：误差 {result.PositionError:F3} 米，" +
                 $"重放 {m_Prediction.PendingCount} 条输入（seq={entry.Sequence}）。");
+
+            m_RollbackCount++;
         }
+
+        /// <summary>本局因对账超差而回滚重放的次数（诊断与验收用）。</summary>
+        /// <remarks>
+        /// 把它做成可读的计数而不是只丢在日志里：判读"移动手感是否有问题"时，
+        /// "一局回滚了几次"是最直接的量化指标（P4.5 实机定位"一卡一卡"时用过）。
+        /// </remarks>
+        public int RollbackCount
+        {
+            get { return m_RollbackCount; }
+        }
+
+        private int m_RollbackCount;
 
     }
 }

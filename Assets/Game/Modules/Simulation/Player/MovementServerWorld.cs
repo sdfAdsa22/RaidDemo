@@ -53,6 +53,21 @@ namespace RaidDemo.Simulation
 
             /// <summary>已经处理到的输入序号。用于拒绝重复与乱序输入。</summary>
             public uint LastProcessedSequence;
+
+            /// <summary>
+            /// 被"更新的输入直接覆盖"掉的**未消费**输入条数（诊断计数）。
+            /// </summary>
+            /// <remarks>
+            /// <para>这不是"重复包被拒绝"，而是客户端在一帧里补了多步、连发多条输入时，
+            /// 服务器只留最新一条：被覆盖的那几条在客户端都已经记过预测，
+            /// 于是"已处理序号"与"实际执行步数"会错开同样多的步数——表现为
+            /// **客户端位置比服务器稳定地领先一步**，超过对账容差后每次快照都硬吸附一次。</para>
+            ///
+            /// <para>实测（2026-09-14，编辑器当客户端）：客户端 60 FPS 时该计数为 0；
+            /// 同一客户端降到 20 FPS 时每秒被覆盖 12~13 条——与"房主一卡一卡、
+            /// 加进来的玩家正常"的现象完全对上（低帧率那一端才会在一帧里补多步）。</para>
+            /// </remarks>
+            public int CoalescedInputs;
         }
 
         private readonly PlayerMovementProfile m_Profile;
@@ -216,8 +231,33 @@ namespace RaidDemo.Simulation
                 return false;
             }
 
+            if (slot.HasPendingInput)
+            {
+                // 临时诊断：上一条还没被固定步消费就被这条覆盖了 —— 等于少执行了一步。
+                slot.CoalescedInputs++;
+            }
+
             slot.PendingInput = intent;
             slot.HasPendingInput = true;
+            return true;
+        }
+
+        /// <summary>
+        /// 取一名玩家的输入诊断计数。临时接口，用于定位"固定一步偏差"的来源。
+        /// </summary>
+        /// <param name="playerId">玩家标识。</param>
+        /// <param name="coalescedInputs">被覆盖丢弃的未消费输入条数。</param>
+        /// <returns>玩家在世界内返回 true。</returns>
+        public bool TryGetInputDiagnostics(int playerId, out int coalescedInputs)
+        {
+            var slot = Find(playerId);
+            if (slot == null)
+            {
+                coalescedInputs = 0;
+                return false;
+            }
+
+            coalescedInputs = slot.CoalescedInputs;
             return true;
         }
 

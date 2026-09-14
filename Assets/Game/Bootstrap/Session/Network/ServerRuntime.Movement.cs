@@ -197,6 +197,7 @@ namespace RaidDemo.Bootstrap
             }
 
             m_World.Advance(deltaTime);
+            ReportInputDiagnostics();
             TickCombat(deltaTime);
             SyncPlayerTransforms();
 
