@@ -36,6 +36,19 @@ namespace RaidDemo.Inventory
 
         /// <summary>装备被卸下。</summary>
         public const string Unequip = "unequip";
+
+        /// <summary>
+        /// 内容被服务器全量同步覆盖（联机专用）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么需要单独一种类型：</b>联机里容器的变更由**服务器**执行，
+        /// 事件发在服务器的事件总线上，客户端收不到；客户端拿到全量内容后必须**自己补发一条本地事件**，
+        /// 界面才会重画（U-75：数据搬了、画面没搬，玩家感受就是"搬不动物品"）。</para>
+        ///
+        /// <para>用独立类型而不是复用 <see cref="Move"/> / <see cref="Place"/>：
+        /// 界面音效只对"放置/装备"发声，复用会让"别人在自己客户端里动了箱子"也响起界面音。</para>
+        /// </remarks>
+        public const string Sync = "sync";
     }
 
     /// <summary>

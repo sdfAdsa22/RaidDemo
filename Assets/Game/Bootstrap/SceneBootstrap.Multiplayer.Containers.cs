@@ -104,106 +104,20 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            var factory = new ItemFactory();
-            var rebuilt = 0;
+            var log = m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose)
+                // Verbose 带一个可选的 UnityEngine.Object 参数，因此这里用 lambda 定型到 Action<string>。
+                ? new System.Action<string>(message => m_Session.Log.Verbose(message))
+                : null;
 
-            for (var i = 0; i < batch.Containers.Length; i++)
-            {
-                var container = batch.Containers[i];
-                if (container.ContainerId <= 0)
-                {
-                    continue;
-                }
-
-                // 宽度为 0 说明服务器那边也没建起来（例如容器定义缺失）：保持本地现状，
-                // 而不是把界面指向一个 0×0 的网格。
-                if (container.Width <= 0 || container.Height <= 0)
-                {
-                    continue;
-                }
-
-                // 就地重建而不是 Replace：背包网格被 PlayerLoadout 直接持有，
-                // 换掉对象会让装备、重量、快捷转移全都指向旧网格。
-                if (!m_ContainerRegistry.TryGetGrid(container.ContainerId, out var grid))
-                {
-                    continue;
-                }
-
-                // 尺寸不一致（换了背包）时也没法就地改，只能换对象——
-                // 这种情况在联机里由服务器的装备同步负责，这里先只处理尺寸一致的情形。
-                if (grid.Width != container.Width || grid.Height != container.Height)
-                {
-                    m_ContainerRegistry.Replace(container.ContainerId, new InventoryGrid(
-                        container.Width,
-                        container.Height,
-                        grid.Label));
-                    m_ContainerRegistry.TryGetGrid(container.ContainerId, out grid);
-                }
-
-                if (grid == null)
-                {
-                    continue;
-                }
-
-                ClearGrid(grid);
-
-                var placed = 0;
-                var items = container.Items;
-                if (items != null)
-                {
-                    for (var index = 0; index < items.Length; index++)
-                    {
-                        var entry = items[index];
-                        var definition = entry.ItemId != null ? m_ItemCatalog.Get(entry.ItemId) : null;
-                        if (definition == null)
-                        {
-                            continue;
-                        }
-
-                        var item = factory.Create(definition, Mathf.Max(1, entry.Count));
-                        item.Rotated = entry.Rotated;
-
-                        if (grid.AutoPlace(item).Success)
-                        {
-                            placed++;
-                        }
-                    }
-                }
-
-                rebuilt++;
-
-                if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
-                {
-                    m_Session.Log.Verbose(
-                        $"[联机] 容器 {container.ContainerId} 内容已同步：{placed} 件（服务器权威）。");
-                }
-            }
+            // 真正的搬运与"补发本地事件"都在 LootContainerSync 里：
+            // 那里有测试钉住"改完数据必须发事件"，避免再出现"数据动了、画面没动"（U-75）。
+            var rebuilt = LootContainerSync.Apply(
+                m_ContainerRegistry, m_ItemCatalog, batch, m_EventBus, log);
 
             m_ContainerSyncCount += rebuilt;
 
             // 一条汇总痕迹：它证明"箱子内容来自服务器"这件事真的发生了。
             Debug.Log($"[联机] 容器内容已同步：{rebuilt} 个（服务器权威）。");
-        }
-
-        /// <summary>清空一个网格（逐个移除，保持网格对象本身不变）。</summary>
-        /// <param name="grid">目标网格。</param>
-        private static void ClearGrid(InventoryGrid grid)
-        {
-            // Items 是只读视图，直接遍历时 Remove 会改集合，因此先拷一份出来。
-            var items = grid.Items;
-            var snapshot = new ItemInstance[items.Count];
-            for (var i = 0; i < items.Count; i++)
-            {
-                snapshot[i] = items[i];
-            }
-
-            for (var i = 0; i < snapshot.Length; i++)
-            {
-                if (snapshot[i] != null)
-                {
-                    grid.Remove(snapshot[i]);
-                }
-            }
         }
     }
 }
