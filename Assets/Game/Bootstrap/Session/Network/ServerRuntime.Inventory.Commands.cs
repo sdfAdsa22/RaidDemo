@@ -185,6 +185,41 @@ namespace RaidDemo.Bootstrap
 
             // 自己背包/弹药挂的变化只发给他一个人。
             SendContainerContentsTo(playerId);
+
+            // 自检痕迹：把"服务器侧这名玩家的随身容器里到底有什么"写进日志。
+            // 没有它时，客户端"背包还是空的"这一现象无法区分三种原因——
+            // 服务器没搬成功、服务器搬了但没下发、下发的内容被客户端丢掉了（P4 验收实机排查）。
+            if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
+            {
+                m_Session.Log.Verbose(
+                    $"[服务器] 玩家 {playerId} 随身容器自检：背包 {DescribeGrid(playerId, ContainerIds.PlayerSlot.Backpack)}"
+                    + $"；弹药挂 {DescribeGrid(playerId, ContainerIds.PlayerSlot.AmmoPouch)}");
+            }
+        }
+
+        /// <summary>把某个随身容器的内容压成一行（自检日志用）。</summary>
+        /// <param name="playerId">玩家编号。</param>
+        /// <param name="slot">随身容器槽位。</param>
+        private string DescribeGrid(int playerId, ContainerIds.PlayerSlot slot)
+        {
+            var id = ContainerIds.ServerPlayerContainer(playerId, slot);
+            if (!m_Containers.TryGetGrid(id, out var grid))
+            {
+                return $"容器 {id} 未注册";
+            }
+
+            var builder = new System.Text.StringBuilder();
+            builder.Append(grid.Items.Count).Append(" 件[");
+            for (var i = 0; i < grid.Items.Count; i++)
+            {
+                var item = grid.Items[i];
+                grid.TryGetOrigin(item, out var origin);
+                builder.Append(item.Definition != null ? item.Definition.Id : "?")
+                    .Append('@').Append(origin.X).Append(',').Append(origin.Y).Append(' ');
+            }
+
+            builder.Append(']');
+            return builder.ToString();
         }
 
         /// <summary>收到一条上行的装备 / 卸下命令。</summary>

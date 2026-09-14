@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
@@ -21,6 +22,17 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public static class LootContainerSync
     {
+        /// <summary>
+        /// 已经报过"两端容量不一致"的组合（键 = 容器号 + 两端尺寸）。
+        /// </summary>
+        /// <remarks>
+        /// <para>同一种不一致只报一次：容量差异不是错误，而是"装备还没同步"的**持续状态**，
+        /// 每次搬东西都刷一条警告会把真正重要的逐件告警淹掉。</para>
+        ///
+        /// <para>只在主线程访问（同步消息由网络回调驱动），因此不加锁。</para>
+        /// </remarks>
+        private static readonly HashSet<string> s_ReportedCapacityMismatch = new HashSet<string>();
+
         /// <summary>
         /// 应用一批容器内容。
         /// </summary>
@@ -68,20 +80,22 @@ namespace RaidDemo.Bootstrap
                     continue;
                 }
 
-                // 尺寸不一致（换了背包）时无法就地改，只能换对象——
-                // 这种情况在联机里由服务器的装备同步负责，这里先只处理尺寸一致的情形。
                 if (grid.Width != container.Width || grid.Height != container.Height)
                 {
-                    registry.Replace(container.ContainerId, new InventoryGrid(
-                        container.Width,
-                        container.Height,
-                        grid.Label));
-                    registry.TryGetGrid(container.ContainerId, out grid);
-                }
-
-                if (grid == null)
-                {
-                    continue;
+                    // 尺寸不一致时**保留本地网格对象**，只把内容铺进去——绝不换对象。
+                    //
+                    // 为什么不能换：一个背包网格同时被三方持有——ContainerRegistry、
+                    // PlayerLoadout（装备 / 重量 / 快捷转移都读它）、以及已经打开的界面视图。
+                    // 只换注册表里那一份，就等于从这一刻起有三份"同一个背包"：
+                    // 服务器内容铺进了新网格，而玩家眼前和命令里用的还是旧网格。
+                    // 表现正是"搜出来的东西进了背包却看不见"与"背包里明明有的东西拖不动"，
+                    // 日志里却只留下一句"内容已同步"（P4.5 实机定位的第三处缺陷）。
+                    //
+                    // 为什么会有差异：联机时服务器用它自己那份装备建随身容器（默认配发 5×5），
+                    // 而客户端带的是局外装备（装了背包就是 6×6 / 7×7）。把两者真正对齐属于
+                    // P5 的装备同步；在那之前以**本地容量为准**更贴近玩家预期——
+                    // 屏幕上画出来的格子，就是他实际能用的格子。
+                    ReportCapacityMismatchOnce(container, grid);
                 }
 
                 ClearGrid(grid);
@@ -96,16 +110,41 @@ namespace RaidDemo.Bootstrap
                         var definition = entry.ItemId != null ? catalog.Get(entry.ItemId) : null;
                         if (definition == null)
                         {
+                            // 静默跳过物品定义找不到的情况，等于"服务器说有、客户端当没有"，
+                            // 排查时完全看不出发生了什么——因此这里必须留痕（P4 验收教训）。
+                            UnityEngine.Debug.LogWarning(
+                                $"[联机] 容器 {container.ContainerId} 的第 {index} 件物品定义找不到："
+                                + $"「{entry.ItemId}」（数量 {entry.Count}）。");
                             continue;
                         }
 
                         var item = factory.Create(definition, Mathf.Max(1, entry.Count));
                         item.Rotated = entry.Rotated;
 
+                        // 先按服务器给的坐标**原位复原**；只有放不下（例如坐标已被别的物品占据、
+                        // 或版本差异导致坐标越界）才退回自动摆放，并且必须留一条警告——
+                        // 静默退化正是"两端布局悄悄分叉"的来源（P4 验收定位）。
+                        var origin = new GridPoint(entry.CellX, entry.CellY);
+                        if (grid.Place(item, origin, entry.Rotated).Success)
+                        {
+                            placed++;
+                            continue;
+                        }
+
                         if (grid.AutoPlace(item).Success)
                         {
                             placed++;
+                            // 用 Warning 而不是可选的 Verbose：静默退化正是"两端布局悄悄分叉"的来源，
+                            // 这一条必须在任何日志级别下都看得见（P4 验收教训）。
+                            UnityEngine.Debug.LogWarning(
+                                $"[联机] 容器 {container.ContainerId} 的第 {index} 件物品坐标 "
+                                + $"({entry.CellX},{entry.CellY}) 放不下，已退回自动摆放。");
+                            continue;
                         }
+
+                        UnityEngine.Debug.LogWarning(
+                            $"[联机] 容器 {container.ContainerId} 的第 {index} 件物品「{entry.ItemId}」"
+                            + $"既放不回原坐标 ({entry.CellX},{entry.CellY})、也找不到空位，已丢弃本次同步。");
                     }
                 }
 
@@ -131,6 +170,25 @@ namespace RaidDemo.Bootstrap
                 sequence: 0u));
 
             return rebuilt;
+        }
+
+        /// <summary>
+        /// 报告一次"服务器与本地容量不一致"，同一种组合只报一次。
+        /// </summary>
+        /// <param name="container">服务器下发的容器描述。</param>
+        /// <param name="grid">本地保留的网格。</param>
+        private static void ReportCapacityMismatchOnce(ContainerContentsMessage container, InventoryGrid grid)
+        {
+            var key = $"{container.ContainerId}:{container.Width}x{container.Height}:{grid.Width}x{grid.Height}";
+            if (!s_ReportedCapacityMismatch.Add(key))
+            {
+                return;
+            }
+
+            UnityEngine.Debug.LogWarning(
+                $"[联机] 容器 {container.ContainerId} 的容量两端不一致：服务器 {container.Width}×{container.Height}，"
+                + $"本地 {grid.Width}×{grid.Height}。已保留本地网格（换对象会让装备与界面指向旧网格），"
+                + "内容按本地容量铺放；放不下的物品会逐件告警。");
         }
 
         /// <summary>清空一个网格（逐个移除，保持网格对象本身不变）。</summary>

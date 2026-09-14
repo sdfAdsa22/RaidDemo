@@ -116,8 +116,32 @@ namespace RaidDemo.Bootstrap
 
             m_ContainerSyncCount += rebuilt;
 
+            // 逐容器清单：出问题时它能一眼区分"服务器没发这些容器"与"发了但客户端没应用"——
+            // 这两者的修法完全不同（P4 验收实机排查）。用 Debug.Log 而不是 Verbose：
+            // 大厅流程里的客户端日志级别是 Info，Verbose 会被过滤掉，等于没有这条诊断。
+            // 频率上也安全：批次只在"有人操作容器 / 新客户端接入"时下发，不是每帧。
+            var listing = new System.Text.StringBuilder("[联机] 收到容器清单：");
+            for (var i = 0; i < batch.Containers.Length; i++)
+            {
+                var c = batch.Containers[i];
+                var items = c.Items == null ? 0 : c.Items.Length;
+                listing.Append('#').Append(c.ContainerId).Append('(').Append(c.Width).Append('x')
+                    .Append(c.Height).Append('/').Append(items).Append(") ");
+            }
+
+            Debug.Log(listing.ToString());
+
             // 一条汇总痕迹：它证明"箱子内容来自服务器"这件事真的发生了。
-            Debug.Log($"[联机] 容器内容已同步：{rebuilt} 个（服务器权威）。");
+            // 带上物品件数：出问题时"同步到了空箱子"与"根本没同步"是两种完全不同的诊断
+            // （只报容器个数时两者看起来一样——P4 验收时就被这一点耽误过）。
+            var itemCount = 0;
+            for (var i = 0; i < batch.Containers.Length; i++)
+            {
+                var items = batch.Containers[i].Items;
+                itemCount += items == null ? 0 : items.Length;
+            }
+
+            Debug.Log($"[联机] 容器内容已同步：{rebuilt} 个容器 / {itemCount} 件物品（服务器权威）。");
         }
     }
 }

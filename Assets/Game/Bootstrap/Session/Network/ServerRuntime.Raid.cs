@@ -64,6 +64,9 @@ namespace RaidDemo.Bootstrap
         private readonly List<int> m_BledOutBuffer = new List<int>();
         private readonly List<int> m_RevivedBuffer = new List<int>();
 
+        /// <summary>本帧要推进的玩家编号快照（见 <see cref="TickRaid"/> 的说明）。</summary>
+        private readonly List<int> m_RaidActorBuffer = new List<int>();
+
         private float m_NextRaidTickTime;
         private bool m_RaidZonesReady;
 
@@ -105,9 +108,19 @@ namespace RaidDemo.Bootstrap
                 OnPlayerBledOut(m_BledOutBuffer[i]);
             }
 
+            // 必须先拷一份编号再遍历：结算会把玩家移出世界（RemovePlayerFromWorld → m_PlayerBodies.Remove），
+            // 直接在 m_PlayerBodies 上 foreach 会在下一次 MoveNext 抛
+            // InvalidOperationException（"Collection was modified"）——
+            // 那是一次阵亡就报一次的异常，还会把本帧剩下的战局推进整段跳过（M9 P4.5 实机定位）。
+            m_RaidActorBuffer.Clear();
             foreach (var pair in m_PlayerBodies)
             {
-                TickPlayerRaid(pair.Key);
+                m_RaidActorBuffer.Add(pair.Key);
+            }
+
+            for (var i = 0; i < m_RaidActorBuffer.Count; i++)
+            {
+                TickPlayerRaid(m_RaidActorBuffer[i]);
             }
         }
 

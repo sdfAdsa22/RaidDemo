@@ -301,11 +301,19 @@ namespace RaidDemo.Bootstrap
             for (var i = 0; i < items.Count; i++)
             {
                 var item = items[i];
+
+                // 带上真实坐标：客户端据此"原位复原"，而不是重新自动摆放——
+                // 否则玩家显式摆过的位置会在下一次同步被抹掉，两端坐标从那一刻开始分叉。
+                var origin = default(GridPoint);
+                grid.TryGetOrigin(item, out origin);
+
                 entries[i] = new ContainerItemMessage
                 {
                     ItemId = item.Definition != null ? item.Definition.Id : null,
                     Count = item.StackCount,
                     Rotated = item.Rotated,
+                    CellX = origin.X,
+                    CellY = origin.Y,
                 };
             }
 

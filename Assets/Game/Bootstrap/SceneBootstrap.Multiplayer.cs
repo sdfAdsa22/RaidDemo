@@ -35,6 +35,22 @@ namespace RaidDemo.Bootstrap
         private const float ReconciliationTolerance = 0.08f;
 
         private NetworkManager m_NetworkClient;
+
+        /// <summary>
+        /// 当前真正持有战局网络通道的装配根（跨场景注册的归属标记）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须有这个标记：</b>P4 起网络管理器由大厅会话持有、跨场景存活，
+        /// 而战局通道（快照 / 战斗 / 敌人 / 容器 / 结算 / 生命）是**每个战局场景**各自注册的。
+        /// 场景切换的真实顺序是：<c>新场景 Awake（注册）→ 旧场景 OnDestroy（退订）</c>——
+        /// 旧场景的生命周期回调会把新场景刚注册的处理器**按同名全部删掉**。
+        /// 症状极具迷惑性：进图时那一次同步是好的（发生在删除之前），
+        /// 之后服务器发什么都没反应——容器搬不动、队友与敌人也不动（P4 验收实机定位）。</para>
+        ///
+        /// <para>做法：注册时认领，退订时先看自己是不是持有者；不是就什么都不做。
+        /// 这样"谁注册谁负责退订"这条规矩在跨场景共享的连接上依然成立。</para>
+        /// </remarks>
+        private static SceneBootstrap s_ActiveChannelOwner;
         private MovementPredictionBuffer m_Prediction;
         private float m_NetworkStepAccumulator;
         private uint m_NetworkSequence;
@@ -121,6 +137,15 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void DetachFromServer()
         {
+            // 只允许"当前持有者"退订：跨场景连接上，旧场景的 OnDestroy 发生在新场景注册之后，
+            // 不做这个判断就会把新场景刚注册的处理器全部删掉（见 s_ActiveChannelOwner 的说明）。
+            if (!ReferenceEquals(s_ActiveChannelOwner, this))
+            {
+                return;
+            }
+
+            s_ActiveChannelOwner = null;
+
             if (m_NetworkClient != null)
             {
                 m_NetworkClient.OnClientConnectedCallback -= OnNetworkConnected;
@@ -159,6 +184,10 @@ namespace RaidDemo.Bootstrap
         private void AttachToServer(int playerId)
         {
             m_LocalPlayerId = playerId;
+
+            // 认领通道所有权：只有本实例负责退订（旧场景的销毁回调会被上面那道判断挡掉）。
+            s_ActiveChannelOwner = this;
+
             Debug.Log($"[联机] 已连接，玩家标识 {m_LocalPlayerId}。");
 
             if (m_NetworkSnapshotHandlerRegistered || m_NetworkClient.CustomMessagingManager == null)

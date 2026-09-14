@@ -18,12 +18,28 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否横放（占用尺寸宽高互换）。</summary>
         public bool Rotated;
 
+        /// <summary>
+        /// 物品左上角所在的格子坐标。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须带坐标：</b>只下发"有什么、几个、是否横放"时，客户端只能用
+        /// <c>AutoPlace</c> 重新自动摆放；而服务器那边可能是玩家**显式摆过**的位置（拖到指定格子）。
+        /// 一旦两端坐标分叉，客户端再拖拽就是"按 A 端的坐标去动 B 端的格子"——
+        /// 表现是有的能动、有的动不了（P4 验收实机定位）。</para>
+        /// </remarks>
+        public int CellX;
+
+        /// <summary>物品左上角所在的格子坐标（Y）。</summary>
+        public int CellY;
+
         /// <inheritdoc />
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref ItemId);
             serializer.SerializeValue(ref Count);
             serializer.SerializeValue(ref Rotated);
+            serializer.SerializeValue(ref CellX);
+            serializer.SerializeValue(ref CellY);
         }
     }
 
