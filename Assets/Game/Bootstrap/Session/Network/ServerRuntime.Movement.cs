@@ -67,16 +67,18 @@ namespace RaidDemo.Bootstrap
                 MovementNetworkChannel.InputMessageName,
                 OnInputMessageReceived);
 
-            // 容器内容的请求通道：客户端注册好自己的处理器之后会来要一次
-            // （服务器主动推的那一次可能早于客户端就绪，见 ContainerNetworkChannel 的说明）。
+            // 容器内容请求通道（服务器主动推的那次可能早于客户端就绪，见 P-20）。
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
                 ContainerNetworkChannel.RequestMessageName,
                 OnContainerContentsRequested);
 
-            // 背包操作的上行通道：客户端发意图，服务器用同一套背包规则执行（P3-2）。
+            // 背包操作上行（P3-2）与重开战局请求（P3 的"战局可重开"）。
             m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
                 ContainerNetworkChannel.CommandMessageName,
                 OnInventoryMoveCommandReceived);
+            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
+                ContainerNetworkChannel.RestartMessageName,
+                OnRaidRestartRequested);
 
             m_Session.Log.Info("[服务器] 移动权威世界已就绪（60 Hz 仿真 / 20 Hz 快照）。");
 
@@ -100,6 +102,8 @@ namespace RaidDemo.Bootstrap
                     ContainerNetworkChannel.RequestMessageName);
                 m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
                     ContainerNetworkChannel.CommandMessageName);
+                m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
+                    ContainerNetworkChannel.RestartMessageName);
             }
 
             m_PlayerBodies.Clear();
@@ -160,10 +164,8 @@ namespace RaidDemo.Bootstrap
             AddPlayerToCombat(playerId);
             BindPlayerHitTarget(playerId);
 
-            // 背包命令通道要在参战之后建：它需要这名玩家的随身装备（武器 / 背包 / 弹药挂）。
+            // 背包命令通道要在参战之后建（需要随身装备）；容器内容随接入下发。
             RegisterPlayerContainers(playerId);
-
-            // 容器内容随接入下发：晚进来的玩家必须看到与先到者完全一样的箱子。
             SendAllContainerContentsTo(clientId);
         }
 

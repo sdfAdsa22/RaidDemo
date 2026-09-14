@@ -296,5 +296,78 @@ namespace RaidDemo.Bootstrap
         {
             m_RaidProgress.Remove(playerId);
         }
+
+        /// <summary>
+        /// 收到客户端的"重开战局"请求：把这一局重置成初始状态。
+        /// </summary>
+        /// <param name="senderId">发起请求的客户端。</param>
+        /// <param name="reader">消息体（当前为空）。</param>
+        /// <remarks>
+        /// <para><b>为什么需要它：</b>结算之后这一局的容器、AI、进度都是"上一局"的残留，
+        /// 不做重置就只能重启进程才能再打一局——而"战局可重开"是 P3 的验收项之一。</para>
+        ///
+        /// <para><b>重置什么：</b>容器内容（重新抽，编号不变）、AI（全部重建）、
+        /// 每名玩家的战斗状态（护甲血量与配发弹药）与出生位置。P4 的大厅会把"谁能重开"
+        /// 收进房主权限；现在只要有人请求就重开，够自动化验收用。</para>
+        /// </remarks>
+        private void OnRaidRestartRequested(ulong senderId, FastBufferReader reader)
+        {
+            m_Session?.Log.Info($"[服务器] 收到玩家 {(int)senderId} 的重开请求，正在重置战局。");
+            RestartRaid();
+        }
+
+        /// <summary>把战局重置成初始状态（容器重抽、AI 重建、玩家回到出生点）。</summary>
+        private void RestartRaid()
+        {
+            // 1. 进度与计数清零。
+            m_RaidProgress.Clear();
+            ExtractedPlayerCount = 0;
+            KilledPlayerCount = 0;
+
+            // 2. 容器重新抽：先清空注册表里的场景容器，再按同一份生成点重建（编号不变）。
+            var sceneIds = new List<int>();
+            var ids = m_Containers.ContainerIds;
+            for (var i = 0; i < ids.Count; i++)
+            {
+                if (ids[i] >= ContainerIds.SceneBase && ids[i] < ContainerIds.ServerPlayerBase)
+                {
+                    sceneIds.Add(ids[i]);
+                }
+            }
+
+            for (var i = 0; i < sceneIds.Count; i++)
+            {
+                m_Containers.Unregister(sceneIds[i]);
+            }
+
+            m_ContainersReady = false;
+            TickContainers();
+
+            // 3. AI 重建：先全部销毁，下一帧由 TickAi 重新生成（它本来就是惰性初始化）。
+            ShutdownAi();
+
+            // 4. 每名玩家回到参战状态：移除再添加，等价于"血量、护甲、弹药全部重置"。
+            var playerIds = new List<int>();
+            m_World.GetPlayerIds(playerIds);
+
+            for (var i = 0; i < playerIds.Count; i++)
+            {
+                var playerId = playerIds[i];
+                RemovePlayerFromCombat(playerId);
+                UnregisterPlayerContainers(playerId);
+                m_PlayerGroundHeights.Remove(playerId);
+
+                var spawn = SpawnPositionFor(playerId);
+                m_World.TryTeleport(playerId, spawn);
+
+                CreatePlayerBody(playerId);
+                AddPlayerToCombat(playerId);
+                RegisterPlayerContainers(playerId);
+                SendContainerContentsTo(playerId);
+            }
+
+            BroadcastAllContainerContents();
+            m_Session?.Log.Info("[服务器] 战局已重开：容器重抽、AI 重建、玩家回到出生点。");
+        }
     }
 }

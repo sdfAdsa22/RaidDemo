@@ -137,6 +137,32 @@ namespace RaidDemo.Simulation
             return true;
         }
 
+        /// <summary>
+        /// 把一名玩家直接放到指定位置（重开战局时用）。
+        /// </summary>
+        /// <param name="playerId">玩家标识。</param>
+        /// <param name="position">目标位置。</param>
+        /// <param name="facing">目标朝向。</param>
+        /// <returns>玩家在世界内时返回 true。</returns>
+        /// <remarks>
+        /// <para>这是**唯一**允许绕过移动模拟写位置的入口，因此单独命名并写明用途：
+        /// 正常游玩的位移一律走输入 → 模拟 → 快照这条链，只有"重开一局"这种重置语义
+        /// 才需要把玩家直接搬回去（它的合法性来自服务器自己的决定，而不是某个客户端的请求）。</para>
+        /// </remarks>
+        public bool TryTeleport(int playerId, Vector2F position, Vector2F facing = default)
+        {
+            var slot = Find(playerId);
+            if (slot == null)
+            {
+                return false;
+            }
+
+            var look = facing.IsNearlyZero ? Vector2F.Up : facing;
+            slot.Simulator.Reset(position, look);
+            slot.HasPendingInput = false;
+            return true;
+        }
+
         /// <summary>世界内是否包含该玩家。</summary>
         public bool ContainsPlayer(int playerId)
         {

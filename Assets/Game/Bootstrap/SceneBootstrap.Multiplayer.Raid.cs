@@ -21,6 +21,7 @@ namespace RaidDemo.Bootstrap
     {
         private bool m_RaidOutcomeChannelRegistered;
         private bool m_LocalOutcomeApplied;
+        private double m_NextRestartRequestTime;
 
         /// <summary>服务器给我裁定的结果（未结算时为 null）。</summary>
         public RaidOutcomeMessage? LocalOutcome { get; private set; }
@@ -59,6 +60,16 @@ namespace RaidDemo.Bootstrap
             m_LocalOutcomeApplied = true;
             LocalOutcome = message;
 
+            // 验收模式：结算 8 秒后自动请求重开，用来自动化验证"战局可重开"。
+            // 正常游玩由结算界面上的按钮触发（P4 把它接进大厅）。
+            if (m_AutoWalk)
+            {
+                // 立刻发，不做延迟：结算界面会把 timeScale 压成 0，
+                // 而 Invoke / 协程里的等待都依赖时间推进——延迟 8 秒的请求永远发不出去
+                // （M9-P-09 的同一条教训：时间被冻住时，一切"稍后再做"都会静默消失）。
+                RequestRaidRestart();
+            }
+
             // 走本地已有的收尾路径：会话结束 → 广播事件 → 结算界面。
             if (m_RaidSession == null || !m_RaidSession.IsActive)
             {
@@ -73,6 +84,28 @@ namespace RaidDemo.Bootstrap
             {
                 m_RaidSession.NotifyPlayerKilled();
             }
+        }
+
+        /// <summary>请求服务器重开这一局。</summary>
+        public void RequestRaidRestart()
+        {
+            if (m_NetworkClient == null || !m_NetworkClient.IsConnectedClient
+                || m_NetworkClient.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(8, Allocator.Temp))
+            {
+                writer.WriteValueSafe((byte)1);
+                m_NetworkClient.CustomMessagingManager.SendNamedMessage(
+                    ContainerNetworkChannel.RestartMessageName,
+                    NetworkManager.ServerClientId,
+                    writer,
+                    NetworkDelivery.ReliableSequenced);
+            }
+
+            Debug.Log("[联机] 已请求重开战局。");
         }
     }
 }

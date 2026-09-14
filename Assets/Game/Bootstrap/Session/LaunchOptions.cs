@@ -81,15 +81,7 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public bool AutoWalk { get; private set; }
 
-        /// <summary>
-        /// 验收模式：把玩家出生点放到第一个撤离点里。
-        /// </summary>
-        /// <remarks>
-        /// <para>只用于自动化验收。谷底到塬面之间的坡体让"脚本直线走过去"经常卡住，
-        /// 而"撤离读秒与结算由服务器裁定"这件事**必须**被走到才算验证过。</para>
-        ///
-        /// <para>它只改出生位置，不改任何规则：读秒、判定、结算走的都是与真实游玩相同的代码路径。</para>
-        /// </remarks>
+        /// <summary>验收模式：出生在第一个撤离点里（只改出生位置，不改规则）。</summary>
         public bool SpawnAtExtraction { get; private set; }
 
         /// <summary>

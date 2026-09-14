@@ -34,5 +34,8 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>服务器 → 全体客户端：某人被结算了（撤离 / 阵亡）。</summary>
         public const string OutcomeMessageName = "RaidDemo.Raid.Outcome";
+
+        /// <summary>客户端 → 服务器：请求重开这一局（P4 会把它收进房主权限）。</summary>
+        public const string RestartMessageName = "RaidDemo.Raid.Restart";
     }
 }
