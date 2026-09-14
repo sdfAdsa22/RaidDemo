@@ -71,6 +71,15 @@ namespace RaidDemo.Presentation
         /// <summary>上一次吸附到的地面高度。台阶过滤以它为基准，避免视觉插值拖慢判定。</summary>
         private float m_LastGroundHeight;
 
+        /// <summary>
+        /// 视觉跟随速率（每秒）。越大越贴近模拟位置、越小越平滑。
+        /// </summary>
+        /// <remarks>
+        /// 取 22 的含义：一帧（1/60 秒）追上约 30%，三帧内差值降到 1/3 以下——
+        /// 既看不到"模型落在身后"，也不会因为跟随过慢而显得飘。
+        /// </remarks>
+        private const float FollowRate = 22f;
+
         /// <summary>当前模拟位置（水平面）。</summary>
         public Vector2 SimulatedPosition { get; private set; }
 
@@ -145,13 +154,56 @@ namespace RaidDemo.Presentation
                 FacingDegrees = Mathf.Atan2(evt.Facing.Y, evt.Facing.X) * Mathf.Rad2Deg;
             }
 
-            ApplyTransform(instant: false);
+            // 位置不在这里改：这里只记录"模拟层说我在哪"，真正的视觉跟随放到每渲染帧做
+            // （见 FollowSimulatedPosition）。原因见下方方法的注释。
         }
 
         private void ApplyTransform(bool instant)
         {
             var target = new Vector3(SimulatedPosition.x, ResolveGroundHeight(), SimulatedPosition.y);
             transform.position = instant ? target : Vector3.Lerp(transform.position, target, 0.5f);
+            ApplyRotation();
+        }
+
+        /// <summary>
+        /// 每渲染帧把模型拉向模拟位置（帧率无关的指数跟随）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么不能按"事件次数"插值（曾经的写法）：</b>旧实现是
+        /// <c>Lerp(当前位置, 目标, 0.5f)</c> 放在 <c>PlayerMovementChanged</c> 回调里，
+        /// 即"每来一个移动事件就靠近一半"。单机时移动事件每帧一次，二者同拍，看起来没问题；
+        /// 但**联机客户端的移动是固定 60 Hz 步进**（一帧可能 0 次、1 次或若干次事件），
+        /// 与渲染帧数不再一一对应：有的帧模型完全不动、有的帧只追一半，
+        /// 于是**永远追不上模拟位置**——移动过程表现为落后加一顿一顿（肉眼就是"拖影/发糊"），
+        /// 停下后差值收敛立刻变清晰。</para>
+        ///
+        /// <para><b>为什么用指数形式：</b><c>1 - exp(-rate·dt)</c> 与帧率无关：
+        /// 60 Hz 与 144 Hz 下的收敛速度一致，也不会在某一帧恰好"跳"过去（线性 Lerp 会）。</para>
+        ///
+        /// <para>远端队友不受这个问题影响：他们走的是按服务器时间采样的插值缓冲，
+        /// 本来就是时间驱动的——这也是"只有自己的模型发糊"的原因。</para>
+        /// </remarks>
+        private void FollowSimulatedPosition(float deltaTime)
+        {
+            if (deltaTime <= 0f)
+            {
+                return;
+            }
+
+            var target = new Vector3(SimulatedPosition.x, ResolveGroundHeight(), SimulatedPosition.y);
+            var factor = 1f - Mathf.Exp(-FollowRate * deltaTime);
+            transform.position = Vector3.Lerp(transform.position, target, factor);
+            ApplyRotation();
+        }
+
+        private void Update()
+        {
+            FollowSimulatedPosition(Time.deltaTime);
+        }
+
+        /// <summary>把朝向写到 Transform 上（映射规则见下方长注释）。</summary>
+        private void ApplyRotation()
+        {
 
             // 坐标轴映射说明（这段映射容易搞错，特此写明推导依据）：
             //
