@@ -57,6 +57,14 @@ namespace RaidDemo.Bootstrap
         /// <summary>本局已进行的秒数；不在战局中时为 0。</summary>
         public float RaidElapsedSeconds;
 
+        /// <summary>已广播的快照批数（含"无人"的保活批次），用于联机掉线排查。</summary>
+        /// <remarks>
+        /// 它把"服务器还在不在发包"变成可从外部观测的数字：两支诊断采样一减，
+        /// 就能区分"服务器停发导致客户端超时"与"服务器在发但客户端没收到/没在发"。
+        /// 日志会因进程被强杀而丢缓冲，这个计数走状态页内存读取，不受影响。
+        /// </remarks>
+        public int SnapshotBatches;
+
         /// <summary>最近的服务端日志（新的在前）。</summary>
         public List<ServerStatusLogEntry> Logs = new List<ServerStatusLogEntry>();
     }

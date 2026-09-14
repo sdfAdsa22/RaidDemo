@@ -37,6 +37,7 @@ namespace RaidDemo.Bootstrap
                 HostNickname = ResolveHostNickname(),
                 ConnectedPlayerCount = m_LobbyClients.Count,
                 RaidElapsedSeconds = m_RaidStartedAt >= 0f ? now - m_RaidStartedAt : 0f,
+                SnapshotBatches = SnapshotBroadcastCount,
             };
 
             snapshot.Addresses.Add($"{ServerAddressReporter.LoopbackAddress}:{m_Options.Port}");

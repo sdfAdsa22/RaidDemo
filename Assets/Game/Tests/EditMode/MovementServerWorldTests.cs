@@ -186,13 +186,14 @@ namespace RaidDemo.Tests.EditMode
 
             // 10 ms：未到 50 ms 的节拍。
             m_World.Advance(0.01f);
-            Assert.AreEqual(0, m_World.CaptureSnapshots(snapshots));
+            Assert.IsFalse(m_World.TryCaptureSnapshots(snapshots), "未到节拍时不应产出快照批。");
 
             // 再推进 60 ms：累计超过节拍。
             m_World.Advance(0.06f);
-            Assert.AreEqual(1, m_World.CaptureSnapshots(snapshots));
+            Assert.IsTrue(m_World.TryCaptureSnapshots(snapshots), "到达节拍时必须产出快照批。");
+            Assert.AreEqual(1, snapshots.Count);
             Assert.AreEqual(PlayerId, snapshots[0].PlayerId);
-            Assert.AreEqual(0, m_World.CaptureSnapshots(snapshots), "同一批快照不应被重复取走。");
+            Assert.IsFalse(m_World.TryCaptureSnapshots(snapshots), "同一批快照不应被重复取走。");
         }
 
         /// <summary>快照里带服务器时间，远端插值靠它排序。</summary>
@@ -206,7 +207,8 @@ namespace RaidDemo.Tests.EditMode
             }
 
             var snapshots = new List<PlayerSnapshot>();
-            Assert.Greater(m_World.CaptureSnapshots(snapshots), 0);
+            Assert.IsTrue(m_World.TryCaptureSnapshots(snapshots));
+            Assert.Greater(snapshots.Count, 0);
             Assert.Greater(snapshots[0].ServerTime, 0d);
             Assert.AreEqual((float)m_World.SimulationTime, (float)snapshots[0].ServerTime, 1e-6f);
         }
@@ -223,7 +225,10 @@ namespace RaidDemo.Tests.EditMode
             m_World.Advance(0.06f);
             var snapshots = new List<PlayerSnapshot>();
 
-            Assert.AreEqual(0, m_World.CaptureSnapshots(snapshots));
+            // 关键语义（2026-09-14 修复）："没有玩家"仍然是"到达节拍"——
+            // 调用方要靠这一点继续下发空批次，把服务器存活的心跳维持住。
+            Assert.IsTrue(m_World.TryCaptureSnapshots(snapshots), "没有玩家时也应当消费节拍。");
+            Assert.AreEqual(0, snapshots.Count, "没有玩家时批次内容为空。");
         }
 
         /// <summary>多人同局时，每个人的输入只影响自己。</summary>

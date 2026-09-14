@@ -26,7 +26,7 @@ namespace RaidDemo.Bootstrap
     ///
     /// <para>本类不依赖网络库：网络层只负责把输入搬进来、把事件搬出去。</para>
     /// </remarks>
-    public sealed class ServerCombatCoordinator
+    public sealed partial class ServerCombatCoordinator
     {
         /// <summary>默认生命上限。</summary>
         public const float DefaultMaxHealth = 100f;

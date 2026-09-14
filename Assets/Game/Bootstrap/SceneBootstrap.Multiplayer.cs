@@ -60,6 +60,37 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否处于联机客户端模式。</summary>
         public bool IsMultiplayerClient => m_NetworkClient != null;
 
+        /// <summary>已上行的输入包总数（诊断用）。</summary>
+        /// <remarks>
+        /// 联机排障时"我到底还在不在发包"是最难从现象反推的一件事：
+        /// 断线、掉包、界面冻结的表现都是"对面没反应"。把它做成可读计数，
+        /// 采样两次就能区分"没在发"与"发了但对面没收到"（2026-09-14 联机基础问题排查）。
+        /// </remarks>
+        public int SentInputCount { get; private set; }
+
+        /// <summary>最后一次"上行停滞"的原因（诊断用）。</summary>
+        /// <remarks>
+        /// 上行停发有好几个分支（网络未连接 / 移动处理器缺失 / 消息通道缺失），
+        /// 现象一模一样都是"对面没反应"，但修法完全不同。这里只记录**第一次**停滞的原因：
+        /// 重复刷屏没有价值，而"第一次从哪条分支掉出去"正好是定位需要的全部信息
+        /// （2026-09-14 联机掉线排查）。
+        /// </remarks>
+        public string LastInputStallReason { get; private set; } = string.Empty;
+
+        /// <summary>记录一次上行停滞；同一原因只记一次。</summary>
+        private void NoteInputStall(string reason)
+        {
+            if (LastInputStallReason == reason)
+            {
+                return;
+            }
+
+            LastInputStallReason = reason;
+            // 用 Warning 而不是 Verbose：联机客户端的会话在编辑器里跑的是默认 Info 级，
+            // Verbose 会被直接过滤掉——而"上行停在哪条分支"恰恰要能在实机日志里看见。
+            m_Session?.Log.Warning($"[联机] 上行停滞：{reason}（已发 {SentInputCount} 包）。");
+        }
+
         /// <summary>
         /// 本进程是否以联机客户端身份运行。
         /// </summary>
@@ -221,16 +252,19 @@ namespace RaidDemo.Bootstrap
         /// <summary>
         /// 联机客户端的每帧推进：固定步预测 + 上行输入 + 远端插值。
         /// </summary>
-        private void TickMultiplayerClient(float deltaTime)
+        private void TickMultiplayerClient(float deltaTime, float networkDeltaTime)
         {
             ReportNetworkState();
 
             if (m_NetworkClient == null || !m_NetworkClient.IsConnectedClient)
             {
+                NoteInputStall("网络未连接");
                 return;
             }
 
-            m_NetworkStepAccumulator += deltaTime;
+            // 上行节拍用未缩放时间：时间被冻结时（结算 / 暂停 / 角色选择）也要继续发包保活，
+            // 这也是"冻结期间只发零输入"这条规则的落点（见 StepAndSendInput）。
+            m_NetworkStepAccumulator += networkDeltaTime;
 
             CollectReviveIntent();
             TickDownedHud(deltaTime);
@@ -246,6 +280,12 @@ namespace RaidDemo.Bootstrap
                 m_NetworkStepAccumulator -= NetworkFixedStep;
                 steps++;
                 StepAndSendInput();
+            }
+
+            // 累积器超过一秒的步长说明节拍推进异常（正常每帧只攒一两步）。
+            if (m_NetworkStepAccumulator > 1f)
+            {
+                NoteInputStall("节拍积压");
             }
 
             // 卡顿之后**不要**把攒下的时间全部补回来：一帧最多补 MaxNetworkStepsPerFrame 步，
@@ -274,6 +314,7 @@ namespace RaidDemo.Bootstrap
         {
             if (m_MoveHandler == null)
             {
+                NoteInputStall("移动处理器缺失");
                 return;
             }
 
@@ -281,11 +322,16 @@ namespace RaidDemo.Bootstrap
 
             // 倒地期间发零输入：服务器本来就不收，而本地预测也必须跟着停——
             // 否则本地位置会一直往前跑，快照每 50 毫秒把它拉回来一次，画面上是"躺着还在抽"。
+            //
+            // 时间被冻结（结算 / 暂停 / 角色选择界面把 timeScale 压成 0）同样发零输入：
+            // 此时发包的唯一目的是保活，界面上残留的按键状态绝不能变成服务器上的移动或开火。
+            var frozen = Time.timeScale <= 0f;
+            var noControl = m_LocalDowned || frozen;
             var intent = new PlayerMoveIntent(
                 m_LocalPlayerId,
-                m_LocalDowned ? RaidDemo.Shared.Vector2F.Zero : m_PendingMoveIntent,
+                noControl ? RaidDemo.Shared.Vector2F.Zero : m_PendingMoveIntent,
                 m_PendingLookDirection,
-                m_LocalDowned ? false : m_PendingWantsToSprint,
+                noControl ? false : m_PendingWantsToSprint,
                 m_NetworkSequence,
                 Time.timeAsDouble);
 
@@ -307,19 +353,24 @@ namespace RaidDemo.Bootstrap
             var messaging = m_NetworkClient != null ? m_NetworkClient.CustomMessagingManager : null;
             if (messaging == null)
             {
+                NoteInputStall("消息通道缺失");
                 return;
             }
 
+            // 本方法与 StepAndSendInput 是两条调用路径，冻结判断各自算一次：
+            // 两边都必须遵守"冻结 = 只保活"的规则。
+            var frozen = Time.timeScale <= 0f;
             var message = new PlayerInputMessage
             {
                 Move = new Vector2(intent.MoveDirection.X, intent.MoveDirection.Y),
                 Look = new Vector2(intent.LookDirection.X, intent.LookDirection.Y),
                 Sprint = intent.WantsToSprint,
-                TriggerHeld = m_NetworkTriggerHeld,
+                // 冻结期间不带任何战斗意图：结算 / 暂停时按下的键不该变成服务器的开火或换弹请求。
+                TriggerHeld = !frozen && m_NetworkTriggerHeld,
 
                 // 换弹是边沿事件：发出去之后就清掉，避免同一次按键被重复上报。
-                ReloadRequested = m_NetworkReloadRequested,
-                ReviveHeld = m_NetworkReviveHeld,
+                ReloadRequested = !frozen && m_NetworkReloadRequested,
+                ReviveHeld = !frozen && m_NetworkReviveHeld,
                 Sequence = intent.Sequence,
                 Timestamp = intent.Timestamp,
             };
@@ -333,6 +384,16 @@ namespace RaidDemo.Bootstrap
                     MovementNetworkChannel.InputMessageName,
                     NetworkManager.ServerClientId,
                     writer);
+            }
+
+            // 发送成功才计数：它衡量的是"真正上行的流量"，采样两次即可判断丢线方向。
+            SentInputCount++;
+            if (SentInputCount % 600 == 0)
+            {
+                // 每 600 包（约 10 秒）一条进度：断线后回看日志，
+                // 最后一条进度与断开之间的时间差就是"上行是什么时候停的"。
+                // 用 Info 而不是 Verbose：默认日志级别下 Verbose 会被过滤（见上一条）。
+                m_Session?.Log.Info($"[联机] 上行正常：已发 {SentInputCount} 包。");
             }
         }
 

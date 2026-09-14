@@ -201,13 +201,21 @@ namespace RaidDemo.Bootstrap
             TickCombat(deltaTime);
             SyncPlayerTransforms();
 
-            if (m_World.CaptureSnapshots(m_SnapshotBuffer) > 0)
+            if (m_World.TryCaptureSnapshots(m_SnapshotBuffer))
             {
+                // 即使这一批里没有玩家（战局结束、全员已离开世界）也要发出去：
+                // 快照通道同时是"服务器还活着"的心跳，停发会让客户端在 NGO 的连接超时
+                // （约 10 秒）后自行断开——表现是"结算之后所有人都掉线、重连也进不来"
+                // （2026-09-14 联机基础问题修复的定位结论）。
                 BroadcastSnapshots();
 
-                // 敌人快照与玩家快照同一节拍：两者在客户端是同一帧被插值的，
-                // 节拍不同会让"敌人打中了队友"这类事件在两边的画面上错开半拍。
-                BroadcastEnemySnapshots();
+                if (m_SnapshotBuffer.Count > 0)
+                {
+                    // 敌人快照与玩家快照同一节拍：两者在客户端是同一帧被插值的，
+                    // 节拍不同会让"敌人打中了队友"这类事件在两边的画面上错开半拍。
+                    // 没有玩家在局时不发：敌人快照的意义是"给还在局里的人看"。
+                    BroadcastEnemySnapshots();
+                }
             }
         }
 
@@ -279,6 +287,25 @@ namespace RaidDemo.Bootstrap
                     MovementNetworkChannel.SnapshotMessageName,
                     writer);
             }
+
+            // 每 100 批（约 5 秒）留一条 Verbose 痕迹：联机掉线排查时要能区分
+            // "服务器在发保活流量但客户端没收到"与"服务器自己停了"——
+            // 这两种情况的现象完全一样（对面掉线），修法却完全不同（2026-09-14 定位）。
+            m_SnapshotBroadcastCount++;
+            if (m_SnapshotBroadcastCount % 100 == 0)
+            {
+                m_Session?.Log.Verbose(
+                    $"[服务器] 快照批次已广播 {m_SnapshotBroadcastCount} 批（最近一批 {players.Length} 人，在线 {manager.ConnectedClientsIds.Count}）。");
+            }
+        }
+
+        /// <summary>已广播的快照批数（含不含玩家的保活批次）。</summary>
+        private int m_SnapshotBroadcastCount;
+
+        /// <summary>已广播的快照批数（含保活批次）；供状态页与诊断读取。</summary>
+        internal int SnapshotBroadcastCount
+        {
+            get { return m_SnapshotBroadcastCount; }
         }
 
         /// <summary>

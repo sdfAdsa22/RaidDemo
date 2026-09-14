@@ -170,8 +170,21 @@ namespace RaidDemo.Bootstrap
             }
         }
 
-        /// <summary>只发给某一个客户端（刚接入时用）。</summary>
-        /// <param name="clientId">目标客户端。</param>
+        /// <summary>
+        /// 把全部容器内容 + 这名玩家自己的随身容器与装备槽镜像发给他本人。
+        /// </summary>
+        /// <param name="clientId">目标客户端（数值上等于该玩家的编号）。</param>
+        /// <remarks>
+        /// <para>两个调用点都是"发给某一名玩家本人"：玩家刚接入时（<c>ServerRuntime.Players</c>）
+        /// 与客户端主动请求时（<c>OnContainerContentsRequested</c>）。后者才是真正可靠的路径——
+        /// 服务器推的那一次可能早于客户端处理器注册完成。</para>
+        ///
+        /// <para><b>踩过的坑：</b>本方法原先调用不带玩家编号的
+        /// <c>BuildContainerContentsBatch()</c>，于是这条"可靠路径"只给了场景容器：
+        /// 背包内容要等第一次背包命令的重发才补上，而装备槽镜像（<see cref="ContainerIds.EquipmentMirror"/>）
+        /// 完全不在批次里。客户端表现是"进图后 HUD 无武器、按开火没有反应"，
+        /// 而服务器日志一切正常（2026-09-14 联机基础问题修复的定位结论）。</para>
+        /// </remarks>
         private void SendAllContainerContentsTo(ulong clientId)
         {
             var manager = m_Network;
@@ -180,7 +193,7 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            var batch = BuildContainerContentsBatch();
+            var batch = BuildContainerContentsBatch(playerId: (int)clientId);
             using (var writer = new FastBufferWriter(ContainerContentsCapacity(batch), Allocator.Temp))
             {
                 writer.WriteValueSafe(batch);
@@ -283,6 +296,13 @@ namespace RaidDemo.Bootstrap
                         : containerId;
 
                 entries.Add(BuildContainerContents(wireId, grid));
+            }
+
+            // 装备槽没有自己的下行通道，借容器批次一起发（见 ContainerIds.EquipmentMirror 的说明）。
+            // 只在发给"玩家本人"的批次里带：装备状态是私有的，广播给所有人没有意义。
+            if (playerId >= 0 && TryBuildEquipmentMirror(playerId, out var equipmentMirror))
+            {
+                entries.Add(equipmentMirror);
             }
 
             return new ContainerContentsBatchMessage

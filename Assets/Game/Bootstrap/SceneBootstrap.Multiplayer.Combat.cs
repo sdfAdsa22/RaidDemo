@@ -52,7 +52,14 @@ namespace RaidDemo.Bootstrap
 
             // 验收模式下一律扣着扳机：无头进程没有键盘，但要让"开火 → 命中 → 掉血"
             // 这条链路可以被自动验证。它走的是与真实输入完全相同的上报路径。
-            m_NetworkTriggerHeld = wantsToFire || m_AutoWalk;
+            //
+            // 例外是 -rescueonly：那个模式的语义是"只救人、不主动交火"。
+            // 第一版没有排除它，验收里的"乙"几秒就把"甲"打死，后续所有阶段全部失真
+            // （2026-09-14 联机基础问题排查里踩过）。
+            var rescueOnly = ClientMode.IsActive
+                && ClientMode.Options != null
+                && ClientMode.Options.RescueOnly;
+            m_NetworkTriggerHeld = wantsToFire || (m_AutoWalk && !rescueOnly);
 
             if (m_NetworkTriggerHeld != m_LastReportedTrigger)
             {
@@ -142,6 +149,14 @@ namespace RaidDemo.Bootstrap
                         timestamp: 0d,
                         sequence: message.Sequence,
                         pelletIndex: message.PelletIndex));
+
+                    // 服务器在开火事件里带回了结算后的弹匣数：本地不推进武器，
+                    // 不应用这个值，HUD 的弹药数会停在收到装备时的那一刻。
+                    if (message.SourceId == m_LocalPlayerId)
+                    {
+                        ApplyLocalMagazineAmmo(message.MagazineAmmo);
+                    }
+
                     break;
 
                 case CombatEventMessage.KindDamaged:
@@ -172,6 +187,12 @@ namespace RaidDemo.Bootstrap
                         message.SourceId,
                         message.IsReloading,
                         message.MagazineAmmo));
+
+                    if (message.SourceId == m_LocalPlayerId)
+                    {
+                        ApplyLocalMagazineAmmo(message.MagazineAmmo);
+                    }
+
                     break;
 
                 case CombatEventMessage.KindDestroyed:
@@ -185,6 +206,27 @@ namespace RaidDemo.Bootstrap
             {
                 m_Session.Log.Verbose($"[联机] 收到战斗事件：种类 {message.Kind}（来源 {message.SourceId}）");
             }
+        }
+
+        /// <summary>
+        /// 把服务器给的弹匣数应用到本地武器运行时。
+        /// </summary>
+        /// <param name="magazineAmmo">服务器结算后的弹匣数；负数表示"本次事件没有带这个信息"。</param>
+        /// <remarks>
+        /// <para>联机客户端不推进武器（扣弹、换弹全在服务器算），因此每一次
+        /// "我开的火"与"我的换弹状态变化"都是刷新 HUD 弹匣数的机会。</para>
+        ///
+        /// <para><b>为什么用负值做哨兵：</b>开火事件对 AI 射手不带弹药数（它们没有玩家弹匣），
+        /// 把 0 当有效数据会把"没有信息"显示成"打空了"。</para>
+        /// </remarks>
+        private void ApplyLocalMagazineAmmo(int magazineAmmo)
+        {
+            if (magazineAmmo < 0)
+            {
+                return;
+            }
+
+            m_WeaponController?.Runtime?.SetMagazineAmmo(magazineAmmo);
         }
 
         /// <summary>

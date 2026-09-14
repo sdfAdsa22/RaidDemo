@@ -301,6 +301,24 @@ namespace RaidDemo.Combat
             m_Spread = m_Weapon.BaseSpreadDegrees;
         }
 
+        /// <summary>
+        /// 把弹匣数量设为服务器给的权威值。
+        /// </summary>
+        /// <param name="ammo">服务器结算后的弹匣数量；会被夹取到 0..容量。</param>
+        /// <remarks>
+        /// <para><b>只服务于联机客户端的显示：</b>单机与服务器自己都通过真实的开火 / 换弹流程改弹匣，
+        /// 只有联机客户端需要"把服务器算出来的数字显示在 HUD 上"——本地不推进武器，
+        /// 没有这条同步，弹药数会永远停在收到装备的那一刻。</para>
+        ///
+        /// <para><b>夹取而不是抛异常：</b>网络乱序时旧事件可能后到，夹取保证界面永远显示一个
+        /// 合法数字（0 到容量之间），而不是把异常抛到一个每帧都会走的路径上。</para>
+        /// </remarks>
+        public void SetMagazineAmmo(int ammo)
+        {
+            // 全限定名：本文件刻意不引用 UnityEngine（纯逻辑层），只在这一处借它的夹取。
+            m_MagazineAmmo = UnityEngine.Mathf.Clamp(ammo, 0, m_Weapon.MagazineCapacity);
+        }
+
         /// <summary>按射击模式安排按下扳机时的排队弹数。</summary>
         private void QueueOnPress()
         {

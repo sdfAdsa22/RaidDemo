@@ -261,5 +261,27 @@ namespace RaidDemo.Tests.EditMode
 
             Assert.AreEqual(1f, weapon.CurrentSpreadDegrees, 1e-3f, "换弹后重新握枪，散布应当回到基础值。");
         }
+
+        /// <summary>
+        /// 服务器权威弹匣数的应用：联机客户端不推进武器，HUD 的弹药数完全靠这条同步。
+        /// </summary>
+        /// <remarks>
+        /// 夹取而不是抛异常是刻意的：网络乱序时旧事件可能后到，
+        /// 一个越界值不应该把异常抛到每帧都会走的显示路径上（2026-09-14 联机基础问题）。
+        /// </remarks>
+        [Test]
+        public void SetMagazineAmmo_ClampsToLegalRange()
+        {
+            var weapon = CreateWeapon(magazineCapacity: 30);
+
+            weapon.SetMagazineAmmo(7);
+            Assert.AreEqual(7, weapon.MagazineAmmo, "应当接受区间内的权威值。");
+
+            weapon.SetMagazineAmmo(-3);
+            Assert.AreEqual(0, weapon.MagazineAmmo, "负数必须夹到 0。");
+
+            weapon.SetMagazineAmmo(999);
+            Assert.AreEqual(30, weapon.MagazineAmmo, "超过容量的值必须夹到容量。");
+        }
     }
 }

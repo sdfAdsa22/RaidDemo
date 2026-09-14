@@ -212,8 +212,26 @@ namespace RaidDemo.Bootstrap
                 DidHit = evt.DidHit,
                 PelletIndex = evt.PelletIndex,
                 NoiseRadius = evt.NoiseRadiusMeters,
+                // 弹匣数必须随开火事件下行：客户端本地不扣弹，没有这个字段
+                // HUD 的弹药数会一直停在收到装备时的满弹（2026-09-14 定位）。
+                MagazineAmmo = ResolveFiredMagazineAmmo(evt.ShooterId),
                 Sequence = evt.Sequence,
             });
+        }
+
+        /// <summary>
+        /// 取开火者当前的弹匣数；取不到时返回 -1（表示"本次事件不带弹药数据"）。
+        /// </summary>
+        /// <remarks>
+        /// <para>用 -1 而不是 0 做哨兵：AI 射手没有玩家弹匣，客户端也不显示它们的弹药；
+        /// 若用 0，客户端会把"没有数据"显示成"打空了"。</para>
+        /// </remarks>
+        private int ResolveFiredMagazineAmmo(int combatantId)
+        {
+            var playerId = ResolvePlayerId(combatantId);
+            return playerId > 0 && m_Combat != null && m_Combat.TryGetMagazineAmmo(playerId, out var ammo)
+                ? ammo
+                : -1;
         }
 
         private void OnCombatDamaged(DamageAppliedEvent evt)

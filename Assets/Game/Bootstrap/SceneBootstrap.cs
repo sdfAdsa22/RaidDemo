@@ -249,7 +249,11 @@ namespace RaidDemo.Bootstrap
             // 每个固定步产生一条输入并记录一条预测，因此这里只做分流。
             if (IsMultiplayerClient)
             {
-                TickMultiplayerClient(Time.deltaTime);
+                // 网络节拍要用**未缩放时间**：结算 / 暂停 / 角色选择会把 timeScale 压成 0，
+                // 而帧循环仍在跑。如果节拍跟着缩放时间走，客户端就会停止发送任何协议消息，
+                // 服务器在 10 秒（NGO 协议超时）后把连接踢掉——表现是"结算界面停留一会儿就掉线"
+                // （2026-09-14 联机基础问题修复的定位结论）。
+                TickMultiplayerClient(Time.deltaTime, Time.unscaledDeltaTime);
             }
             else
             {

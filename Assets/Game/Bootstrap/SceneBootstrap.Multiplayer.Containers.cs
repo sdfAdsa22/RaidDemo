@@ -1,5 +1,6 @@
 using RaidDemo.Data;
 using RaidDemo.Inventory;
+using RaidDemo.Shared;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -109,6 +110,10 @@ namespace RaidDemo.Bootstrap
                 ? new System.Action<string>(message => m_Session.Log.Verbose(message))
                 : null;
 
+            // 装备槽镜像是"每槽一格"的伪容器，不在容器注册表里：
+            // LootContainerSync 按注册表网格处理，找不到网格会直接跳过它，因此在这里单独应用。
+            ApplyEquipmentMirror(batch);
+
             // 真正的搬运与"补发本地事件"都在 LootContainerSync 里：
             // 那里有测试钉住"改完数据必须发事件"，避免再出现"数据动了、画面没动"（U-75）。
             var rebuilt = LootContainerSync.Apply(
@@ -142,6 +147,51 @@ namespace RaidDemo.Bootstrap
             }
 
             Debug.Log($"[联机] 容器内容已同步：{rebuilt} 个容器 / {itemCount} 件物品（服务器权威）。");
+        }
+
+        /// <summary>
+        /// 把服务器下发的装备槽镜像应用到本地装备槽。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么整槽覆盖：</b>镜像是权威状态而不是增量。必须先清空再按条目重建——
+        /// 服务器取下的装备（例如换枪、阵亡清空）才会真的从客户端消失；
+        /// 只"补上有的"会让本地留下服务器早已不存在的装备。</para>
+        ///
+        /// <para><b>为什么应用后不需要额外通知表现层：</b><c>UpdateCombat</c> 每帧调用
+        /// <c>SyncEquippedWeapon</c> 读的就是这份装备槽，下一帧武器运行时与枪械模型自然跟上。
+        /// 装备变更本身由服务器广播的容器批次驱动，本地不再造第二条事件。</para>
+        ///
+        /// <para><b>失败不抛错：</b>目录里查不到的定义（旧存档、物品被删）直接跳过——
+        /// 这与 <c>LootContainerSync</c> 对未知物品的处理保持一致，
+        /// 避免一个坏定义让整批同步停下。</para>
+        /// </remarks>
+        private void ApplyEquipmentMirror(in ContainerContentsBatchMessage batch)
+        {
+            if (m_Loadout == null || m_Loadout.Equipment == null || m_ItemCatalog == null)
+            {
+                return;
+            }
+
+            var mirrorIndex = -1;
+            for (var i = 0; i < batch.Containers.Length; i++)
+            {
+                if (batch.Containers[i].ContainerId == ContainerIds.EquipmentMirror)
+                {
+                    mirrorIndex = i;
+                    break;
+                }
+            }
+
+            if (mirrorIndex < 0)
+            {
+                // 批次里没有镜像（例如广播批只含场景容器）：保持本地装备现状。
+                return;
+            }
+
+            var mirror = batch.Containers[mirrorIndex];
+            var applied = EquipmentMirrorCodec.Apply(m_Loadout.Equipment, mirror, m_ItemCatalog);
+
+            Debug.Log($"[联机] 装备槽已按服务器同步：{applied} 件。");
         }
     }
 }

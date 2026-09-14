@@ -269,7 +269,18 @@ namespace RaidDemo.Simulation
         /// <param name="results">结果列表，会先被清空。</param>
         /// <returns>写入的快照条数；本次不到节拍时返回 0。</returns>
         /// <remarks>取走之后节拍标记被清除，避免同一批快照被重复下发。</remarks>
-        public int CaptureSnapshots(List<PlayerSnapshot> results)
+        /// <summary>
+        /// 若到达快照节拍，取出一批玩家快照。
+        /// </summary>
+        /// <param name="results">输出列表；到达节拍时会被重填（没有玩家时是一个空列表）。</param>
+        /// <returns>本帧到达快照节拍返回 true；未到节拍返回 false。</returns>
+        /// <remarks>
+        /// <para><b>为什么用 bool 而不是返回玩家数：</b>调用方必须能区分"没到节拍"与"到了节拍但没有玩家"。
+        /// 战局结束后所有玩家都会被移出世界，而快照通道同时承担着"服务器还活着"的心跳职责——
+        /// 若因为"没有玩家"而完全不发包，客户端会在 NGO 的连接超时（约 10 秒）后自行断开，
+        /// 表现是"结算之后所有人都掉线、重连也进不来"（2026-09-14 联机基础问题修复的定位结论）。</para>
+        /// </remarks>
+        public bool TryCaptureSnapshots(List<PlayerSnapshot> results)
         {
             if (results == null)
             {
@@ -280,7 +291,7 @@ namespace RaidDemo.Simulation
 
             if (!m_SnapshotDue)
             {
-                return 0;
+                return false;
             }
 
             m_SnapshotDue = false;
@@ -294,7 +305,7 @@ namespace RaidDemo.Simulation
                     slot.Simulator.CaptureSnapshot()));
             }
 
-            return results.Count;
+            return true;
         }
 
         /// <summary>推进一个固定步：先消费新输入，再让每名玩家的模拟器走一步。</summary>
