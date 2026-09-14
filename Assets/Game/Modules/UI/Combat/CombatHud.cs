@@ -193,6 +193,29 @@ namespace RaidDemo.UI
         }
 
         /// <summary>
+        /// 显示"倒地待救"状态。
+        /// </summary>
+        /// <param name="secondsRemaining">流血倒计时剩余秒数。</param>
+        /// <remarks>
+        /// <para>联机里被打倒不是死亡：玩家还躺着，等队友来扶。这段时间界面必须说清楚两件事——
+        /// **我还活着**（否则玩家会以为已经结束、直接退出）与**还剩多少秒**（否则无法判断要不要爬过去）。</para>
+        ///
+        /// <para>它复用生命标签而不是新增一个文本对象：倒地时生命条本来就没有别的信息要显示，
+        /// 多一个标签只会让 HUD 里多一处需要维护的绑定。</para>
+        /// </remarks>
+        public void SetDowned(float secondsRemaining)
+        {
+            if (m_HealthLabel == null)
+            {
+                return;
+            }
+
+            var seconds = Mathf.Max(0f, secondsRemaining);
+            m_HealthLabel.text = $"倒地 · 等待救援 {Mathf.CeilToInt(seconds)} 秒";
+            m_HealthLabel.color = LowHealthColor;
+        }
+
+        /// <summary>
         /// 更新护甲显示。由启动层推送。
         /// </summary>
         /// <param name="bodyLevel">身体护甲等级，0 表示无甲。</param>

@@ -43,6 +43,15 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public bool ReloadRequested;
 
+        /// <summary>
+        /// 本步是否按住"扶起队友"（电平：按住期间每步都为 true）。
+        /// </summary>
+        /// <remarks>
+        /// 与扣扳机同为持续状态，因此搭在同一条输入上：服务器按"每一帧都按住且距离够近"
+        /// 累计施救进度，松手即清零（见 <see cref="RaidDemo.Combat.PlayerLifeStateTracker"/>）。
+        /// </remarks>
+        public bool ReviveHeld;
+
         /// <summary>单调递增的输入序号。</summary>
         public uint Sequence;
 
@@ -57,6 +66,7 @@ namespace RaidDemo.Bootstrap
             serializer.SerializeValue(ref Sprint);
             serializer.SerializeValue(ref TriggerHeld);
             serializer.SerializeValue(ref ReloadRequested);
+            serializer.SerializeValue(ref ReviveHeld);
             serializer.SerializeValue(ref Sequence);
             serializer.SerializeValue(ref Timestamp);
         }

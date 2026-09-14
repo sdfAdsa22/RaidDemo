@@ -160,6 +160,7 @@ namespace RaidDemo.Bootstrap
             }
 
             m_Session?.Log.Info($"[服务器] 玩家 {playerId} 已加入（在线 {m_World.PlayerCount} 人）。");
+            RegisterLifeState(playerId);
             AddPlayerToCombat(playerId);
             BindPlayerHitTarget(playerId);
 
@@ -176,6 +177,7 @@ namespace RaidDemo.Bootstrap
             m_PlayerGroundHeights.Remove(playerId);
             UnregisterPlayerContainers(playerId);
             UnregisterRaidProgress(playerId);
+            UnregisterLifeState(playerId);
             RemovePlayerFromCombat(playerId);
 
             if (m_World != null && m_World.RemovePlayer(playerId))
@@ -204,6 +206,13 @@ namespace RaidDemo.Bootstrap
                 message.Sprint,
                 message.Sequence,
                 message.Timestamp);
+
+            // 倒地的人不能移动、也不能开枪：只接受"扶起队友"这一个意图。
+            SetReviveHeld((int)clientId, message.ReviveHeld);
+            if (IsPlayerDowned((int)clientId))
+            {
+                return;
+            }
 
             if (m_InputLogged.Add((int)clientId) && m_Session != null
                 && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
@@ -358,30 +367,6 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
-        /// 按玩家标识排布出生点。
-        /// </summary>
-        /// <remarks>
-        /// 每个人都叠在地图原点会让第一帧看起来像只有一个角色。P1 用一圈小队列把玩家排开，
-        /// 真正的出生点由战局配置决定（P3 的生成管理）。
-        /// </remarks>
-        private Vector2F SpawnPositionFor(int playerId)
-        {
-            // 验收模式：出生点放进撤离区，用于验收"撤离读秒与结算由服务器裁定"。
-            // 只改出生位置，不改任何规则：读秒、判定、结算走的都是真实路径。
-            if (m_Options != null && m_Options.SpawnAtExtraction && m_ExtractionZones.Count > 0)
-            {
-                var marker = m_ExtractionZones[0];
-                if (marker != null)
-                {
-                    var position = marker.transform.position;
-                    return new Vector2F(position.x, position.z);
-                }
-            }
-
-            var index = playerId < 0 ? 0 : playerId;
-            return new Vector2F((index % 4) * SpawnSpacing, (index / 4) * SpawnSpacing);
-        }
-
         /// <summary>
         /// 为玩家创建碰撞世界。
         /// </summary>

@@ -40,5 +40,8 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>客户端 → 服务器：装备 / 卸下（P3 的装备权威化）。</summary>
         public const string EquipCommandMessageName = "RaidDemo.Container.Equip";
+
+        /// <summary>服务器 → 全体客户端：倒地 / 被救起 / 流血死亡。</summary>
+        public const string LifeMessageName = "RaidDemo.Raid.Life";
     }
 }

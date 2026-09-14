@@ -70,27 +70,18 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>是否以无头方式启动（<c>-batchmode</c> 或 <c>-nographics</c>）。</summary>
         public bool IsHeadless { get; private set; }
-
-        /// <summary>
-        /// 是否让客户端自动绕圈行走（<c>-autowalk</c>）。
-        /// </summary>
-        /// <remarks>
-        /// <b>验收辅助</b>：无头环境没有键盘，要让"两个客户端互相看到对方移动"可以自动验证，
-        /// 就得有人在动。它走的是与真实输入完全相同的链路（脚本化输入 → 命令 → 预测 → 上行），
-        /// 因此证明的不是"代码能跑"，而是"输入真的传到了对面"。
-        /// </remarks>
+        /// <summary>是否让客户端自动行动（<c>-autowalk</c>）：无头验收的脚本化输入。</summary>
         public bool AutoWalk { get; private set; }
 
         /// <summary>验收模式：出生在第一个撤离点里（只改出生位置，不改规则）。</summary>
         public bool SpawnAtExtraction { get; private set; }
+        /// <summary>验收模式：开局把玩家 1 打到 0（验收倒地与救援）。</summary>
+        public bool DownTest { get; private set; }
+        /// <summary>验收模式：客户端原地待命、只做救援（验收扶起队友）。</summary>
+        public bool RescueOnly { get; private set; }
 
-        /// <summary>
-        /// 要连接的服务器地址（<c>主机[:端口]</c>）；为 null 表示本进程不是联机客户端。
-        /// </summary>
-        /// <remarks>
-        /// <b>它是 P1~P3 的临时加入路径</b>：这几批还没有大厅界面，先用命令行把两个客户端接起来做验证。
-        /// P4 的主菜单联机入口上线后，本参数保留给自动化测试与快速调试用。
-        /// </remarks>
+        /// <summary>要连接的服务器地址（<c>主机[:端口]</c>）；为 null 表示不是联机客户端。</summary>
+        /// <remarks>P1~P3 的临时加入路径；P4 的大厅上线后保留给自动化测试与快速调试。</remarks>
         public string ConnectAddress { get; private set; }
 
         /// <summary>
@@ -164,6 +155,14 @@ namespace RaidDemo.Bootstrap
 
                     case "-spawnzone":
                         result.SpawnAtExtraction = true;
+                        break;
+
+                    case "-downtest":
+                        result.DownTest = true;
+                        break;
+
+                    case "-rescueonly":
+                        result.RescueOnly = true;
                         break;
 
                     case "-port":

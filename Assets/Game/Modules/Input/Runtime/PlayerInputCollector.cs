@@ -160,6 +160,9 @@ namespace RaidDemo.Input
         /// <summary>脚本化「使用医疗品」输入。</summary>
         public bool ScriptedWantsToUseMedical { get; set; }
 
+        /// <summary>脚本化输入模式下的"按住扶起队友"（验收用）。</summary>
+        public bool ScriptedWantsToRevive { get; set; }
+
         /// <summary>是否启用脚本化输入。启用后真实设备输入被忽略。</summary>
         public bool UseScriptedInput { get; set; }
 

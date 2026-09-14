@@ -60,6 +60,31 @@ namespace RaidDemo.Bootstrap
             var x = (float)Math.Cos(angle);
             var y = (float)Math.Sin(angle);
 
+            // 队友倒地优先于一切：验收要走到"扶起队友"这条路径，
+            // 而它只在有队友躺着的时候才会发生。
+            if (TryResolveRescueAim(out var rescueAim, out var withinRange))
+            {
+                m_InputCollector.ScriptedLookDirection = rescueAim;
+                m_InputCollector.ScriptedMoveDirection = withinRange
+                    ? Vector2.zero
+                    : new Vector2(rescueAim.X, rescueAim.Y);
+
+                // 走到身边就按住救援键（走的是与玩家按 F 完全相同的上报路径）。
+                m_InputCollector.ScriptedWantsToRevive = withinRange;
+                return;
+            }
+
+            m_InputCollector.ScriptedWantsToRevive = false;
+
+            // 只救人的验收模式：不搜刮、不撤离、不主动交火，站在原地等队友倒地。
+            // 它让"扶起队友"这条路径不再依赖脚本能不能走到某个位置（见排障手册 P-22/R-1）。
+            if (ClientMode.IsActive && ClientMode.Options != null && ClientMode.Options.RescueOnly)
+            {
+                m_InputCollector.ScriptedLookDirection = new Vector2F(x, y);
+                m_InputCollector.ScriptedMoveDirection = Vector2.zero;
+                return;
+            }
+
             // 验收的最后一段是撤离：让客户端在打了一阵之后自己往撤离点走，
             // 否则"撤离读秒由服务器裁定"这条路径永远走不到（出生点离撤离点三十多米）。
             if (TryResolveExtractionAim(out var extractAim))
@@ -330,7 +355,6 @@ namespace RaidDemo.Bootstrap
 
         private const int AutoLootContainerCount = 15;
         private int m_AutoLootContainerOffset;
-
         private bool m_EquipmentSelfTestLogged;
 
     }

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using RaidDemo.Combat;
 using RaidDemo.Inventory;
+using RaidDemo.Shared;
 using RaidDemo.Presentation;
 using RaidDemo.Raid;
 using Unity.Collections;
@@ -52,6 +54,16 @@ namespace RaidDemo.Bootstrap
 
         private readonly Dictionary<int, RaidProgress> m_RaidProgress = new Dictionary<int, RaidProgress>();
         private readonly List<ExtractionZoneMarker> m_ExtractionZones = new List<ExtractionZoneMarker>();
+
+        /// <summary>生命两态（存活 / 失能 / 死亡）与施救进度。</summary>
+        private readonly PlayerLifeStateTracker m_LifeStates = new PlayerLifeStateTracker();
+
+        /// <summary>每名玩家本帧是否按住"扶起队友"。</summary>
+        private readonly Dictionary<int, bool> m_ReviveHeld = new Dictionary<int, bool>();
+
+        private readonly List<int> m_BledOutBuffer = new List<int>();
+        private readonly List<int> m_RevivedBuffer = new List<int>();
+
         private float m_NextRaidTickTime;
         private bool m_RaidZonesReady;
 
@@ -76,124 +88,103 @@ namespace RaidDemo.Bootstrap
 
             m_NextRaidTickTime = Time.unscaledTime + RaidTickInterval;
 
+            TickRevives();
+
+            // 倒地倒计时与救起判定走逻辑层的跟踪器：那里的规则有单元测试钉着。
+            m_BledOutBuffer.Clear();
+            m_RevivedBuffer.Clear();
+            m_LifeStates.Tick(RaidTickInterval, m_BledOutBuffer, m_RevivedBuffer);
+
+            for (var i = 0; i < m_RevivedBuffer.Count; i++)
+            {
+                OnPlayerRevived(m_RevivedBuffer[i]);
+            }
+
+            for (var i = 0; i < m_BledOutBuffer.Count; i++)
+            {
+                OnPlayerBledOut(m_BledOutBuffer[i]);
+            }
+
             foreach (var pair in m_PlayerBodies)
             {
                 TickPlayerRaid(pair.Key);
             }
         }
 
-        /// <summary>地图生效后收集撤离点。</summary>
-        private void TryCollectExtractionZones()
+        /// <summary>
+        /// 累加所有"正在被施救"的玩家的进度。
+        /// </summary>
+        /// <remarks>
+        /// <para>每名倒地玩家只认一名施救者：最近的那个按住 F 的活着的队友。
+        /// 多人同时救不叠加（叠加会让"两个人一起救"变成一瞬间起来，破坏这个机制的时间成本）。</para>
+        /// </remarks>
+        private void TickRevives()
         {
-            if (string.IsNullOrEmpty(m_Options.MapSceneName)
-                || SceneManager.GetActiveScene().name != m_Options.MapSceneName)
+            List<int> downed = null;
+
+            foreach (var pair in m_PlayerBodies)
             {
-                return;
-            }
-
-            var markers = Object.FindObjectsByType<ExtractionZoneMarker>(FindObjectsSortMode.None);
-            m_ExtractionZones.Clear();
-            m_ExtractionZones.AddRange(markers);
-            m_RaidZonesReady = true;
-
-            m_Session?.Log.Info($"[服务器] 撤离点已就绪：{m_ExtractionZones.Count} 个。");
-        }
-
-        /// <summary>推进一名玩家的撤离读秒与生死判定。</summary>
-        /// <param name="playerId">玩家编号。</param>
-        private void TickPlayerRaid(int playerId)
-        {
-            if (!m_RaidProgress.TryGetValue(playerId, out var progress))
-            {
-                progress = new RaidProgress();
-                m_RaidProgress[playerId] = progress;
-            }
-
-            if (progress.Settled)
-            {
-                return;
-            }
-
-            // 阵亡优先于撤离：倒在撤离区里不能算撤离成功。
-            if (!IsPlayerAlive(playerId))
-            {
-                KilledPlayerCount++;
-                SettlePlayer(playerId, progress, RaidOutcome.Killed);
-                return;
-            }
-
-            if (!m_World.TryGetSnapshot(playerId, out var snapshot))
-            {
-                return;
-            }
-
-            var zoneId = FindZoneAt(snapshot.State.Position);
-            if (zoneId < 0)
-            {
-                // 离开撤离区：读条清零（与客户端一致——撤离读条不能"攒着"）。
-                progress.SecondsInZone = 0f;
-                progress.ZoneId = -1;
-                return;
-            }
-
-            if (zoneId != progress.ZoneId)
-            {
-                progress.ZoneId = zoneId;
-                progress.SecondsInZone = 0f;
-            }
-
-            progress.SecondsInZone += RaidTickInterval;
-
-            // 读秒痕迹：整秒变化时记一笔。"撤离读秒由服务器裁定"这条路径
-            // 只有走通了才有意义，而验收时它必须能从日志里看出来。
-            var wholeSeconds = Mathf.FloorToInt(progress.SecondsInZone);
-            if (wholeSeconds != progress.LastReportedSecond)
-            {
-                progress.LastReportedSecond = wholeSeconds;
-                m_Session?.Log.Info(
-                    $"[服务器] 玩家 {playerId} 在撤离区 {zoneId} 读秒 {wholeSeconds}/{ExtractionSeconds:F0} 秒。");
-            }
-
-            if (progress.SecondsInZone < ExtractionSeconds)
-            {
-                return;
-            }
-
-            ExtractedPlayerCount++;
-            SettlePlayer(playerId, progress, RaidOutcome.Extracted);
-        }
-
-        /// <summary>玩家所处撤离区的编号；不在任何区内时返回 -1。</summary>
-        /// <param name="position">玩家的权威平面位置。</param>
-        private int FindZoneAt(RaidDemo.Shared.Vector2F position)
-        {
-            for (var i = 0; i < m_ExtractionZones.Count; i++)
-            {
-                var marker = m_ExtractionZones[i];
-                if (marker == null)
+                if (m_LifeStates.GetState(pair.Key) != PlayerLifeState.Downed)
                 {
                     continue;
                 }
 
-                var center = marker.transform.position;
-                var dx = center.x - position.X;
-                var dz = center.z - position.Y;
-                var radius = marker.Radius;
-                if ((dx * dx) + (dz * dz) <= radius * radius)
+                downed ??= new List<int>();
+                downed.Add(pair.Key);
+            }
+
+            if (downed == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < downed.Count; i++)
+            {
+                var targetId = downed[i];
+                var targetPosition = ResolvePlanePosition(targetId);
+                var rescuer = FindRescuer(targetId, targetPosition);
+
+                if (rescuer < 0)
                 {
-                    return marker.ZoneId;
+                    m_LifeStates.InterruptRevive(targetId);
+                    continue;
+                }
+
+                m_LifeStates.AddReviveProgress(targetId, RaidTickInterval);
+            }
+        }
+
+        /// <summary>找正在施救的队友；没有返回 -1。</summary>
+        /// <param name="targetId">被救者。</param>
+        /// <param name="targetPosition">被救者位置。</param>
+        private int FindRescuer(int targetId, RaidDemo.Shared.Vector2F targetPosition)
+        {
+            foreach (var pair in m_PlayerBodies)
+            {
+                var rescuerId = pair.Key;
+                if (!m_ReviveHeld.TryGetValue(rescuerId, out var held) || !held)
+                {
+                    continue;
+                }
+
+                if (m_LifeStates.CanRevive(
+                        rescuerId, targetId, ResolvePlanePosition(rescuerId), targetPosition))
+                {
+                    return rescuerId;
                 }
             }
 
             return -1;
         }
 
-        /// <summary>
-        /// 结算一名玩家：算带出价值、广播结果、留一条 Info 痕迹。
-        /// </summary>
-        /// <param name="playerId">玩家编号。</param>
-        /// <param name="progress">该玩家的战局进度。</param>
-        /// <param name="outcome">结果。</param>
+        /// <summary>取一名玩家的权威平面位置；查不到时返回原点。</summary>
+        private RaidDemo.Shared.Vector2F ResolvePlanePosition(int playerId)
+        {
+            return m_World != null && m_World.TryGetSnapshot(playerId, out var snapshot)
+                ? snapshot.State.Position
+                : RaidDemo.Shared.Vector2F.Zero;
+        }
+
         private void SettlePlayer(int playerId, RaidProgress progress, RaidOutcome outcome)
         {
             progress.Settled = true;
@@ -215,12 +206,10 @@ namespace RaidDemo.Bootstrap
             });
         }
 
-        /// <summary>统计一名玩家带出/损失物品的总价值（服务器那份数据）。</summary>
+        /// <summary>
+        /// 统计一名玩家带出/损失物品的总价值（只算背包与弹药挂，装备槽留给 P5 的结算细化）。
+        /// </summary>
         /// <param name="playerId">玩家编号。</param>
-        /// <remarks>
-        /// 只统计随身背包与弹药挂：装备槽的物品价值属于"带进去的东西"，
-        /// 等 P5 的仓库与结算细化再一起算（这条简化不会让任何人有额外收益）。
-        /// </remarks>
         private int ResolveCarriedValue(int playerId)
         {
             if (m_Combat == null || !m_Combat.TryGetLoadout(playerId, out var loadout) || loadout == null)
@@ -270,7 +259,6 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>把一条结果广播给所有客户端。</summary>
-        /// <param name="message">结果消息。</param>
         private void BroadcastRaidOutcome(in RaidOutcomeMessage message)
         {
             var manager = m_Network;
@@ -297,19 +285,32 @@ namespace RaidDemo.Bootstrap
             m_RaidProgress.Remove(playerId);
         }
 
-        /// <summary>
-        /// 收到客户端的"重开战局"请求：把这一局重置成初始状态。
-        /// </summary>
+        /// <summary>登记一名玩家的生命状态（接入时调用）。</summary>
+        /// <param name="playerId">玩家编号。</param>
+        private void RegisterLifeState(int playerId)
+        {
+            m_LifeStates.Register(playerId);
+            m_ReviveHeld[playerId] = false;
+        }
+
+        /// <summary>清理一名玩家的生命状态（断开时调用）。</summary>
+        /// <param name="playerId">玩家编号。</param>
+        private void UnregisterLifeState(int playerId)
+        {
+            m_LifeStates.Remove(playerId);
+            m_ReviveHeld.Remove(playerId);
+        }
+
+        /// <summary>重置全员的生命状态（重开一局）。</summary>
+        private void ResetLifeStates()
+        {
+            m_LifeStates.Clear();
+            m_ReviveHeld.Clear();
+        }
+
+        /// <summary>收到"重开战局"请求：把这一局重置成初始状态（P4 会收进房主权限）。</summary>
         /// <param name="senderId">发起请求的客户端。</param>
         /// <param name="reader">消息体（当前为空）。</param>
-        /// <remarks>
-        /// <para><b>为什么需要它：</b>结算之后这一局的容器、AI、进度都是"上一局"的残留，
-        /// 不做重置就只能重启进程才能再打一局——而"战局可重开"是 P3 的验收项之一。</para>
-        ///
-        /// <para><b>重置什么：</b>容器内容（重新抽，编号不变）、AI（全部重建）、
-        /// 每名玩家的战斗状态（护甲血量与配发弹药）与出生位置。P4 的大厅会把"谁能重开"
-        /// 收进房主权限；现在只要有人请求就重开，够自动化验收用。</para>
-        /// </remarks>
         private void OnRaidRestartRequested(ulong senderId, FastBufferReader reader)
         {
             m_Session?.Log.Info($"[服务器] 收到玩家 {(int)senderId} 的重开请求，正在重置战局。");
@@ -321,6 +322,7 @@ namespace RaidDemo.Bootstrap
         {
             // 1. 进度与计数清零。
             m_RaidProgress.Clear();
+            ResetLifeStates();
             ExtractedPlayerCount = 0;
             KilledPlayerCount = 0;
 
@@ -361,6 +363,7 @@ namespace RaidDemo.Bootstrap
                 m_World.TryTeleport(playerId, spawn);
 
                 CreatePlayerBody(playerId);
+                RegisterLifeState(playerId);
                 AddPlayerToCombat(playerId);
                 RegisterPlayerContainers(playerId);
                 SendContainerContentsTo(playerId);
@@ -368,6 +371,30 @@ namespace RaidDemo.Bootstrap
 
             BroadcastAllContainerContents();
             m_Session?.Log.Info("[服务器] 战局已重开：容器重抽、AI 重建、玩家回到出生点。");
+        }
+        /// <summary>按玩家标识排布出生点（验收模式下改到撤离区）。</summary>
+        /// 按玩家标识排布出生点。
+        /// </summary>
+        /// <remarks>
+        /// 每个人都叠在地图原点会让第一帧看起来像只有一个角色。P1 用一圈小队列把玩家排开，
+        /// 真正的出生点由战局配置决定（P3 的生成管理）。
+        /// </remarks>
+        private Vector2F SpawnPositionFor(int playerId)
+        {
+            // 验收模式：出生点放进撤离区，用于验收"撤离读秒与结算由服务器裁定"。
+            // 只改出生位置，不改任何规则：读秒、判定、结算走的都是真实路径。
+            if (m_Options != null && m_Options.SpawnAtExtraction && m_ExtractionZones.Count > 0)
+            {
+                var marker = m_ExtractionZones[0];
+                if (marker != null)
+                {
+                    var position = marker.transform.position;
+                    return new Vector2F(position.x, position.z);
+                }
+            }
+
+            var index = playerId < 0 ? 0 : playerId;
+            return new Vector2F((index % 4) * SpawnSpacing, (index / 4) * SpawnSpacing);
         }
     }
 }

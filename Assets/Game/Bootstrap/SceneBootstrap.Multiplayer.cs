@@ -127,6 +127,7 @@ namespace RaidDemo.Bootstrap
             RegisterEnemyChannel();
             RegisterContainerChannel();
             RegisterRaidOutcomeChannel();
+            RegisterLifeChannel();
 
             // 联机里血量由服务器说了算，因此连上就先按满血显示一次：
             // 否则在挨第一枪之前，界面上的血量是"本地战斗世界"的默认值（联机里根本没建）。
@@ -155,6 +156,9 @@ namespace RaidDemo.Bootstrap
             }
 
             m_NetworkStepAccumulator += deltaTime;
+
+            CollectReviveIntent();
+            TickDownedHud(deltaTime);
 
             if (m_AutoWalk)
             {
@@ -188,11 +192,13 @@ namespace RaidDemo.Bootstrap
 
             m_NetworkSequence++;
 
+            // 倒地期间发零输入：服务器本来就不收，而本地预测也必须跟着停——
+            // 否则本地位置会一直往前跑，快照每 50 毫秒把它拉回来一次，画面上是"躺着还在抽"。
             var intent = new PlayerMoveIntent(
                 m_LocalPlayerId,
-                m_PendingMoveIntent,
+                m_LocalDowned ? RaidDemo.Shared.Vector2F.Zero : m_PendingMoveIntent,
                 m_PendingLookDirection,
-                m_PendingWantsToSprint,
+                m_LocalDowned ? false : m_PendingWantsToSprint,
                 m_NetworkSequence,
                 Time.timeAsDouble);
 
@@ -226,6 +232,7 @@ namespace RaidDemo.Bootstrap
 
                 // 换弹是边沿事件：发出去之后就清掉，避免同一次按键被重复上报。
                 ReloadRequested = m_NetworkReloadRequested,
+                ReviveHeld = m_NetworkReviveHeld,
                 Sequence = intent.Sequence,
                 Timestamp = intent.Timestamp,
             };

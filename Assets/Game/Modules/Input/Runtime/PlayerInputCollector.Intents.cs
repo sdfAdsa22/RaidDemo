@@ -131,6 +131,28 @@ namespace RaidDemo.Input
         }
 
         /// <summary>
+        /// 读取「扶起队友」的输入（按住 F）。
+        /// </summary>
+        /// <returns>本帧是否按住救援键。</returns>
+        /// <remarks>
+        /// <para><b>为什么是"按住"而不是"按一下"：</b>扶起是持续动作（需要 3 秒），
+        /// 服务器按"每一帧都按住且距离够近"来累计进度；按一下就走等于放弃施救，
+        /// 这正是它作为团队压力的地方。</para>
+        ///
+        /// <para>与医疗键一样直接读键盘：只有一个绑定，不值得新增输入动作。</para>
+        /// </remarks>
+        public bool ReadReviveHeld()
+        {
+            if (UseScriptedInput)
+            {
+                return ScriptedWantsToRevive;
+            }
+
+            var keyboard = Keyboard.current;
+            return keyboard != null && keyboard.fKey.isPressed;
+        }
+
+        /// <summary>
         /// 读取本帧的暂停输入（默认 Esc）。
         /// </summary>
         /// <returns>本帧是否按下了暂停键。</returns>
