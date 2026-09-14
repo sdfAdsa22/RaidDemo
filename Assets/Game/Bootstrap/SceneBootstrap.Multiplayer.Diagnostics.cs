@@ -1,5 +1,6 @@
 using System;
 using RaidDemo.Inventory;
+using RaidDemo.Presentation;
 using RaidDemo.Shared;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
@@ -81,6 +82,17 @@ namespace RaidDemo.Bootstrap
             var x = (float)Math.Cos(angle);
             var y = (float)Math.Sin(angle);
 
+            // 验收的最后一段是撤离：让客户端在打了一阵之后自己往撤离点走，
+            // 否则"撤离读秒由服务器裁定"这条路径永远走不到（出生点离撤离点三十多米）。
+            if (TryResolveExtractionAim(out var extractAim))
+            {
+                extractAim = ApplyUnstick(extractAim);
+                m_InputCollector.ScriptedLookDirection = extractAim;
+                m_InputCollector.ScriptedMoveDirection = new Vector2(extractAim.X, extractAim.Y);
+                TryIssueAutoLootCommand();
+                return;
+            }
+
             // 先找射程内最近的敌人；找不到再退回"盯着最近的队友"。
             // 打中谁不重要，重要的是"打中"这件事必须真的发生：只有命中了，
             // 才会走到"伤害结算 → 广播 → 客户端更新"这条链路上。
@@ -101,6 +113,149 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>验收模式下自动拾取的间隔（秒）。</summary>
         private const float AutoLootIntervalSeconds = 4f;
+
+        /// <summary>验收模式下开始前往撤离点的时间（秒）。</summary>
+        private const float AutoExtractSeekSeconds = 25f;
+
+        private ExtractionZoneMarker[] m_ExtractionMarkerCache;
+
+        /// <summary>卡住判定的采样间隔（秒）。</summary>
+        private const float StuckCheckInterval = 1.5f;
+
+        /// <summary>判定"没动"的位移阈值（米）。</summary>
+        private const float StuckDistanceMeters = 0.5f;
+
+        /// <summary>侧移持续时间（秒）。</summary>
+        private const float UnstickDuration = 1.2f;
+
+        private Vector2 m_LastStuckPosition;
+        private double m_NextStuckCheck;
+        private double m_UnstickUntil;
+        private float m_UnstickSign = 1f;
+
+        /// <summary>
+        /// 卡住就往侧向偏一下。
+        /// </summary>
+        /// <param name="desired">本来想走的方向。</param>
+        /// <returns>实际要发的方向。</returns>
+        /// <remarks>
+        /// <para><b>为什么需要它：</b>验收模式是"朝目标直线走"，撞到集装箱或墙就再也过不去——
+        /// 实测两名客户端一起卡在 (2.1, 9.3) 一分钟，于是"撤离读秒"这条路径永远走不到。</para>
+        ///
+        /// <para>做法是最朴素的：每 1.5 秒检查一次位移，几乎没动就把方向转 90°（左右交替）1.2 秒。
+        /// 它不是寻路，只是让验收脚本能从障碍上"蹭"过去；真正的寻路在 AI 那一侧，
+        /// 客户端联机时不跑 AI、也没有导航网格。</para>
+        /// </remarks>
+        private Vector2F ApplyUnstick(Vector2F desired)
+        {
+            if (m_PlayerMotor == null)
+            {
+                return desired;
+            }
+
+            var now = Time.timeAsDouble;
+            var position = m_PlayerMotor.SimulatedPosition;
+
+            if (now >= m_NextStuckCheck)
+            {
+                // SimulatedPosition 是 Unity 的 Vector2（x=世界 x，y=世界 z）。
+                var dx = position.x - m_LastStuckPosition.x;
+                var dy = position.y - m_LastStuckPosition.y;
+                var moved = Mathf.Sqrt((dx * dx) + (dy * dy));
+
+                if (moved < StuckDistanceMeters)
+                {
+                    m_UnstickUntil = now + UnstickDuration;
+                    // 左右交替，避免每次都往同一侧蹭、结果在同一处反复卡住。
+                    m_UnstickSign = -m_UnstickSign;
+                }
+
+                m_LastStuckPosition = position;
+                m_NextStuckCheck = now + StuckCheckInterval;
+            }
+
+            if (now >= m_UnstickUntil)
+            {
+                return desired;
+            }
+
+            // 顺时针 / 逆时针转 90°。
+            return m_UnstickSign > 0f
+                ? new Vector2F(-desired.Y, desired.X)
+                : new Vector2F(desired.Y, -desired.X);
+        }
+
+        /// <summary>
+        /// 找最近的撤离点方向（验收模式用）。
+        /// </summary>
+        /// <param name="aim">指向撤离点的单位方向。</param>
+        /// <returns>到了该去撤离的时间、且地图上有撤离点时返回 true。</returns>
+        /// <remarks>
+        /// 用的是场景里的 <see cref="ExtractionZoneMarker"/>——与服务器判定读的是同一批对象，
+        /// 因此"客户端往哪走"与"服务器认不认"不会错位。
+        /// </remarks>
+        private bool TryResolveExtractionAim(out Vector2F aim)
+        {
+            aim = Vector2F.Zero;
+
+            if (!m_AutoWalk || Time.timeSinceLevelLoad < AutoExtractSeekSeconds || m_PlayerMotor == null)
+            {
+                return false;
+            }
+
+            if (m_ExtractionMarkerCache == null)
+            {
+                // 显式写 UnityEngine.Object：本文件引入了 System，Object 会有二义性。
+                m_ExtractionMarkerCache =
+                    UnityEngine.Object.FindObjectsByType<ExtractionZoneMarker>(FindObjectsSortMode.None);
+            }
+
+            if (m_ExtractionMarkerCache.Length == 0)
+            {
+                return false;
+            }
+
+            var self = m_PlayerMotor.SimulatedPosition;
+            var bestSqrDistance = float.MaxValue;
+            var found = false;
+
+            // 先去北侧上坡道的入口：谷底到塬面（撤离点所在）之间隔着 6 米高的环状坡体，
+            // 直线走会被坡面挡住（实测两名客户端一起卡在 (2.1, 9.3)）。
+            // 通道位置来自地图剖面：北侧坡道在 x=0、向外为 +Z 方向。
+            var waypointX = 0f;
+            var waypointZ = 24f;
+            var toWaypointX = waypointX - self.x;
+            var toWaypointZ = waypointZ - self.y;
+            if ((toWaypointX * toWaypointX) + (toWaypointZ * toWaypointZ) > 4f)
+            {
+                aim = new Vector2F(toWaypointX, toWaypointZ).Normalized;
+                return true;
+            }
+
+            for (var i = 0; i < m_ExtractionMarkerCache.Length; i++)
+            {
+                var marker = m_ExtractionMarkerCache[i];
+                if (marker == null)
+                {
+                    continue;
+                }
+
+                var position = marker.transform.position;
+                var dx = position.x - self.x;
+                var dz = position.z - self.y;
+                var sqrDistance = (dx * dx) + (dz * dz);
+                if (sqrDistance >= bestSqrDistance || sqrDistance < 0.25f)
+                {
+                    continue;
+                }
+
+                bestSqrDistance = sqrDistance;
+                aim = new Vector2F(dx, dz).Normalized;
+                found = true;
+            }
+
+            return found;
+        }
 
         private double m_NextAutoLootTime;
 

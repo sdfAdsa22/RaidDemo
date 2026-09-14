@@ -174,6 +174,7 @@ namespace RaidDemo.Bootstrap
             m_PlayerBodies.Remove(playerId);
             m_PlayerGroundHeights.Remove(playerId);
             UnregisterPlayerContainers(playerId);
+            UnregisterRaidProgress(playerId);
             RemovePlayerFromCombat(playerId);
 
             if (m_World != null && m_World.RemovePlayer(playerId))
@@ -362,8 +363,20 @@ namespace RaidDemo.Bootstrap
         /// 每个人都叠在地图原点会让第一帧看起来像只有一个角色。P1 用一圈小队列把玩家排开，
         /// 真正的出生点由战局配置决定（P3 的生成管理）。
         /// </remarks>
-        private static Vector2F SpawnPositionFor(int playerId)
+        private Vector2F SpawnPositionFor(int playerId)
         {
+            // 验收模式：出生点放进撤离区，用于验收"撤离读秒与结算由服务器裁定"。
+            // 只改出生位置，不改任何规则：读秒、判定、结算走的都是真实路径。
+            if (m_Options != null && m_Options.SpawnAtExtraction && m_ExtractionZones.Count > 0)
+            {
+                var marker = m_ExtractionZones[0];
+                if (marker != null)
+                {
+                    var position = marker.transform.position;
+                    return new Vector2F(position.x, position.z);
+                }
+            }
+
             var index = playerId < 0 ? 0 : playerId;
             return new Vector2F((index % 4) * SpawnSpacing, (index / 4) * SpawnSpacing);
         }

@@ -147,6 +147,7 @@ namespace RaidDemo.Bootstrap
             TickContainers();
             TickMovement(Time.deltaTime);
             TickAi(Time.deltaTime);
+            TickRaid();
 
             if (Time.unscaledTime < m_NextHeartbeatTime)
             {

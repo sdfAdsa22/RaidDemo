@@ -31,5 +31,8 @@ namespace RaidDemo.Bootstrap
         /// 丢一条或乱序都会让"谁拿到了"变得不可解释。
         /// </remarks>
         public const string CommandMessageName = "RaidDemo.Container.Command";
+
+        /// <summary>服务器 → 全体客户端：某人被结算了（撤离 / 阵亡）。</summary>
+        public const string OutcomeMessageName = "RaidDemo.Raid.Outcome";
     }
 }

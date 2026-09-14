@@ -74,6 +74,35 @@ namespace RaidDemo.Bootstrap
                 $"[服务器] AI 状态：存活 {m_AiDirector.AliveCount}/{agents.Count}，" +
                 $"交战 {engaging}／警惕 {alert}／调查 {investigating}；{sample}；" +
                 $"敌人累计开火 {EnemyShotCount} 发。");
+
+            ReportPlayerPositions();
+        }
+
+        /// <summary>
+        /// 验收模式下把每名玩家的权威位置打出来。
+        /// </summary>
+        /// <remarks>
+        /// 撤离与战斗都依赖"玩家确实走到了某处"：没有这行日志，
+        /// "没结算"与"根本没走过去"从外部看起来完全一样（M9-P-14 的同一原则）。
+        /// </remarks>
+        private void ReportPlayerPositions()
+        {
+            if (m_World == null)
+            {
+                return;
+            }
+
+            foreach (var pair in m_PlayerBodies)
+            {
+                if (!m_World.TryGetSnapshot(pair.Key, out var snapshot))
+                {
+                    continue;
+                }
+
+                m_Session?.Log.Info(
+                    $"[服务器] 玩家 {pair.Key} 位置 ({snapshot.State.Position.X:F1}, " +
+                    $"{snapshot.State.Position.Y:F1})，存活 {IsPlayerAlive(pair.Key)}。");
+            }
         }
 
         /// <summary>
