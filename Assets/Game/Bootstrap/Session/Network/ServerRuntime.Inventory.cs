@@ -4,6 +4,8 @@ using RaidDemo.Inventory;
 using RaidDemo.Kernel;
 using RaidDemo.Presentation;
 using RaidDemo.Raid;
+using Unity.Collections;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -134,6 +136,170 @@ namespace RaidDemo.Bootstrap
             m_Session?.Log.Info(
                 $"[服务器] 容器已就绪：{built}/{spawnPoints.Length} 个，共 {placedTotal} 件物品"
                 + $"（掉落种子 {DefaultLootSeed}）。");
+
+            // 容器可能在客户端接入之后才建好（要等地图与物品目录），因此建完就补发一次全量。
+            BroadcastAllContainerContents();
+        }
+
+        /// <summary>
+        /// 把全部容器的内容发给所有客户端。
+        /// </summary>
+        /// <remarks>
+        /// 全量重发：箱子内容必须绝对一致，而全量的字节数很小（每箱最多几十件）。
+        /// 增量同步要处理丢包与乱序，收益远小于风险。
+        /// </remarks>
+        private void BroadcastAllContainerContents()
+        {
+            var manager = m_Network;
+            if (manager == null || manager.CustomMessagingManager == null
+                || manager.ConnectedClientsIds.Count == 0)
+            {
+                return;
+            }
+
+            var batch = BuildContainerContentsBatch();
+            using (var writer = new FastBufferWriter(ContainerContentsCapacity(batch), Allocator.Temp))
+            {
+                writer.WriteValueSafe(batch);
+                manager.CustomMessagingManager.SendNamedMessageToAll(
+                    ContainerNetworkChannel.ContentsMessageName,
+                    writer,
+                    // 容器全量一次可能上千字节，超过默认投递方式的单包上限（1264 字节）会抛异常。
+                    // 用分片可靠投递：内容必须完整到达，而且它本来就是"一次全量"。
+                    NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        /// <summary>只发给某一个客户端（刚接入时用）。</summary>
+        /// <param name="clientId">目标客户端。</param>
+        private void SendAllContainerContentsTo(ulong clientId)
+        {
+            var manager = m_Network;
+            if (manager == null || manager.CustomMessagingManager == null || !m_ContainersReady)
+            {
+                return;
+            }
+
+            var batch = BuildContainerContentsBatch();
+            using (var writer = new FastBufferWriter(ContainerContentsCapacity(batch), Allocator.Temp))
+            {
+                writer.WriteValueSafe(batch);
+                manager.CustomMessagingManager.SendNamedMessage(
+                    ContainerNetworkChannel.ContentsMessageName,
+                    clientId,
+                    writer,
+                    NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        /// <summary>客户端要求容器内容：回一份全量。</summary>
+        /// <param name="senderId">发起请求的客户端。</param>
+        /// <param name="reader">消息体（当前为空）。</param>
+        /// <remarks>
+        /// 这是容器内容真正可靠的下发路径：服务器推的那一次可能早于客户端就绪，
+        /// 而"客户端注册完处理器之后自己来要"不存在时序问题。
+        /// </remarks>
+        private void OnContainerContentsRequested(ulong senderId, FastBufferReader reader)
+        {
+            SendAllContainerContentsTo(senderId);
+
+            if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
+            {
+                m_Session.Log.Verbose($"[服务器] 客户端 {senderId} 请求容器内容，已回发全量。");
+            }
+        }
+
+        /// <summary>把当前容器注册表里所有场景容器的内容打包成一条消息。</summary>
+        private ContainerContentsBatchMessage BuildContainerContentsBatch()
+        {
+            var ids = m_Containers.ContainerIds;
+            var entries = new List<ContainerContentsMessage>(ids.Count);
+
+            for (var i = 0; i < ids.Count; i++)
+            {
+                var containerId = ids[i];
+
+                // 只同步场景容器（箱子）：玩家自己的背包由各自的客户端持有，
+                // 现在把它发出去只会浪费带宽，等 P3-2 的背包权威化再处理。
+                if (containerId < ContainerIds.SceneBase)
+                {
+                    continue;
+                }
+
+                if (!m_Containers.TryGetGrid(containerId, out var grid))
+                {
+                    continue;
+                }
+
+                entries.Add(BuildContainerContents(containerId, grid));
+            }
+
+            return new ContainerContentsBatchMessage
+            {
+                ServerTime = m_World != null ? m_World.SimulationTime : 0d,
+                Containers = entries.ToArray(),
+            };
+        }
+
+        /// <summary>把一个容器网格转成可下行的内容描述。</summary>
+        private static ContainerContentsMessage BuildContainerContents(int containerId, InventoryGrid grid)
+        {
+            var items = grid.Items;
+            var entries = new ContainerItemMessage[items.Count];
+
+            for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                entries[i] = new ContainerItemMessage
+                {
+                    ItemId = item.Definition != null ? item.Definition.Id : null,
+                    Count = item.StackCount,
+                    Rotated = item.Rotated,
+                };
+            }
+
+            return new ContainerContentsMessage
+            {
+                ContainerId = containerId,
+                Width = grid.Width,
+                Height = grid.Height,
+                Items = entries,
+            };
+        }
+
+        /// <summary>
+        /// 估算一条容器全量消息需要的缓冲区大小。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么不能"估个差不多"：</b><c>FastBufferWriter</c> 写不下时会直接抛
+        /// <c>OverflowException</c>——消息发不出去，而且异常发生在发送这一侧，
+        /// 客户端只会表现为"什么都没收到"。（这条是实测踩出来的：按 128 字节/容器估算，
+        /// 十几个容器就溢出了。）</para>
+        ///
+        /// <para>因此按**上界**给：每个容器最多按它自己的网格容量算物品数，
+        /// 每件物品按 64 字节（物品 ID 字符串 + 数量 + 旋转 + 长度前缀）估算，
+        /// 再留 1 KB 的固定余量。</para>
+        /// </remarks>
+        private static int ContainerContentsCapacity(in ContainerContentsBatchMessage batch)
+        {
+            const int fixedOverheadBytes = 1024;
+            const int perItemBytes = 64;
+
+            var containers = batch.Containers;
+            if (containers == null)
+            {
+                return fixedOverheadBytes;
+            }
+
+            var total = fixedOverheadBytes;
+            for (var i = 0; i < containers.Length; i++)
+            {
+                var items = containers[i].Items;
+                var itemCount = items == null ? 0 : items.Length;
+                total += 64 + (itemCount * perItemBytes);
+            }
+
+            return total;
         }
     }
 }

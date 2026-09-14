@@ -67,6 +67,12 @@ namespace RaidDemo.Bootstrap
                 MovementNetworkChannel.InputMessageName,
                 OnInputMessageReceived);
 
+            // 容器内容的请求通道：客户端注册好自己的处理器之后会来要一次
+            // （服务器主动推的那一次可能早于客户端就绪，见 ContainerNetworkChannel 的说明）。
+            m_Network.CustomMessagingManager.RegisterNamedMessageHandler(
+                ContainerNetworkChannel.RequestMessageName,
+                OnContainerContentsRequested);
+
             m_Session.Log.Info("[服务器] 移动权威世界已就绪（60 Hz 仿真 / 20 Hz 快照）。");
 
             if (!string.IsNullOrEmpty(m_Options.MapSceneName))
@@ -85,6 +91,8 @@ namespace RaidDemo.Bootstrap
 
                 m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
                     MovementNetworkChannel.InputMessageName);
+                m_Network.CustomMessagingManager?.UnregisterNamedMessageHandler(
+                    ContainerNetworkChannel.RequestMessageName);
             }
 
             m_PlayerBodies.Clear();
@@ -144,6 +152,9 @@ namespace RaidDemo.Bootstrap
             m_Session?.Log.Info($"[服务器] 玩家 {playerId} 已加入（在线 {m_World.PlayerCount} 人）。");
             AddPlayerToCombat(playerId);
             BindPlayerHitTarget(playerId);
+
+            // 容器内容随接入下发：晚进来的玩家必须看到与先到者完全一样的箱子。
+            SendAllContainerContentsTo(clientId);
         }
 
         /// <summary>客户端断开：从权威世界移除。</summary>

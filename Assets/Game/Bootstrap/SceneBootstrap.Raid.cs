@@ -254,9 +254,13 @@ namespace RaidDemo.Bootstrap
                 var containerId = m_ContainerRegistry.Register(
                     grid, ContainerKind.Loot, ContainerIds.SceneContainer(i));
 
-                // 掉落在这里一次抽完：搜刮读条只是「打开箱子的成本」，
-                // 而不是「逐件抽取」——逐件抽取会让玩家在读条时就猜出箱子里有什么。
-                roller.Roll(definition.Table, grid, definition.FixedContents);
+                // 掉落在这里一次抽完：搜刮读条只是「打开箱子的成本」，而不是「逐件抽取」。
+                // 联机模式下**不抽**：内容由服务器抽好后下发（两人抢同一个箱子时，
+                // 各抽一份就是两份不同的东西）。这里仍然建容器，只为让搜刮交互在本地成立。
+                if (!ClientMode.IsActive)
+                {
+                    roller.Roll(definition.Table, grid, definition.FixedContents);
+                }
 
                 m_LootContainers.Add(new LootContainerRuntime(
                     containerId,

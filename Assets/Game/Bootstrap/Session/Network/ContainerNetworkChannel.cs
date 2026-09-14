@@ -1,0 +1,26 @@
+namespace RaidDemo.Bootstrap
+{
+    /// <summary>
+    /// 容器内容同步使用的命名消息通道。
+    /// </summary>
+    /// <remarks>
+    /// <para>只有下行：容器的内容是服务器抽的，客户端没有"我要你把箱子改成这样"这种请求
+    /// （客户端能表达的是"我要拿走这件"，那是 P3-2 的上行命令，走另一条通道）。</para>
+    /// </remarks>
+    public static class ContainerNetworkChannel
+    {
+        /// <summary>服务器 → 客户端：一批容器的完整内容。</summary>
+        public const string ContentsMessageName = "RaidDemo.Container.Contents";
+
+        /// <summary>
+        /// 客户端 → 服务器：请把容器内容发给我。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须由客户端主动请求：</b>服务器在"客户端接入"事件里就发内容，
+        /// 但那一刻客户端的命名消息处理器**还没注册完**（注册发生在它自己的接入回调里），
+        /// 于是这条一次性消息会被直接丢掉——现象是"服务器说有容器、客户端一个也没有"，
+        /// 而且没有任何报错。改成客户端就绪后主动要一次，竞态就不存在了。</para>
+        /// </remarks>
+        public const string RequestMessageName = "RaidDemo.Container.Request";
+    }
+}
