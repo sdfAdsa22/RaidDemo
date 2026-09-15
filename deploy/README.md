@@ -174,3 +174,52 @@ curl -s localhost:8080/status.json     # 云主机本机看状态页数据
 | 状态页打不开 | 两层防火墙的 **TCP 8080**；`curl localhost:8080/status.json` 是否本机可通 |
 | 日志里 「监听失败：端口可能已被占用」 | 同端口已有另一个进程：`ss -tulnp \| grep 7777` |
 | 玩家掉线后房间解散 | 看日志里有没有「自愈」与「宽限」两行（P-51 的自愈正常时会在几秒内恢复） |
+
+---
+
+## 8. 更新源服务端（M10 批次 3，同一台机器）
+
+更新源与专用服务器**同机不同进程**：游戏服务器占 UDP 7777 与 TCP 8080，更新源占 **TCP 8090**。
+它与 `server.sh` 完全解耦——停掉任何一个都不影响另一个。
+
+### 8.1 上传
+
+```bash
+# 在开发机执行
+dotnet publish Tools/UpdateSource/RaidDemo.UpdateSource.csproj -c Release -r linux-x64 \
+    --self-contained true -p:PublishSingleFile=true -o Builds/Tools/UpdateSource-linux
+
+scp -i <私钥路径> Builds/Tools/UpdateSource-linux/RaidDemo.UpdateSource \
+    deploy/updatesource.sh <user>@<云主机IP>:/root/raid-demo-updatesource/
+```
+
+产物是**自包含单文件**：目标机器不需要安装 .NET 运行时（云主机实测没有 `dotnet`）。
+
+### 8.2 放行端口（同样是两层）
+
+```bash
+# 系统防火墙（云主机）
+firewall-cmd --add-port=8090/tcp --permanent && firewall-cmd --reload
+```
+
+还要在**云平台控制台的防火墙 / 安全组**里放行 TCP 8090——两层都通才算真的通
+（实测：只放系统防火墙时公网仍然连不上，`ss -lntp` 能看到端口在听、`curl 127.0.0.1:8090/health`
+返回 200，但公网 IP 超时）。
+
+### 8.3 启动与验收
+
+```bash
+# 云主机上
+cd /root/raid-demo-updatesource
+RAIDDEMO_UPDATE_TOKEN=<写操作口令> ./updatesource.sh start
+./updatesource.sh status          # PID、端口监听、当前发布版本
+
+# 本机验收：面板与接口
+curl -s http://<云主机IP>:8090/health          # 期望 ok
+curl -s http://<云主机IP>:8090/api/status      # 期望当前版本与版本列表
+```
+
+浏览器打开 `http://<云主机IP>:8090/` 就是管理面板：上传新版本包 → 校验 → 发布 / 回滚。
+
+> 上传版本包时请用**「生成更新清单」产出的版本目录**（根目录含 `manifest.json` 与 `body/`）压成的 zip；
+> 服务端会先逐文件校验哈希，**通过后才**放进 `versions/`，坏包不会污染版本历史。
