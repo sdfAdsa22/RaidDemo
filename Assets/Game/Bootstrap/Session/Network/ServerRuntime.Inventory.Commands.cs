@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Shared;
 using Unity.Netcode;
+using UnityEngine;
 
 namespace RaidDemo.Bootstrap
 {
@@ -243,11 +245,18 @@ namespace RaidDemo.Bootstrap
             // 非法输入一律丢弃，并把权威状态推回客户端——它在本地是"先动过界面"的。
             if (message.Slot >= EquipmentLoadout.SlotCount
                 || (message.Kind != InventoryEquipCommandMessage.KindEquip
-                    && message.Kind != InventoryEquipCommandMessage.KindUnequip))
+                    && message.Kind != InventoryEquipCommandMessage.KindUnequip
+                    && message.Kind != InventoryEquipCommandMessage.KindUse))
             {
                 m_Session?.Log.Warning(
                     $"[服务器] 玩家 {playerId} 的装备命令不合法（Kind {message.Kind}，槽位 {message.Slot}），已丢弃。");
                 RefreshContainersAfterCommand(playerId);
+                return;
+            }
+
+            if (message.Kind == InventoryEquipCommandMessage.KindUse)
+            {
+                HandleItemUseCommand(playerId, in message);
                 return;
             }
 

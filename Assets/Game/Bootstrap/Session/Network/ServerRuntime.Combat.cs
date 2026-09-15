@@ -281,6 +281,22 @@ namespace RaidDemo.Bootstrap
             var killerPlayerId = ResolvePlayerId(evt.KillerId);
             if (killerPlayerId > 0)
             {
+                // 结算里的击杀数（RD-AUD-045）：这个字段以前只被读、从来没人写，
+                // 于是服务器下发的击杀数恒为 0，而客户端又用本地数据盖住了它——
+                // 修完展示之后（049/043）才看得出来谁都拿不到真实值。
+                // 只统计"玩家造成的击杀"：AI 打 AI 不计入任何人的战功。
+                if (m_WorldKind == ServerWorldKind.Raid)
+                {
+                    if (!m_RaidProgress.TryGetValue(killerPlayerId, out var killProgress))
+                    {
+                        // 极端时序（刚结算完又收到一条死亡事件）：补一条记录，避免空引用。
+                        killProgress = new RaidProgress();
+                        m_RaidProgress[killerPlayerId] = killProgress;
+                    }
+
+                    killProgress.Kills++;
+                }
+
                 var profile = ResolveProfileForPlayer(killerPlayerId);
                 if (profile != null && profile.Quests.NotifyKill())
                 {
@@ -335,6 +351,32 @@ namespace RaidDemo.Bootstrap
                 writer.WriteValueSafe(message);
                 manager.CustomMessagingManager.SendNamedMessageToAll(
                     CombatNetworkChannel.EventMessageName,
+                    writer);
+            }
+        }
+
+        /// <summary>
+        /// 把一条战斗事件只发给某一名玩家。
+        /// </summary>
+        /// <param name="clientId">目标客户端编号。</param>
+        /// <param name="message">事件内容。</param>
+        /// <remarks>
+        /// 生命值是私有状态：治疗结果只该给本人看（伤害事件是广播的，因为队友要看到谁挨打了）。
+        /// </remarks>
+        private void SendCombatEventTo(int clientId, in CombatEventMessage message)
+        {
+            var manager = m_Network;
+            if (manager == null || manager.CustomMessagingManager == null || !IsClientConnected((ulong)clientId))
+            {
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(160, Allocator.Temp))
+            {
+                writer.WriteValueSafe(message);
+                manager.CustomMessagingManager.SendNamedMessage(
+                    CombatNetworkChannel.EventMessageName,
+                    (ulong)clientId,
                     writer);
             }
         }

@@ -112,7 +112,21 @@ namespace RaidDemo.Bootstrap
         /// <summary>卸下：把指定槽位里的物品放回来源容器。</summary>
         public const byte KindUnequip = 1;
 
-        /// <summary>0 = 装备（<see cref="KindEquip"/>），1 = 卸下（<see cref="KindUnequip"/>）。</summary>
+        /// <summary>
+        /// 使用：把来源格子里的一件**消耗品**用掉（当前只有医疗品）。
+        /// </summary>
+        /// <remarks>
+        /// <para>联机下"使用物品"必须上行：回血改的是服务器权威生命值，
+        /// 而扣物品改的是服务器权威容器。客户端自己回血等于两边各算一套（`RD-AUD-044`）。</para>
+        ///
+        /// <para>复用同一条消息：它已经有"来源容器 + 格子 + 序号"这三个字段，
+        /// 正是"用哪一格里的哪一件"需要的全部信息；<see cref="Slot"/> 在本种类下不使用。</para>
+        /// </remarks>
+        public const byte KindUse = 2;
+
+        /// <summary>
+        /// 操作种类：<see cref="KindEquip"/> / <see cref="KindUnequip"/> / <see cref="KindUse"/>。
+        /// </summary>
         public byte Kind;
 
         /// <summary>来源容器编号（卸下时忽略）。</summary>

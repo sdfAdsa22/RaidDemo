@@ -115,6 +115,8 @@ namespace RaidDemo.Bootstrap
                 OnPlayerBledOut(m_BledOutBuffer[i]);
             }
 
+            TickRaidTimeLimit();
+
             // 必须先拷一份编号再遍历：结算会把玩家移出世界（RemovePlayerFromWorld → m_PlayerBodies.Remove），
             // 直接在 m_PlayerBodies 上 foreach 会在下一次 MoveNext 抛
             // InvalidOperationException（"Collection was modified"）——
@@ -211,115 +213,6 @@ namespace RaidDemo.Bootstrap
             return m_World != null && m_World.TryGetSnapshot(playerId, out var snapshot)
                 ? snapshot.State.Position
                 : RaidDemo.Shared.Vector2F.Zero;
-        }
-
-        private void SettlePlayer(int playerId, RaidProgress progress, RaidOutcome outcome)
-        {
-            progress.Settled = true;
-
-            var carriedValue = ResolveCarriedValue(playerId);
-            var elapsed = m_World != null ? (float)m_World.SimulationTime : 0f;
-
-            m_Session?.Log.Info(
-                $"[服务器] 结算：玩家 {playerId} {DescribeOutcome(outcome)}，"
-                + $"带出价值 {carriedValue}，击杀 {progress.Kills}，用时 {elapsed:F0} 秒。");
-
-            BroadcastRaidOutcome(new RaidOutcomeMessage
-            {
-                PlayerId = playerId,
-                Outcome = (byte)outcome,
-                CarriedValue = carriedValue,
-                Kills = progress.Kills,
-                ElapsedSeconds = elapsed,
-            });
-
-            // P5：结果落到服务端存档（撤离入库 / 阵亡清空）并立刻写盘。
-            // 放在广播之后：客户端先看到结算面板，服务器再落库——顺序反了的话，
-            // 落库失败会让玩家看到"界面说带出来了、仓库里没有"，而这是最难解释的一类问题。
-            ApplyOutcomeToProfile(playerId, outcome, carriedValue);
-
-            // U-87：结算即离开权威世界。
-            //
-            // 结算之后这名玩家的战局已经结束（撤离或阵亡），他的身体不该继续出现在快照里——
-            // 否则队友那一侧的验收机器人会把他当目标一直追（"已回屋的队友"在服务器世界里
-            // 仍有身体），既不撤离、也不结束战局。移除之后快照里不再有他，
-            // 远端玩家的表现会随快照自然消失。
-            RemovePlayerFromWorld(playerId);
-
-            // 全员结算完就收尾回大厅（P4）：这里是"这一局什么时候算结束"的唯一判定入口。
-            CheckRaidCompletion();
-        }
-
-        /// <summary>
-        /// 统计一名玩家带出/损失物品的总价值（只算背包与弹药挂，装备槽留给 P5 的结算细化）。
-        /// </summary>
-        /// <param name="playerId">玩家编号。</param>
-        private int ResolveCarriedValue(int playerId)
-        {
-            if (m_Combat == null || !m_Combat.TryGetLoadout(playerId, out var loadout) || loadout == null)
-            {
-                return 0;
-            }
-
-            var total = 0;
-            total += SumGridValue(loadout.Backpack);
-            total += SumGridValue(loadout.AmmoPouch);
-            return total;
-        }
-
-        /// <summary>累加一个网格里所有物品的价值。</summary>
-        private static int SumGridValue(InventoryGrid grid)
-        {
-            if (grid == null)
-            {
-                return 0;
-            }
-
-            var items = grid.Items;
-            var total = 0;
-            for (var i = 0; i < items.Count; i++)
-            {
-                if (items[i] != null)
-                {
-                    total += items[i].TotalValue;
-                }
-            }
-
-            return total;
-        }
-
-        /// <summary>结果的中文描述（日志用）。</summary>
-        private static string DescribeOutcome(RaidOutcome outcome)
-        {
-            switch (outcome)
-            {
-                case RaidOutcome.Extracted:
-                    return "撤离成功";
-                case RaidOutcome.Killed:
-                    return "阵亡";
-                default:
-                    return outcome.ToString();
-            }
-        }
-
-        /// <summary>把一条结果广播给所有客户端。</summary>
-        private void BroadcastRaidOutcome(in RaidOutcomeMessage message)
-        {
-            var manager = m_Network;
-            if (manager == null || manager.CustomMessagingManager == null
-                || manager.ConnectedClientsIds.Count == 0)
-            {
-                return;
-            }
-
-            using (var writer = new FastBufferWriter(32, Allocator.Temp))
-            {
-                writer.WriteValueSafe(message);
-                manager.CustomMessagingManager.SendNamedMessageToAll(
-                    ContainerNetworkChannel.OutcomeMessageName,
-                    writer,
-                    NetworkDelivery.ReliableSequenced);
-            }
         }
 
         /// <summary>玩家断开时清掉他的战局进度。</summary>

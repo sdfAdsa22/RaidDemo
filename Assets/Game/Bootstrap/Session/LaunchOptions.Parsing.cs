@@ -248,6 +248,23 @@ namespace RaidDemo.Bootstrap
                         result.RoomPassword = roomPass;
                         break;
 
+                    case "-raidDuration":
+                        if (!TryReadValue(list, ref i, arg, out var raidDurationText, out error))
+                        {
+                            return false;
+                        }
+
+                        if (!float.TryParse(raidDurationText, out var raidDuration)
+                            || raidDuration < 0f || raidDuration > 7200f)
+                        {
+                            error = $"参数 {arg} 需要 0~7200 之间的秒数（0 表示不做超时判定），"
+                                + $"实际收到「{raidDurationText}」。";
+                            return false;
+                        }
+
+                        result.RaidTimeLimitSeconds = raidDuration;
+                        break;
+
                     case "-autostart":
                         if (!TryReadValue(list, ref i, arg, out var autoStartText, out error))
                         {

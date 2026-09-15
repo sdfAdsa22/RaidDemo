@@ -56,6 +56,21 @@ namespace RaidDemo.Raid
         /// <summary>玩家击杀数。</summary>
         public int Kills { get; private set; }
 
+        /// <summary>
+        /// 本局是否由服务器裁定（联机时置 true）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么需要这个开关（`RD-AUD-041`）：</b>联机时客户端这一份只是**展示用的镜像**：
+        /// 它照旧按 <see cref="Tick"/> 推进本地时钟（HUD 的倒计时要有东西可显示），
+        /// 但**不能自己把这一局结束掉**——否则会出现"客户端已经弹结算面板、服务器还在跑"的分裂，
+        /// 而结算里的价值、击杀、用时又都以服务器为准，两边自然对不上。</para>
+        ///
+        /// <para>置 true 之后，结束只有两条来路：服务器下发的结算消息
+        /// （走 <see cref="NotifyExtracted"/> / <see cref="NotifyPlayerKilled"/>），
+        /// 或者离开这一局。倒计时到点时客户端只是把时间停在 0，等服务器说结束。</para>
+        /// </remarks>
+        public bool IsServerAuthoritative { get; set; }
+
         /// <summary>本局带入的装备总价值。撤离与损失的对比要靠它。</summary>
         public int BroughtInValue { get; private set; }
 
@@ -93,7 +108,12 @@ namespace RaidDemo.Raid
             if (ElapsedSeconds >= m_Settings.RaidDurationSeconds)
             {
                 ElapsedSeconds = m_Settings.RaidDurationSeconds;
-                Finish(RaidOutcome.TimeExpired);
+
+                // 联机时不自行收尾（RD-AUD-041）：本地时钟停在上限，等服务器的裁定。
+                if (!IsServerAuthoritative)
+                {
+                    Finish(RaidOutcome.TimeExpired);
+                }
             }
         }
 
@@ -116,6 +136,17 @@ namespace RaidDemo.Raid
         public void NotifyPlayerKilled()
         {
             Finish(RaidOutcome.Killed);
+        }
+
+        /// <summary>本局因时间耗尽结束（服务器裁定，联机时使用）。</summary>
+        /// <remarks>
+        /// 三种结局必须分开：以前只有"撤离"与"阵亡"两个入口，
+        /// 于是服务器下发的"时间耗尽"被客户端当成阵亡显示——结算面板会写错一句结论
+        /// （2026-09-15 真机验收发现）。
+        /// </remarks>
+        public void NotifyTimeExpired()
+        {
+            Finish(RaidOutcome.TimeExpired);
         }
 
         /// <summary>撤离完成，本局以成功结束。</summary>

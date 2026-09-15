@@ -64,6 +64,44 @@ namespace RaidDemo.Bootstrap
             return CommandResult.Ok();
         }
 
+        /// <summary>
+        /// 把一条"使用这一格里的物品"的意图发给服务器（联机医疗品）。
+        /// </summary>
+        /// <param name="containerId">客户端侧的容器编号（<c>ContainerIds</c>）。</param>
+        /// <param name="cellX">格子 X。</param>
+        /// <param name="cellY">格子 Y。</param>
+        /// <remarks>
+        /// <para>与装备命令共用一条通道与一个结构体：它需要的"来源容器 + 格子"这两项信息那儿已经有了，
+        /// 而回血与扣物品都必须由服务器执行（`RD-AUD-044`），因此客户端只发意图、不做乐观修改。</para>
+        /// </remarks>
+        public void RequestItemUse(int containerId, int cellX, int cellY)
+        {
+            if (m_Network == null || !m_Network.IsConnectedClient || m_Network.CustomMessagingManager == null)
+            {
+                return;
+            }
+
+            var message = new InventoryEquipCommandMessage
+            {
+                Kind = InventoryEquipCommandMessage.KindUse,
+                ContainerId = containerId,
+                CellX = cellX,
+                CellY = cellY,
+                Slot = 0,
+                Sequence = ++m_Sequence,
+            };
+
+            using (var writer = new FastBufferWriter(32, Allocator.Temp))
+            {
+                writer.WriteValueSafe(message);
+                m_Network.CustomMessagingManager.SendNamedMessage(
+                    ContainerNetworkChannel.EquipCommandMessageName,
+                    NetworkManager.ServerClientId,
+                    writer,
+                    NetworkDelivery.ReliableSequenced);
+            }
+        }
+
         /// <summary>把一条装备 / 卸下意图发给服务器。</summary>
         private void SendEquipToServer(int containerId, int cellX, int cellY, EquipmentSlot slot, bool unequip)
         {

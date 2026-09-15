@@ -201,6 +201,17 @@ namespace RaidDemo.Bootstrap
 
                     break;
 
+                case CombatEventMessage.KindHealed:
+                    // 治疗由服务器执行（RD-AUD-044），这里只刷新"我的"血条。
+                    // 事件只发给本人，因此不需要再按 TargetId 过滤，但仍按同一口径判断，
+                    // 免得将来把它改成广播时静默出错。
+                    if (message.TargetId == LocalNetworkPlayerId)
+                    {
+                        ApplyLocalHealthFromServer(message.RemainingHealth, true);
+                    }
+
+                    break;
+
                 case CombatEventMessage.KindDestroyed:
                     m_EventBus.Publish(new TargetDestroyedEvent(
                         message.TargetId,

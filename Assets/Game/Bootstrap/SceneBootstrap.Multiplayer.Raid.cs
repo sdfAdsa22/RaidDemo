@@ -90,13 +90,21 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            if (outcome == RaidOutcome.Extracted)
+            // 三种结局分开映射：服务器说"时间耗尽"时，结算面板就该写"时间耗尽"。
+            // 以前只有"撤离 / 阵亡"两条路，超时会被显示成阵亡（真机验收发现）。
+            switch (outcome)
             {
-                m_RaidSession.NotifyExtracted();
-            }
-            else
-            {
-                m_RaidSession.NotifyPlayerKilled();
+                case RaidOutcome.Extracted:
+                    m_RaidSession.NotifyExtracted();
+                    break;
+
+                case RaidOutcome.TimeExpired:
+                    m_RaidSession.NotifyTimeExpired();
+                    break;
+
+                default:
+                    m_RaidSession.NotifyPlayerKilled();
+                    break;
             }
         }
 

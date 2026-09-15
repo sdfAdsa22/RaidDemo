@@ -15,12 +15,32 @@ namespace RaidDemo.Bootstrap
     public sealed partial class SceneBootstrap
     {
         /// <summary>使用完成：回血并把物品消耗掉。</summary>
+        /// <remarks>
+        /// <para><b>联机时这里只发一条意图（`RD-AUD-044`）：</b>联机客户端没有本地战斗世界，
+        /// 自己回血只会改一份没人读的镜像，而物品却真的从背包里扣掉了——
+        /// 玩家的体感是"绷带用掉了、血没回"。权威生命值与权威容器都在服务器，
+        /// 因此这里只上行"用了哪一格里的哪一件"，然后等服务器回发新的血量与容器内容。</para>
+        /// </remarks>
         private void OnItemUseCompleted(ItemUseCompletedEvent evt)
         {
             var item = evt.Item;
             var medical = ResolveMedical(item);
             if (medical == null)
             {
+                return;
+            }
+
+            if (IsMultiplayerProcess)
+            {
+                var owningGrid = FindOwningGrid(item);
+                if (owningGrid != null && owningGrid.TryGetOrigin(item, out var origin))
+                {
+                    m_ContainerLink?.RequestItemUse(
+                        RaidDemo.Inventory.ContainerIds.PlayerBackpack,
+                        origin.X,
+                        origin.Y);
+                }
+
                 return;
             }
 

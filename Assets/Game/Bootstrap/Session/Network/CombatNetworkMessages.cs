@@ -29,6 +29,15 @@ namespace RaidDemo.Bootstrap
         /// <summary>换弹状态变化。</summary>
         public const byte KindReload = 4;
 
+        /// <summary>
+        /// 治疗结算（联机医疗品由服务器执行时下发）。
+        /// </summary>
+        /// <remarks>
+        /// 只发给被治疗者本人：生命值是私有状态。字段复用 <see cref="RemainingHealth"/>，
+        /// 语义与伤害事件一致——"结算之后剩多少血"。
+        /// </remarks>
+        public const byte KindHealed = 5;
+
         /// <summary>事件种类（见上面的常量）。</summary>
         public byte Kind;
 

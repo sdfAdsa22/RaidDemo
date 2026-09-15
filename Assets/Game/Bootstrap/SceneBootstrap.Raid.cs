@@ -158,6 +158,10 @@ namespace RaidDemo.Bootstrap
 
             m_BroughtInValue = RaidResult.ComputeCarriedValue(m_Loadout);
             m_RaidSession = new RaidSession(m_RaidSettings, m_EventBus, m_PlayerCombatantId);
+
+            // 联机时这份会话只是展示镜像：本地时钟照旧走（HUD 要有倒计时可显示），
+            // 但"这一局结束了吗"由服务器裁定（RD-AUD-041）。
+            m_RaidSession.IsServerAuthoritative = IsMultiplayerProcess;
             m_RaidResultShown = false;
 
             m_KillSubscription = m_EventBus.Subscribe<DamageAppliedEvent>(OnKillCounted);
@@ -343,13 +347,18 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void OnKillCounted(DamageAppliedEvent evt)
         {
-            if (evt.TargetId == m_PlayerCombatantId)
+            // 编号空间随运行形态变化（RD-AUD-044）：联机下战斗事件由服务器按**客户端编号**广播，
+            // 本机的权威编号是 LocalNetworkPlayerId；单机才是本地战斗单位编号。
+            // 用同一个字段去比，联机里会永远不相等——表现为"挨打不打断读条、击杀数恒为 0"。
+            var localId = IsMultiplayerProcess ? LocalNetworkPlayerId : m_PlayerCombatantId;
+
+            if (evt.TargetId == localId)
             {
                 m_PlayerDamagedThisFrame = true;
                 MarkPlayerDamagedForQuests();
             }
 
-            if (!evt.WasKilled || evt.AttackerId != m_PlayerCombatantId)
+            if (!evt.WasKilled || evt.AttackerId != localId)
             {
                 return;
             }

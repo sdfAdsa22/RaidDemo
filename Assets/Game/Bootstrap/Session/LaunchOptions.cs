@@ -72,6 +72,16 @@ namespace RaidDemo.Bootstrap
         public const int DefaultDashboardPort = 8080;
 
         /// <summary>
+        /// 战局总时长的默认值（秒）。
+        /// </summary>
+        /// <remarks>
+        /// 与战局场景里序列化的 <c>SceneBootstrap.m_RaidDurationSeconds</c>（480 秒）保持一致：
+        /// 客户端用它显示倒计时，服务器用它真的结束这一局。两边默认值不同会让
+        /// "界面显示还有 3 分钟、服务器已经判定超时"这种状态出现。
+        /// </remarks>
+        public const float DefaultRaidTimeLimitSeconds = 480f;
+
+        /// <summary>
         /// 掉线宽限的默认时长（秒）。
         /// </summary>
         /// <remarks>与 <c>ServerRuntime.DefaultReconnectGraceSeconds</c> 保持一致（那里是权威默认值）。</remarks>
@@ -199,6 +209,19 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public float AutoStartSeconds { get; private set; }
 
+        /// <summary>
+        /// 战局总时长（<c>-raidDuration</c>，秒）；0 表示服务器不做超时判定。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么服务器必须有自己的时长（RD-AUD-042）：</b>"这一局什么时候结束"是战局裁决，
+        /// 只能由服务器说。以前只有客户端有一个本地计时器，于是多人局跑到时长上限时，
+        /// 客户端自己就走了结算流程，而服务器那边还在继续跑。</para>
+        ///
+        /// <para>做成启动参数还有一个用途：验收脚本把它压到几十秒，就能在自动化里跑完
+        /// "超时 → 结算 → 回屋"这条完整链路，而不必真的等 8 分钟。</para>
+        /// </remarks>
+        public float RaidTimeLimitSeconds { get; private set; } = DefaultRaidTimeLimitSeconds;
+
         /// <summary>服务器状态页端口（<c>-dashboardPort</c>）；0 表示关闭状态页。</summary>
         public int DashboardPort { get; private set; } = DefaultDashboardPort;
 
@@ -292,6 +315,9 @@ namespace RaidDemo.Bootstrap
 
             if (IsServerRequested)
             {
+                description += RaidTimeLimitSeconds > 0f
+                    ? $" ｜ 战局时长上限 {RaidTimeLimitSeconds:F0} 秒"
+                    : " ｜ 战局时长上限 关闭";
                 description += $" ｜ 状态页 {(DashboardPort == 0 ? "关闭" : DashboardPort.ToString())}";
                 description += $" ｜ 发现 {(DiscoveryPort == 0 ? "关闭" : DiscoveryPort.ToString())}";
                 description += $" ｜ 掉线宽限 {ReconnectGraceSeconds:F0} 秒";

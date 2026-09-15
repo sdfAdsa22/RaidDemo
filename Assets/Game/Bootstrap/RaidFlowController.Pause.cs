@@ -74,10 +74,13 @@ namespace RaidDemo.Bootstrap
         /// <remarks>
         /// 战局中调用时按"放弃本局"处理：清空随身携带物后再返回菜单；
         /// 安全屋中调用不受影响。返回后统一在安全屋场景显示主菜单。
+        ///
+        /// <para><b>联机不在这里清装备（RD-AUD-043）：</b>随身装备与仓库都是服务端那一份，
+        /// 客户端清本地镜像既没有意义，又会让"回到单机时"发现自己的存档被联机内容改过。</para>
         /// </remarks>
         private void ReturnToMainMenuFromPause()
         {
-            if (State == FlowState.InRaid)
+            if (State == FlowState.InRaid && !MultiplayerClientSession.IsActive)
             {
                 Progress.ClearLoadout();
             }

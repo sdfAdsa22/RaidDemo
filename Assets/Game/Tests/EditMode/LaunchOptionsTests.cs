@@ -40,6 +40,34 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsFalse(options.IsServerRequested);
         }
 
+        /// <summary>
+        /// 战局时长上限（`-raidDuration`）：默认 480 秒，可覆盖，0 表示关闭。
+        /// </summary>
+        /// <remarks>
+        /// 它是"服务器说了算的超时判定"（RD-AUD-042）的配置入口，默认值必须和客户端
+        /// 场景里序列化的倒计时一致，否则会出现"界面还在跑、服务器已经判超时"。
+        /// </remarks>
+        [Test]
+        public void 战局时长上限可配置()
+        {
+            Assert.IsTrue(LaunchOptions.TryParse(new[] { "-server" }, out var defaults, out _));
+            Assert.AreEqual(
+                LaunchOptions.DefaultRaidTimeLimitSeconds,
+                defaults.RaidTimeLimitSeconds,
+                "默认值要与客户端的倒计时一致。");
+
+            Assert.IsTrue(LaunchOptions.TryParse(new[] { "-server", "-raidDuration", "45" }, out var custom, out _));
+            Assert.AreEqual(45f, custom.RaidTimeLimitSeconds);
+
+            Assert.IsTrue(LaunchOptions.TryParse(new[] { "-server", "-raidDuration", "0" }, out var disabled, out _));
+            Assert.AreEqual(0f, disabled.RaidTimeLimitSeconds, "0 表示不做超时判定（排障时用）。");
+
+            Assert.IsFalse(
+                LaunchOptions.TryParse(new[] { "-server", "-raidDuration", "-5" }, out _, out var error),
+                "负数必须被拒绝。");
+            Assert.IsNotNull(error);
+        }
+
         /// <summary>完整参数组合应逐项生效。</summary>
         [Test]
         public void 完整的服务器参数逐项生效()

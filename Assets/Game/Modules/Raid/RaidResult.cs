@@ -41,7 +41,8 @@ namespace RaidDemo.Raid
             float elapsedSeconds,
             int broughtInValue,
             List<RaidResultEntry> extractedItems,
-            List<RaidResultEntry> lostItems)
+            List<RaidResultEntry> lostItems,
+            int? authoritativeExtractedValue)
         {
             Outcome = outcome;
             Kills = kills;
@@ -49,7 +50,9 @@ namespace RaidDemo.Raid
             BroughtInValue = broughtInValue;
             m_ExtractedItems = extractedItems;
             m_LostItems = lostItems;
-            ExtractedValue = Sum(m_ExtractedItems);
+            // 带出价值默认由清单求和；联机时改由服务器给的数字覆盖（RD-AUD-049）——
+            // 真正入库的是服务器，清单只是本地镜像。
+            ExtractedValue = authoritativeExtractedValue ?? Sum(m_ExtractedItems);
             LostValue = Sum(m_LostItems);
         }
 
@@ -91,17 +94,25 @@ namespace RaidDemo.Raid
         /// <param name="elapsedSeconds">存活时长（秒）。</param>
         /// <param name="broughtInValue">带入价值。</param>
         /// <param name="loadout">玩家当前的携带物。为 null 时清单为空。</param>
+        /// <param name="authoritativeExtractedValue">
+        /// 权威带出价值；为 null 时按 <paramref name="loadout"/> 求和。
+        /// </param>
         /// <returns>结算数据。</returns>
         /// <remarks>
         /// 撤离成功时携带物算「带出」，阵亡与超时算「损失」。
         /// 两者互斥而不是同时列出：结算界面要给的是一句明确结论，不是一本流水账。
+        ///
+        /// <para><b>为什么允许覆盖带出价值（RD-AUD-049）：</b>联机时物品的去向由服务器裁定，
+        /// 客户端手上的 <paramref name="loadout"/> 只是镜像。金额以服务器为准，
+        /// 清单仍用于展示（"这一局都带了什么出来"）——两者不一致时以金额为准。</para>
         /// </remarks>
         public static RaidResult Create(
             RaidOutcome outcome,
             int kills,
             float elapsedSeconds,
             int broughtInValue,
-            PlayerLoadout loadout)
+            PlayerLoadout loadout,
+            int? authoritativeExtractedValue = null)
         {
             var carried = CollectCarriedItems(loadout);
             var extracted = outcome == RaidOutcome.Extracted
@@ -111,7 +122,14 @@ namespace RaidDemo.Raid
                 ? new List<RaidResultEntry>(0)
                 : carried;
 
-            return new RaidResult(outcome, kills, elapsedSeconds, broughtInValue, extracted, lost);
+            return new RaidResult(
+                outcome,
+                kills,
+                elapsedSeconds,
+                broughtInValue,
+                extracted,
+                lost,
+                authoritativeExtractedValue);
         }
 
         /// <summary>
