@@ -84,6 +84,57 @@ namespace RaidDemo.Meta
         }
     }
 
+    /// <summary>
+    /// 服务器回了一次交易 / 任务操作的结果（P5.5）。
+    /// </summary>
+    /// <remarks>
+    /// <para>界面用它把"乐观文案"换成权威文案：成功时显示服务器的摘要，
+    /// 失败时显示服务器给出的原因。</para>
+    ///
+    /// <para>单机路径不发布这个事件——单机的命令结果在派发处就已经是权威的，
+    /// 再广播一遍只会让同一个提示闪两次。</para>
+    /// </remarks>
+    public readonly struct MerchantTradeResultEvent : IEventEnvelope
+    {
+        /// <summary>创建结果事件。</summary>
+        /// <param name="kind">请求种类（<c>MerchantTradeKinds</c>）。</param>
+        /// <param name="success">是否成功。</param>
+        /// <param name="detail">展示文案。</param>
+        public MerchantTradeResultEvent(byte kind, bool success, string detail)
+        {
+            Kind = kind;
+            Success = success;
+            Detail = detail;
+        }
+
+        /// <summary>请求种类（与上行消息的 Kind 对应）。</summary>
+        public byte Kind { get; }
+
+        /// <summary>是否成功。</summary>
+        public bool Success { get; }
+
+        /// <summary>展示给玩家的文案。</summary>
+        public string Detail { get; }
+
+        /// <inheritdoc />
+        public double Timestamp
+        {
+            get { return 0d; }
+        }
+
+        /// <inheritdoc />
+        public string Source
+        {
+            get { return "meta.merchant"; }
+        }
+
+        /// <inheritdoc />
+        public uint Sequence
+        {
+            get { return 0u; }
+        }
+    }
+
     /// <summary>任务变化类型常量。</summary>
     public static class QuestChangeTypes
     {

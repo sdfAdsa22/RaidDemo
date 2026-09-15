@@ -295,6 +295,7 @@ namespace RaidDemo.Bootstrap
         {
             RegisterLobbyMessageHandlers();
             RegisterMovementMessageHandlers();
+            RegisterMerchantHandlers();
         }
 
         /// <summary>

@@ -55,15 +55,9 @@ namespace RaidDemo.Bootstrap
                     break;
 
                 case SafeHouseInteractable.Kind.Merchant:
-                    // P5：商人的一次交易要同时改"共享仓库"和"我的金币"，而这两者现在都在服务器上。
-                    // 在它服务端权威化（P5.5）之前，联机里打开它只会显示一份与服务器不一致的账——
-                    // 买到的物品下一帧就被权威内容覆盖回去，比"暂时打不开"更让人困惑。
-                    if (IsMultiplayerSafeHouse)
-                    {
-                        m_Ui?.ShowHint("联机商店将在后续批次开放（仓库与金币已由服务器权威）");
-                        break;
-                    }
-
+                    // P5.5：联机商店已服务端权威化——购买 / 出售 / 任务都改为上行、
+                    // 由服务器执行并回发结果，因此单机与联机走同一条打开逻辑，
+                    // 不再有"联机下打不开"的特殊分支。
                     m_InventoryScreen?.Close();
                     if (m_InventoryScreen != null)
                     {

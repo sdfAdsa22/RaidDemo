@@ -103,6 +103,19 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否让客户端自动行动（<c>-autowalk</c>）：无头验收的脚本化输入。</summary>
         public bool AutoWalk { get; private set; }
 
+        /// <summary>
+        /// 是否让客户端在联机安全屋里自动做一串交易自检（<c>-autotrade</c>）。
+        /// </summary>
+        /// <remarks>
+        /// <para>验收辅助（P5.5）：房间就绪后按固定节拍执行"购买一件 → 卖出刚买的那件 →
+        /// 接取第一个任务"。没有它，验证"商店在联机下可用"就必须有人手动操作鼠标，
+        /// 而无人值守脚本恰恰是这条链路最需要的回归方式。</para>
+        ///
+        /// <para>它只派发与玩家点击完全相同的命令，不走任何后门——
+        /// 验收的是真实链路，不是"绕过 UI 的特例"。</para>
+        /// </remarks>
+        public bool AutoTrade { get; private set; }
+
         /// <summary>验收模式：出生在第一个撤离点里（只改出生位置，不改规则）。</summary>
         public bool SpawnAtExtraction { get; private set; }
         /// <summary>验收模式：开局把玩家 1 打到 0（验收倒地与救援）。</summary>

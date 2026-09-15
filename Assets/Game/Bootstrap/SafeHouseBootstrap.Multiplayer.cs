@@ -36,6 +36,11 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private MultiplayerContainerLink m_ContainerLink;
 
+        /// <summary>
+        /// 商店 / 任务链路（P5.5）：购买、出售、接任务与领奖都改为上行，由服务器执行。
+        /// </summary>
+        private MultiplayerMerchantLink m_MerchantLink;
+
         /// <summary>本机是否处于联机安全屋模式。</summary>
         public bool IsMultiplayerSafeHouse
         {
@@ -106,9 +111,15 @@ namespace RaidDemo.Bootstrap
             m_ContainerLink = new MultiplayerContainerLink(
                 m_Session, m_Registry, m_ItemCatalog, m_EventBus, m_Loadout);
 
+            m_MerchantLink = new MultiplayerMerchantLink(m_Session, m_Progress, m_EventBus);
+
             // 本地处理器已在 InitializeInventory 里注册过：这里用"只上行"的版本覆盖它们，
             // 界面的乐观更新照旧，真正的结果由服务器回发的容器内容纠正（U-75 的规则）。
             m_ContainerLink.InstallCommandHandlers(m_CommandRouter);
+
+            // P5.5：商店与任务同理——单机那套 handler 直接改本地账本，
+            // 联机时必须换成"只上行"的版本（金币与共享仓库都在服务器上）。
+            m_MerchantLink.InstallCommandHandlers(m_CommandRouter);
 
             m_NetworkClient = session.Network;
             m_NetworkClient.OnClientDisconnectCallback += OnSafeHouseDisconnected;
@@ -141,6 +152,9 @@ namespace RaidDemo.Bootstrap
             m_ContainerLink?.Detach();
             m_ContainerLink = null;
 
+            m_MerchantLink?.Detach();
+            m_MerchantLink = null;
+
             m_NetworkClient = null;
         }
 
@@ -156,6 +170,7 @@ namespace RaidDemo.Bootstrap
             Debug.Log($"[联机] 安全屋已接管连接，玩家标识 {playerId}。");
             m_MovementLink?.Attach(m_NetworkClient, playerId);
             m_ContainerLink?.Attach(m_NetworkClient);
+            m_MerchantLink?.Attach(m_NetworkClient);
         }
 
         /// <summary>与服务器断开：清掉远端玩家，避免留下不会动的假队友。</summary>
@@ -193,6 +208,9 @@ namespace RaidDemo.Bootstrap
                 ReviveHeld = false,
                 NoControl = false,
             });
+
+            // P5.5 验收辅助：-autotrade 时按节拍派发购买 / 出售 / 接任务。
+            TickAutoTrade();
 
             UpdateMultiplayerRoomBadge();
         }

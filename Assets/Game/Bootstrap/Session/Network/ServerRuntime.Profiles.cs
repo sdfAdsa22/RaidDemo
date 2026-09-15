@@ -249,6 +249,10 @@ namespace RaidDemo.Bootstrap
             SendProfileStateTo(
                 playerId,
                 outcome == RaidOutcome.Extracted ? ProfileStateReasons.Extracted : ProfileStateReasons.Killed);
+
+            // P5.5：撤离任务进度也是在这一刻推进的（ReportExtraction），把任务快照一并发回，
+            // 否则玩家回到安全屋后打开任务面板看到的还是战局前的状态。
+            SendQuestStateTo(playerId);
         }
 
         /// <summary>本局这名玩家是否挨过打（任务里的"无伤撤离"判定）。</summary>

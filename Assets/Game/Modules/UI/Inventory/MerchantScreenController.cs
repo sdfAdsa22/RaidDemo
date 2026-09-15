@@ -61,6 +61,9 @@ namespace RaidDemo.UI
         private TMPro.TextMeshProUGUI m_StatusLabel;
         private float m_StatusRemaining;
 
+        /// <summary>服务器交易结果的订阅句柄（P5.5；单机路径不发布该事件，订阅本身无害）。</summary>
+        private System.IDisposable m_TradeResultSubscription;
+
         /// <summary>是否处于批量出售模式。</summary>
         private bool m_SellMode;
 
@@ -109,6 +112,10 @@ namespace RaidDemo.UI
                 m_Progress.Changed += OnMetaChanged;
             }
 
+            // P5.5：联机时交易由服务器执行，结果从下行通道回来——
+            // 用它把派发时的乐观文案换成权威文案（失败时给出服务器算出的原因）。
+            m_TradeResultSubscription = m_EventBus?.Subscribe<MerchantTradeResultEvent>(OnTradeResult);
+
             ExitSellMode();
             RefreshAll();
             SetVisible(false);
@@ -149,6 +156,21 @@ namespace RaidDemo.UI
             {
                 m_Progress.Changed -= OnMetaChanged;
             }
+
+            m_TradeResultSubscription?.Dispose();
+            m_TradeResultSubscription = null;
+        }
+
+        /// <summary>服务器回了一条交易 / 任务结果：更新底部提示条。</summary>
+        /// <param name="result">结果事件。</param>
+        private void OnTradeResult(MerchantTradeResultEvent result)
+        {
+            if (!IsOpen || string.IsNullOrEmpty(result.Detail))
+            {
+                return;
+            }
+
+            ShowStatus(result.Detail, result.Success);
         }
 
         private void Update()

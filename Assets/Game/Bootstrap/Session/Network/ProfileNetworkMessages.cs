@@ -53,5 +53,8 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>阵亡 / 超时结算。</summary>
         public const byte Killed = 2;
+
+        /// <summary>一次交易 / 任务操作（购买、出售、领奖等，P5.5）。</summary>
+        public const byte Traded = 3;
     }
 }

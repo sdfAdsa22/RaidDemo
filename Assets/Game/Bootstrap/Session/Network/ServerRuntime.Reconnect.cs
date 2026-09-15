@@ -175,6 +175,7 @@ namespace RaidDemo.Bootstrap
             // 新连接需要的最少三样：房间状态（画角标）、进度（金币）、容器内容（背包与仓库）。
             SendRoomStateTo(newId);
             SendProfileStateTo(newId, ProfileStateReasons.Join);
+            SendQuestStateTo(newId);
             SendAllContainerContentsTo((ulong)newId);
 
             // 战局还在进行时把"进图"再发一次：客户端据此加载地图场景。

@@ -126,6 +126,10 @@ namespace RaidDemo.Bootstrap
 
             InitializeMovement();
 
+            // P5.5：商人经济（购买 / 出售 / 任务）走服务端权威执行。
+            // 放在移动之后：交易会用容器注册表（共享仓库已在 Profiles 就绪时注册）。
+            InitializeMerchant();
+
             // P4.5-b：服务器先托管共享安全屋——联机首站永远是安全屋，
             // 战局地图只在房主确认出击（或 -autostart 到点）时才加载。
             // 本帧活动场景就是安全屋（构建列表第 0 个），因此这次切换会立刻完成。

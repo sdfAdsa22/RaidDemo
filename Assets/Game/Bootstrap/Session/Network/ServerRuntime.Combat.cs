@@ -276,6 +276,20 @@ namespace RaidDemo.Bootstrap
             // 表现为"明明没人了，开枪还是有命中反馈"。
             DisableEnemyCollider(evt.TargetId);
 
+            // P5.5：击杀类任务（如「清道夫」）在服务器推进——联机时客户端那份任务进度
+            // 只是服务器快照的镜像，写它等于写了个下一帧就被覆盖的数字。
+            var killerPlayerId = ResolvePlayerId(evt.KillerId);
+            if (killerPlayerId > 0)
+            {
+                var profile = ResolveProfileForPlayer(killerPlayerId);
+                if (profile != null && profile.Quests.NotifyKill())
+                {
+                    SendQuestStateTo(killerPlayerId);
+                    MarkProfilesDirty();
+                    m_Session?.Log.Info($"[服务器] 玩家 {killerPlayerId} 的击杀推进了任务进度。");
+                }
+            }
+
             BroadcastCombatEvent(new CombatEventMessage
             {
                 Kind = CombatEventMessage.KindDestroyed,

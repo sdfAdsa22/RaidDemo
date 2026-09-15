@@ -136,6 +136,9 @@ namespace RaidDemo.Bootstrap
             // P5：把该账号的进度摘要（金币）发给他本人，右上角余额立刻是服务器那份。
             SendProfileStateTo(client.ClientId, ProfileStateReasons.Join);
 
+            // P5.5：任务状态同理（联机时客户端的任务副本只是镜像）。
+            SendQuestStateTo(client.ClientId);
+
             BroadcastRoomState();
             ScheduleAutoStart();
         }
@@ -164,6 +167,8 @@ namespace RaidDemo.Bootstrap
             SpawnMemberIntoSafeHouse(client.ClientId);
 
             SendProfileStateTo(client.ClientId, ProfileStateReasons.Join);
+
+            SendQuestStateTo(client.ClientId);
 
             BroadcastRoomState();
         }

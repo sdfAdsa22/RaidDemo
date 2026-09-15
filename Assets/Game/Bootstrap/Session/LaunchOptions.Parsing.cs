@@ -302,6 +302,10 @@ namespace RaidDemo.Bootstrap
                     case "-autoroom":
                         result.AutoRoom = true;
                         break;
+
+                    case "-autotrade":
+                        result.AutoTrade = true;
+                        break;
                 }
             }
 
