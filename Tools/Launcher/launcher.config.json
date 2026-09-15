@@ -1,0 +1,26 @@
+{
+  "installRoot": "Game",
+  "gameExecutable": "RaidDemo.exe",
+  "selectedSource": "本机",
+  "extraGameArguments": "",
+  "sources": [
+    {
+      "name": "本机",
+      "manifestSource": "http://127.0.0.1:8090",
+      "gameServer": "127.0.0.1",
+      "editable": false
+    },
+    {
+      "name": "云主机",
+      "manifestSource": "http://<云主机IP>:8090",
+      "gameServer": "<云主机IP>",
+      "editable": false
+    },
+    {
+      "name": "自定义",
+      "manifestSource": "",
+      "gameServer": "",
+      "editable": true
+    }
+  ]
+}
