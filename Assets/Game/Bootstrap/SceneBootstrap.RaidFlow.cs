@@ -364,7 +364,7 @@ namespace RaidDemo.Bootstrap
                 {
                     Debug.LogWarning(
                         $"[RaidDemo] 仓库放不下，{progress.LastDepositFailures} 件物品未能入库。"
-                        + "请先清理仓库再出击。");
+                        + "它们仍留在你的背包 / 装备槽里——清理仓库后手动放入即可，不会被销毁。");
                 }
 
                 Debug.Log($"[RaidDemo] 撤离成功，{deposited} 件物品已入库。");

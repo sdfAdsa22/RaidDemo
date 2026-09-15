@@ -321,7 +321,8 @@ namespace RaidDemo.Bootstrap
                 case LobbyError.StartRejected:
                     return "当前阶段不能开始战局。";
                 case LobbyError.BadRoomName:
-                    return $"房间名需要 1~{LobbyLimits.MaxRoomNameLength} 个字符。";
+                    return $"房间名需要 1~{LobbyLimits.MaxRoomNameLength} 个字符，"
+                        + $"且不超过 {LobbyLimits.MaxFixedString64ByteCapacity} 字节（约 20 个汉字）。";
                 case LobbyError.BadPasswordFormat:
                     return $"房间密码需要留空或 {LobbyLimits.RoomPasswordDigits} 位数字。";
                 case LobbyError.VersionMismatch:

@@ -147,6 +147,18 @@ namespace RaidDemo.Bootstrap
             // 记下"这名客户端还在说话"：快照只发给还在说话的客户端（见 ServerRuntime.SilentClients）。
             NoteClientInput((int)clientId);
 
+            // 上行是"半可信输入"：NaN / Infinity 会顺着 Normalized 污染权威位置，
+            // 再通过快照广播给所有人——一个坏包就能让整局看起来在瞬移（RD-AUD-047）。
+            // 这里选择整包丢弃，而不是"清洗成一个合法值"：清洗后的包仍然会被当成一次
+            // 真实输入去推进仿真，等于替攻击者伪造了一次输入。
+            if (!message.HasFiniteDirections())
+            {
+                m_Session?.Log.Warning(
+                    $"[服务器] 丢弃玩家 {(int)clientId} 的一条非法输入"
+                    + $"（移动=({message.Move.x},{message.Move.y}) 朝向=({message.Look.x},{message.Look.y})）。");
+                return;
+            }
+
             var intent = new PlayerMoveIntent(
                 (int)clientId,
                 new Vector2F(message.Move.x, message.Move.y),

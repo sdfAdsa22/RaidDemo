@@ -36,14 +36,39 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
-        public void RoomName_RespectsLengthLimit()
+        public void RoomName_RespectsCharacterLimit()
         {
-            var ok = new string('房', LobbyLimits.MaxRoomNameLength);
-            var tooLong = new string('房', LobbyLimits.MaxRoomNameLength + 1);
+            var ok = new string('R', LobbyLimits.MaxRoomNameLength);
+            var tooLong = new string('R', LobbyLimits.MaxRoomNameLength + 1);
 
             Assert.IsTrue(LobbyLimits.IsValidRoomName(ok));
             Assert.IsFalse(LobbyLimits.IsValidRoomName(tooLong));
             Assert.IsFalse(LobbyLimits.IsValidRoomName("  "));
+        }
+
+        /// <summary>
+        /// 房间名还要过 UTF-8 字节容量这一关（`RD-AUD-053`）。
+        /// </summary>
+        /// <remarks>
+        /// 房间名会被原样写进 <c>FixedString64Bytes</c>（可用 61 字节），而汉字在 UTF-8 下是 3 字节：
+        /// 24 个汉字约 72 字节，写进协议会被**静默截断**——玩家看到的是"名字少了几个字"，
+        /// 而日志里什么都没有。因此字符数与字节数两道都要校验。
+        /// </remarks>
+        [Test]
+        public void RoomName_RejectsTextBeyondTheProtocolByteCapacity()
+        {
+            var bytesPerHan = System.Text.Encoding.UTF8.GetByteCount("房");
+            var fitCount = LobbyLimits.MaxFixedString64ByteCapacity / bytesPerHan;
+            var fit = new string('房', fitCount);
+            var overflow = new string('房', fitCount + 1);
+
+            Assert.LessOrEqual(fit.Length, LobbyLimits.MaxRoomNameLength, "这条用例的前提是字符数本身没超限。");
+            Assert.IsTrue(
+                LobbyLimits.IsValidRoomName(fit),
+                $"{fit.Length} 个汉字（约 {fit.Length * bytesPerHan} 字节）应当合法。");
+            Assert.IsFalse(
+                LobbyLimits.IsValidRoomName(overflow),
+                $"{overflow.Length} 个汉字超过 {LobbyLimits.MaxFixedString64ByteCapacity} 字节，必须拒绝而不是截断。");
         }
 
         [TestCase("", true)]

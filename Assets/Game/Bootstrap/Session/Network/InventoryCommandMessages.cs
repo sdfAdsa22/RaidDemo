@@ -106,7 +106,13 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public struct InventoryEquipCommandMessage : INetworkSerializable
     {
-        /// <summary>0 = 装备，1 = 卸下。</summary>
+        /// <summary>装备：把来源容器格子里的一件物品装进指定槽位。</summary>
+        public const byte KindEquip = 0;
+
+        /// <summary>卸下：把指定槽位里的物品放回来源容器。</summary>
+        public const byte KindUnequip = 1;
+
+        /// <summary>0 = 装备（<see cref="KindEquip"/>），1 = 卸下（<see cref="KindUnequip"/>）。</summary>
         public byte Kind;
 
         /// <summary>来源容器编号（卸下时忽略）。</summary>

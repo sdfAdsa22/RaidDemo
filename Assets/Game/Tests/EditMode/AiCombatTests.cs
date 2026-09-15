@@ -27,6 +27,18 @@ namespace RaidDemo.Tests.EditMode
         }
 
         [Test]
+        public void WeaponPenetration_IsOnTheSameScaleAsArmor()
+        {
+            // RD-AUD-027：这个字段曾经是 0.45f（另一根刻度的残留值），代入
+            // DamageCalculator 的 (穿透力 - 有效护甲) / 护甲值 之后，对任何有效护甲都恒为 0 穿透。
+            // 这里钉住"至少能穿透 1 级甲"，同时把测试夹具对穿透力的覆盖去掉——覆盖值正是缺陷藏身之处。
+            Assert.GreaterOrEqual(
+                m_Fixture.Director.WeaponPenetration,
+                ArmorTiers.ArmorValuePerLevel,
+                "AI 穿透力必须与护甲值在同一根刻度上；小于 1 级甲值（10）时等于对任何护甲都打不穿。");
+        }
+
+        [Test]
         public void EngagedAgent_FiresAndDamagesPlayer()
         {
             var shots = 0;

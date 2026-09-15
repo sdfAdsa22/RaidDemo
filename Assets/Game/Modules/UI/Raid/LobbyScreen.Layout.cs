@@ -256,7 +256,10 @@ namespace RaidDemo.UI
                 var roomName = (m_RoomNameInput.Model.Value ?? string.Empty).Trim();
                 if (!LobbyText.IsValidRoomName(roomName))
                 {
-                    SetStatus($"房间名需要 1~{LobbyText.MaxRoomNameLength} 个字符。", true);
+                    SetStatus(
+                        $"房间名需要 1~{LobbyText.MaxRoomNameLength} 个字符，"
+                        + $"且不超过 {LobbyText.ProtocolTextByteCapacity} 字节（约 20 个汉字）。",
+                        true);
                     return;
                 }
 

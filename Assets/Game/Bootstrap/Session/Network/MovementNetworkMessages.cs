@@ -52,6 +52,24 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public bool ReviveHeld;
 
+        /// <summary>
+        /// 两个方向向量的分量是否都是有限数（拒绝 NaN 与 ±Infinity）。
+        /// </summary>
+        /// <returns>四个分量全部是有限数时返回 true。</returns>
+        /// <remarks>
+        /// <para><b>为什么服务器必须在入口查一次（`RD-AUD-047`）：</b>移动方向会先被
+        /// 归一化再驱动权威仿真，<c>Normalized</c> 对 NaN 不设防——只要一个包把 NaN 送进来，
+        /// 权威位置就被污染，而且会顺着快照广播给房间里的所有人。</para>
+        ///
+        /// <para>判定用 <c>float.IsFinite</c>，不要写成"取绝对值再比大小"：那种写法对 NaN 恒为 false，
+        /// 会把 NaN 判成合法值（本工程的 <c>Vector2F.IsNearlyZero</c> 就踩过同一个坑）。</para>
+        /// </remarks>
+        public bool HasFiniteDirections()
+        {
+            return float.IsFinite(Move.x) && float.IsFinite(Move.y)
+                && float.IsFinite(Look.x) && float.IsFinite(Look.y);
+        }
+
         /// <summary>单调递增的输入序号。</summary>
         public uint Sequence;
 

@@ -18,8 +18,18 @@ namespace RaidDemo.Simulation
         /// <summary>移动配置。由外部持有，可在运行时调整（例如负重系统修改体力消耗）。</summary>
         private readonly PlayerMovementProfile m_Profile;
 
-        /// <summary>距上次奔跑结束的时间。用于实现恢复延迟，负值表示尚未开始计时。</summary>
-        private float m_TimeSinceSprintEnd = -1f;
+        /// <summary>
+        /// 距上次奔跑结束的时间（秒），用于实现恢复延迟。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>起点必须是 0，不能用 -1 当"还没开始计时"的哨兵</b>：恢复分支是
+        /// "先累加本帧时间、再与延迟比较"，从 -1 起算等于把实际延迟整体推后一秒——
+        /// 配置写 1.5 秒（常规）/ 3 秒（力竭），玩家感受到的是 2.5 秒 / 4 秒。</para>
+        ///
+        /// <para>踩过的坑见 `Docs/审查报告/RaidDemo_审查问题状态复核.md` 的 `RD-AUD-010`：
+        /// 当时测试注释把"晚一秒"写成了预期行为，于是谁都没发现配置和手感对不上。</para>
+        /// </remarks>
+        private float m_TimeSinceSprintEnd;
 
         private PlayerMoveState m_State;
 
@@ -163,7 +173,7 @@ namespace RaidDemo.Simulation
         public void Reset(Vector2F position, Vector2F facing)
         {
             m_State = PlayerMoveState.CreateInitial(position, facing, m_Profile.MaxStamina);
-            m_TimeSinceSprintEnd = -1f;
+            m_TimeSinceSprintEnd = 0f;
         }
 
         /// <summary>
@@ -214,7 +224,8 @@ namespace RaidDemo.Simulation
             if (sprinting)
             {
                 m_State.Stamina -= m_Profile.StaminaDrainPerSecond * deltaTime;
-                m_TimeSinceSprintEnd = -1f;
+                // 刚停下：恢复延迟从这一刻重新起算（不是"计时器失效"）。
+                m_TimeSinceSprintEnd = 0f;
 
                 if (m_State.Stamina <= 0f)
                 {

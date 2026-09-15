@@ -154,10 +154,19 @@ namespace RaidDemo.Bootstrap
         /// <summary>房间可容纳的最大人数（含房主）。</summary>
         public const int MaxPlayers = 4;
 
-        /// <summary>昵称最大长度（按字符数，不是字节数）。</summary>
+        /// <summary>
+        /// 定长字符串字段的可用字节数上限（<c>FixedString64Bytes</c> 的容量）。
+        /// </summary>
+        /// <remarks>
+        /// 与界面层的预校验共用同一条规则（见 <c>RaidDemo.Shared.LobbyTextBudget</c>）：
+        /// 两边各写一份的话，会出现"界面允许输入、提交却被拒绝"。
+        /// </remarks>
+        public const int MaxFixedString64ByteCapacity = RaidDemo.Shared.LobbyTextBudget.FixedString64ByteCapacity;
+
+        /// <summary>昵称最大长度（按字符数；同时受 <see cref="MaxFixedString64ByteCapacity"/> 约束）。</summary>
         public const int MaxNicknameLength = 16;
 
-        /// <summary>房间名最大长度。</summary>
+        /// <summary>房间名最大长度（按字符数；同时受 <see cref="MaxFixedString64ByteCapacity"/> 约束）。</summary>
         public const int MaxRoomNameLength = 24;
 
         /// <summary>房间密码位数（可选：留空表示不设密码）。</summary>
@@ -181,7 +190,7 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public static bool IsValidNickname(string nickname)
         {
-            if (!IsValidText(nickname, 1, MaxNicknameLength))
+            if (!IsValidText(nickname, 1, MaxNicknameLength, MaxFixedString64ByteCapacity))
             {
                 return false;
             }
@@ -192,7 +201,7 @@ namespace RaidDemo.Bootstrap
         /// <summary>校验房间名是否合法。</summary>
         public static bool IsValidRoomName(string roomName)
         {
-            return IsValidText(roomName, 1, MaxRoomNameLength);
+            return IsValidText(roomName, 1, MaxRoomNameLength, MaxFixedString64ByteCapacity);
         }
 
         /// <summary>
@@ -235,8 +244,15 @@ namespace RaidDemo.Bootstrap
             return true;
         }
 
-        /// <summary>文本合法性：去空白后长度在范围内，且不含分隔符与控制字符。</summary>
-        private static bool IsValidText(string text, int minLength, int maxLength)
+        /// <summary>
+        /// 文本合法性：去空白后长度在范围内、UTF-8 字节数不超协议容量，且不含分隔符与控制字符。
+        /// </summary>
+        /// <param name="text">待校验文本。</param>
+        /// <param name="minLength">最少字符数。</param>
+        /// <param name="maxLength">最多字符数。</param>
+        /// <param name="maxBytes">写进协议字段时的 UTF-8 字节上限。</param>
+        /// <returns>合法返回 true。</returns>
+        private static bool IsValidText(string text, int minLength, int maxLength, int maxBytes)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -245,6 +261,13 @@ namespace RaidDemo.Bootstrap
 
             var trimmed = text.Trim();
             if (trimmed.Length < minLength || trimmed.Length > maxLength)
+            {
+                return false;
+            }
+
+            // 字符数与字节数是两把尺子：'A' 是 1 字节，汉字通常 3 字节。
+            // 协议字段按字节计容量，因此两道都要过。
+            if (System.Text.Encoding.UTF8.GetByteCount(trimmed) > maxBytes)
             {
                 return false;
             }

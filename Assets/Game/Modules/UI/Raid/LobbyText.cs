@@ -16,6 +16,15 @@ namespace RaidDemo.UI
         /// <summary>房间名最大长度（与 <c>LobbyLimits.MaxRoomNameLength</c> 一致）。</summary>
         public const int MaxRoomNameLength = 24;
 
+        /// <summary>
+        /// 会被写进协议字段的文本的 UTF-8 字节上限（与服务器侧共用同一条规则）。
+        /// </summary>
+        /// <remarks>
+        /// 界面层是**预校验**：它必须和服务器用同一把尺子，否则玩家会遇到"输入框接受了、提交被拒绝"。
+        /// 规则本体放在 <c>RaidDemo.Shared.LobbyTextBudget</c>，`UI` 与 `Bootstrap` 都引用它。
+        /// </remarks>
+        public const int ProtocolTextByteCapacity = RaidDemo.Shared.LobbyTextBudget.FixedString64ByteCapacity;
+
         /// <summary>房间密码位数（与 <c>LobbyLimits.RoomPasswordDigits</c> 一致）。</summary>
         public const int RoomPasswordDigits = 4;
 
@@ -34,18 +43,18 @@ namespace RaidDemo.UI
         /// <summary>列表行展示文本的长度上限（超出用省略号）。</summary>
         public const int ListTextLength = 28;
 
-        /// <summary>昵称是否合法：1~16 个字符，且不含分隔符与控制字符。</summary>
+        /// <summary>昵称是否合法：1~16 个字符、不超过协议字节容量，且不含分隔符与控制字符。</summary>
         /// <param name="text">昵称。</param>
         public static bool IsValidNickname(string text)
         {
-            return IsValidText(text, 1, MaxNicknameLength);
+            return IsValidText(text, 1, MaxNicknameLength, ProtocolTextByteCapacity);
         }
 
-        /// <summary>房间名是否合法：1~24 个字符。</summary>
+        /// <summary>房间名是否合法：1~24 个字符，且不超过协议字节容量（汉字按 3 字节算，约 20 个）。</summary>
         /// <param name="text">房间名。</param>
         public static bool IsValidRoomName(string text)
         {
-            return IsValidText(text, 1, MaxRoomNameLength);
+            return IsValidText(text, 1, MaxRoomNameLength, ProtocolTextByteCapacity);
         }
 
         /// <summary>口令是否合法：4~6 位数字。</summary>
@@ -175,7 +184,8 @@ namespace RaidDemo.UI
         }
 
         /// <summary>文本合法性：去空白后长度在范围内，且不含竖线与控制字符。</summary>
-        private static bool IsValidText(string text, int minLength, int maxLength)
+        /// <summary>文本合法性：字符数在范围内、UTF-8 字节数不超协议容量，且不含分隔符与控制字符。</summary>
+        private static bool IsValidText(string text, int minLength, int maxLength, int maxBytes)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -184,6 +194,12 @@ namespace RaidDemo.UI
 
             var trimmed = text.Trim();
             if (trimmed.Length < minLength || trimmed.Length > maxLength)
+            {
+                return false;
+            }
+
+            // 字符数与字节数是两把尺子（'A' 1 字节、汉字 3 字节），协议字段按字节算容量。
+            if (System.Text.Encoding.UTF8.GetByteCount(trimmed) > maxBytes)
             {
                 return false;
             }

@@ -119,10 +119,19 @@ namespace RaidDemo.AI
         /// AI 武器的穿透力。
         /// </summary>
         /// <remarks>
-        /// 玩家的穿透力来自"当前弹匣里装的弹药"；AI 没有背包，因此用常数。
-        /// 放在调度器上而不是写死在 Agent 里，是为了让数值调整只改一处。
+        /// <para>玩家的穿透力来自"当前弹匣里装的弹药"；AI 没有背包，因此用常数。
+        /// 放在调度器上而不是写死在 Agent 里，是为了让数值调整只改一处。</para>
+        ///
+        /// <para><b>取值必须和玩家弹药的同一根刻度对齐</b>：穿透力的参照系是护甲值
+        /// （1 级甲 10 / 2 级甲 20 / 3 级甲 30 / 4 级甲 40，见 <c>ArmorTiers</c>），
+        /// 标准弹药的穿透力是 15（见 <c>AmmoStats</c> 的默认值）。这里取 15 表示"AI 打的是标准弹"：
+        /// 对 1 级甲能穿透一半减伤，对 3 级以上打不穿。</para>
+        ///
+        /// <para>历史坑（`RD-AUD-027`）：这里曾经是 <c>0.45f</c>——那根刻度的残留值。
+        /// 代入 <c>DamageCalculator</c> 的 <c>(穿透力 - 有效护甲) / 护甲值</c> 之后，
+        /// 对任何有效护甲都恒为 0 穿透，等于"AI 的子弹永远打不穿护甲"，而日志与界面都看不出异常。</para>
         /// </remarks>
-        public float WeaponPenetration { get; set; } = 0.45f;
+        public float WeaponPenetration { get; set; } = 15f;
 
         /// <summary>当前战局时刻（秒），由 Tick 累加。</summary>
         public float ElapsedSeconds { get; private set; }

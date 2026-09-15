@@ -141,8 +141,9 @@ namespace RaidDemo.Tests.EditMode
             m_Profile.ApplyModifiers(new MovementModifiers(1f, 0.5f, true));
 
             // 先推进足够长的时间，确保恢复确实已经开始，再记录起点。
-            // 不这样做的话，断言会因为"恰好还在延迟期内"而误判——
-            // 恢复计时器的初值是 -1，实际开始恢复的时刻比 StaminaRegenDelay 晚 1 秒。
+            // 不这样做的话，断言会因为"恰好还在延迟期内"而误判。
+            // 注意：这里刻意留出富余（而不是贴着配置的延迟），因为本用例验证的是恢复速率，
+            // 延迟是否精确由 PlayerMovementTests 的 Stamina_RegenerationStartsRightAfterConfiguredDelay 钉住。
             AdvanceSteps(RecoveryDelaySteps() + 120, Vector2F.Zero);
             var before = m_Simulator.Stamina;
             Assert.Greater(before, 0f, "越过恢复延迟后体力应当已经开始恢复。");

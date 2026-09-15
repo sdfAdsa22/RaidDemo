@@ -88,6 +88,41 @@ namespace RaidDemo.Tests.EditMode
 
             Assert.AreEqual(0, moved, "仓库已满时不应有物品入库。");
             Assert.AreEqual(1, packed.LastDepositFailures, "放不下的件数必须被如实记录。");
+            Assert.IsNotNull(
+                packed.Loadout.Equipment.Get(EquipmentSlot.PrimaryWeapon),
+                "放不下的装备必须留在原槽位里，绝不能因为仓库满而被销毁。");
+        }
+
+        /// <summary>
+        /// 仓库满时，背包里的战利品必须留在背包里。
+        /// </summary>
+        /// <remarks>
+        /// 这条钉的是 `RD-AUD-028`：旧实现"先从网格移除、再放进仓库、失败只记一个计数"，
+        /// 于是仓库满的那一刻战利品就被永久销毁了——而界面只显示一句"未能入库"。
+        /// 入库路径与阵亡丢弃不同：**只有阵亡才允许真的丢东西**。
+        /// </remarks>
+        [Test]
+        public void 仓库满时背包里的战利品留在背包()
+        {
+            var packed = new MetaProgress();
+            var filler = new TestItemDefinition("loot.filler", ItemCategory.Loot, maxStack: 1);
+            for (var y = 0; y < MetaProgress.StashHeight; y++)
+            {
+                for (var x = 0; x < MetaProgress.StashWidth; x++)
+                {
+                    packed.Stash.AutoPlace(m_Factory.Create(filler, 1));
+                }
+            }
+
+            packed.Loadout.Backpack.AutoPlace(m_Factory.Create(m_Bolt, 5));
+            var moved = packed.DepositLoadoutToStash();
+
+            Assert.AreEqual(0, moved, "仓库已满时不应有物品入库。");
+            Assert.AreEqual(1, packed.LastDepositFailures, "放不下的件数必须被如实记录。");
+            Assert.AreEqual(
+                1,
+                packed.Loadout.Backpack.Items.Count,
+                "放不下的战利品必须留在背包里，等待玩家清理仓库后手动放入。");
         }
     }
 }

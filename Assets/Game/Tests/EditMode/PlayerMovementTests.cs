@@ -272,6 +272,32 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(afterSprint, m_Simulator.State.Stamina, 1e-3f, "延迟期内不应恢复体力。");
         }
 
+        /// <summary>
+        /// 越过配置的恢复延迟之后应当**立刻**开始回体力。
+        /// </summary>
+        /// <remarks>
+        /// <para>这条钉的是 RD-AUD-010：恢复计时器的起点曾经是 <c>-1</c>（当"还没开始计时"的哨兵），
+        /// 而恢复分支是"先累加本帧时间、再与延迟比较"，于是实际延迟比配置整整多一秒
+        /// （常规 1.5→2.5 秒、力竭 3→4 秒）。</para>
+        ///
+        /// <para>只多给两个步长是有意的：起点若还是 -1，这点时间根本到不了配置的延迟，
+        /// 断言会失败——换成"多给一秒"的宽裕写法就把这个缺陷盖住了。</para>
+        /// </remarks>
+        [Test]
+        public void Stamina_RegenerationStartsRightAfterConfiguredDelay()
+        {
+            Advance(1f, Vector2F.Right, sprint: true);
+            var afterSprint = m_Simulator.State.Stamina;
+            Assert.Less(afterSprint, m_Profile.MaxStamina, "先跑一秒，制造体力缺口。");
+
+            Advance(m_Profile.StaminaRegenDelay + (Step * 2f), Vector2F.Right);
+
+            Assert.Greater(
+                m_Simulator.State.Stamina,
+                afterSprint,
+                "越过 StaminaRegenDelay 之后应当立刻开始恢复体力。");
+        }
+
         [Test]
         public void Stamina_DoesNotExceedMaximum()
         {

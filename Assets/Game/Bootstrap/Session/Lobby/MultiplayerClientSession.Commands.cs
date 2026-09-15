@@ -25,7 +25,9 @@ namespace RaidDemo.Bootstrap
 
             if (!LobbyLimits.IsValidRoomName(roomName))
             {
-                SetError($"房间名需要 1~{LobbyLimits.MaxRoomNameLength} 个字符。");
+                SetError(
+                    $"房间名需要 1~{LobbyLimits.MaxRoomNameLength} 个字符，"
+                    + $"且不超过 {LobbyLimits.MaxFixedString64ByteCapacity} 字节（约 20 个汉字）。");
                 return;
             }
 

@@ -243,7 +243,13 @@ namespace RaidDemo.Meta
         /// <remarks>
         /// 先搬装备槽、再搬弹药挂与背包：装备类物品占地最大，
         /// 让小件先进仓库会把空间切碎（M5-P-13 那条教训）。
-        /// 放不下的物品会被**丢弃并计数**，而不是静默消失——它是仓库满时唯一可能丢东西的路径。
+        ///
+        /// <para><b>放不下的物品留在原地，不会被销毁</b>：仓库满时它仍然待在背包 / 弹药挂里，
+        /// 玩家回到安全屋后可以自己清理仓库再放进去。件数记在 <see cref="LastDepositFailures"/> 里，
+        /// 由调用方给玩家一句明确提示。</para>
+        ///
+        /// <para>这个语义是 `RD-AUD-028` 改出来的：旧实现"先移除、再放置、失败只计数"，
+        /// 于是仓库满的那一刻，战利品会被永久销毁——而界面上只显示一句"未能入库"。</para>
         /// </remarks>
         public int DepositLoadoutToStash()
         {
@@ -311,7 +317,12 @@ namespace RaidDemo.Meta
             }
         }
 
-        /// <summary>把一个网格里的物品全部搬进仓库。</summary>
+        /// <summary>把一个网格里的物品全部搬进仓库；放不下的留在原格。</summary>
+        /// <remarks>
+        /// 每一件都先记下原位与朝向：仓库放不下时按原样放回去。
+        /// 这一格刚被同一件物品腾空、中间没有别的改动，因此放回必定成功；
+        /// 万一仍然失败，说明网格状态已经不一致——那就用 `LogError` 把事实喊出来，而不是当作"没搬成"悄悄算过。
+        /// </remarks>
         private int DrainGrid(InventoryGrid grid, ref int failed)
         {
             if (grid == null)
@@ -324,6 +335,9 @@ namespace RaidDemo.Meta
             for (var i = 0; i < items.Count; i++)
             {
                 var item = items[i];
+                grid.TryGetOrigin(item, out var origin);
+                var rotated = item.Rotated;
+
                 if (!grid.Remove(item).Success)
                 {
                     continue;
@@ -332,11 +346,17 @@ namespace RaidDemo.Meta
                 if (Stash.AutoPlace(item).Success)
                 {
                     moved++;
+                    continue;
                 }
-                else
+
+                // 放不下：原样退回，绝不销毁（RD-AUD-028）。
+                if (!grid.Place(item, origin, rotated).Success)
                 {
-                    failed++;
+                    UnityEngine.Debug.LogError(
+                        $"[结算] 仓库放不下「{item.Definition?.Id}」，且放回原格也失败——这一件可能已经丢失。");
                 }
+
+                failed++;
             }
 
             return moved;

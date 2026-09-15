@@ -109,9 +109,6 @@ namespace RaidDemo.Tests.EditMode
     /// </remarks>
     internal sealed class AiTestFixture
     {
-        /// <summary>武器穿透力。测试里固定值，便于断言伤害。</summary>
-        public const float WeaponPenetration = 0.45f;
-
         /// <summary>事件总线。</summary>
         public EventBus Bus { get; } = new EventBus();
 
@@ -147,7 +144,9 @@ namespace RaidDemo.Tests.EditMode
                 Profile,
                 Pathfinding);
 
-            Director.WeaponPenetration = WeaponPenetration;
+            // 穿透力刻意不覆盖：用生产默认值（AI 打标准弹，穿透力 15）。
+            // 测试里另设一个常量会让"AI 穿透力与护甲值不在同一根刻度上"这类缺陷重新藏起来
+            // ——`RD-AUD-027` 就是这么来的（测试固定 0.45f，与生产的旧值一起漂）。
 
             PlayerId = World.Create(100f);
             SetPlayer(playerPosition, alive: true);

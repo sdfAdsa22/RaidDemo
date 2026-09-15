@@ -238,8 +238,21 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 入口校验（RD-AUD-046）：Slot 与 Kind 都是上行字节，直接强转成枚举再拿去索引
+            // 长度 5 的槽位数组，会走到越界路径（异常会被命令路由兜住，但那是"事后补救"）。
+            // 非法输入一律丢弃，并把权威状态推回客户端——它在本地是"先动过界面"的。
+            if (message.Slot >= EquipmentLoadout.SlotCount
+                || (message.Kind != InventoryEquipCommandMessage.KindEquip
+                    && message.Kind != InventoryEquipCommandMessage.KindUnequip))
+            {
+                m_Session?.Log.Warning(
+                    $"[服务器] 玩家 {playerId} 的装备命令不合法（Kind {message.Kind}，槽位 {message.Slot}），已丢弃。");
+                RefreshContainersAfterCommand(playerId);
+                return;
+            }
+
             CommandResult result;
-            if (message.Kind == 0)
+            if (message.Kind == InventoryEquipCommandMessage.KindEquip)
             {
                 result = router.Dispatch(new InventoryEquipIntent(
                     playerId,
