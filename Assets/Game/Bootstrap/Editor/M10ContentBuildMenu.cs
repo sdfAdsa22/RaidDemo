@@ -55,6 +55,15 @@ namespace RaidDemo.Bootstrap.Editor
 
             Debug.Log($"[M10 资源] 开始构建：{settings.groups.Count(group => group != null)} 个分组 / {totalEntries} 个条目");
 
+            // 构建前清空输出目录：Addressables 的 bundle 名带内容哈希，不清空的话旧 bundle 会一直留在目录里，
+            // 而清单是"扫描整个目录"生成的——结果就是每次改数值，玩家都要多下一份已经没人引用的旧 bundle。
+            var staleDirectory = GetOutputDirectory();
+            if (Directory.Exists(staleDirectory))
+            {
+                Directory.Delete(staleDirectory, true);
+                Debug.Log($"[M10 资源] 已清空上次的构建输出：{staleDirectory}");
+            }
+
             AddressableAssetSettings.BuildPlayerContent(out AddressablesPlayerBuildResult result);
 
             if (!string.IsNullOrEmpty(result.Error))
