@@ -20,6 +20,33 @@ namespace RaidDemo.Bootstrap.Editor
         /// <summary>默认连接的地址：本机服务器的标准端口。</summary>
         private const string DefaultAddress = "127.0.0.1";
 
+        /// <summary>默认端口。</summary>
+        private const int DefaultPort = 7777;
+
+        /// <summary>
+        /// 连接参数的 EditorPrefs 键（P6 起）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么可覆盖：</b>全流程验收要连的不一定是本机服务器——例如连云主机。
+        /// 把地址写死在代码里会让"连云上环境验收"变成一次改代码 + 提交；
+        /// 而写进仓库又会把公网 IP 带进公开仓库。EditorPrefs 存在本机、不进版本库，
+        /// 正好落在两者之间。</para>
+        ///
+        /// <para>设置方式（编辑器命令行）：
+        /// <c>unity command --project-path &lt;工程&gt; eval --code "UnityEditor.EditorPrefs.SetString(\"RaidDemo.EditorConnect.Address\", \"&lt;服务器地址&gt;\")"</c>。
+        /// 不设置时全部走上面的默认值（本机 7777）。</para>
+        /// </remarks>
+        public const string AddressPrefKey = "RaidDemo.EditorConnect.Address";
+
+        /// <summary>端口覆盖键。</summary>
+        public const string PortPrefKey = "RaidDemo.EditorConnect.Port";
+
+        /// <summary>昵称覆盖键。</summary>
+        public const string NicknamePrefKey = "RaidDemo.EditorConnect.Nickname";
+
+        /// <summary>口令覆盖键。</summary>
+        public const string PassphrasePrefKey = "RaidDemo.EditorConnect.Passphrase";
+
         /// <summary>安全屋场景：联机流程的起点（大厅界面叠在它上面）。</summary>
         private const string SafeHouseScenePath = "Assets/Game/Content/Scenes/SafeHouse.unity";
 
@@ -43,13 +70,23 @@ namespace RaidDemo.Bootstrap.Editor
                 return;
             }
 
+            var address = EditorPrefs.GetString(AddressPrefKey, DefaultAddress);
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                address = DefaultAddress;
+            }
+
+            var port = EditorPrefs.GetInt(PortPrefKey, DefaultPort);
+            var nickname = EditorPrefs.GetString(NicknamePrefKey, EditorNickname);
+            var passphrase = EditorPrefs.GetString(PassphrasePrefKey, "123456");
+
             var arguments = new[]
             {
-                "-connect", DefaultAddress,
-                "-port", "7777",
+                "-connect", address,
+                "-port", port.ToString(),
                 "-map", "GreyboxRaid",
-                "-nickname", EditorNickname,
-                "-passphrase", "123456",
+                "-nickname", nickname,
+                "-passphrase", passphrase,
                 "-autoroom",
             };
 
@@ -66,7 +103,7 @@ namespace RaidDemo.Bootstrap.Editor
             EditorApplication.isPlaying = true;
 
             Debug.Log(
-                $"[联机] 以客户端身份进入，连接 {DefaultAddress}:7777（请先启动服务器），昵称「{EditorNickname}」。");
+                $"[联机] 以客户端身份进入，连接 {address}:{port}（请先启动服务器），昵称「{nickname}」。");
         }
     }
 }
