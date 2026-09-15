@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RaidDemo 启动器（M10 批次 2）。
+
+    为什么是独立工程而不是 Unity 的一部分：
+    “更新本体”这件事必须发生在游戏进程之外（Windows 下运行中的 exe/dll 被占用，无法覆盖），
+    所以它天然不能是游戏代码的一部分；放在 Tools/ 下也不会污染 Unity 的程序集与构建产物（ADR-007）。
+
+    为什么用链接文件共享协议模型：
+    Assets/Game/Kernel/Pure/Updates 下的三个文件（清单模型 / 差异比对 / 哈希工具）只依赖 System，
+    不依赖 UnityEngine，因此可以被 Unity 与启动器**同时编译**。
+    这样“协议只有一份实现”，不会出现两端各自演化出细微差异的经典事故。
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>RaidDemo.Launcher</AssemblyName>
+    <RootNamespace>RaidDemo.Launcher</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Version>0.10.0</Version>
+    <!-- 自包含单文件发布：目标机器不需要预装 .NET 运行时（云主机与玩家机器都适用）。 -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 与 Unity 侧共用同一份协议实现（只读链接，不产生副本）。 -->
+    <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateManifest.cs" Link="Shared\UpdateManifest.cs" />
+    <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateManifestDiff.cs" Link="Shared\UpdateManifestDiff.cs" />
+    <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateFileHash.cs" Link="Shared\UpdateFileHash.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 配置模板随产物一起输出：仓库里只有占位地址，真实地址写 launcher.config.local.json（不入库）。 -->
+    <None Update="launcher.config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

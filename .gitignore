@@ -33,6 +33,12 @@
 *.user
 *.userprefs
 *.pidb
+
+# Tools/ 下的 .csproj 与 .sln 是**手写**的工具工程（启动器 / 更新源服务端），不是 Unity 生成的，
+# 必须入库——否则他人克隆仓库后这两个工具根本构建不了（这条曾真实踩到：工程文件被上面的 *.csproj 吃掉）。
+!/Tools/**/*.csproj
+!/Tools/**/*.sln
+!/Tools/**/*.slnx
 *.booproj
 *.svd
 *.pdb

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Launcher/">
+    <Project Path="Launcher/RaidDemo.Launcher.csproj" />
+  </Folder>
+  <Folder Name="/UpdateSource/">
+    <Project Path="UpdateSource/RaidDemo.UpdateSource.csproj" />
+  </Folder>
+</Solution>

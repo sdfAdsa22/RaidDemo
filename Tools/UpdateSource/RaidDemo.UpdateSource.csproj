@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RaidDemo 更新源服务端（M10 批次 3）。
+
+    职责只有两件事：
+      1. 把更新源目录按"客户端认识的 URL 命名空间"托管出去（manifest.json + body/content/code），
+         并支持 Range 请求（断点续传的前提）；
+      2. 提供一个 Web 可视化面板：看当前版本、上传新版本包、发布 / 回滚、校验、看访问日志。
+
+    为什么用 HttpListener 而不是 ASP.NET Core：
+    它随 .NET 自带、不引入额外包，自包含单文件体积小，Windows 与 Linux 行为一致；
+    面板是内嵌的单页 HTML，不需要前端构建链。演示与作品集场景下，依赖越少越容易"别人克隆后一次跑起来"。
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>RaidDemo.UpdateSource</AssemblyName>
+    <RootNamespace>RaidDemo.UpdateSource</RootNamespace>
+    <Version>0.10.0</Version>
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 与 Unity 侧、启动器共用同一份协议模型与哈希实现。 -->
+    <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateManifest.cs" Link="Shared\UpdateManifest.cs" />
+    <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateFileHash.cs" Link="Shared\UpdateFileHash.cs" />
+  </ItemGroup>
+
+</Project>
