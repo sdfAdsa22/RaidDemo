@@ -55,6 +55,13 @@
 Builds/
 [Ee]xported[Oo]bj/
 
+# .NET 工具（Tools/）的中间产物与发布输出；仅作用于 Tools 目录，避免误伤 Unity 侧同名目录
+/Tools/**/bin/
+/Tools/**/obj/
+/Tools/**/publish/
+/Tools/**/TestResults/
+launcher.config.local.json
+
 # Crash 报告
 sysinfo.txt
 crashlytics-build.properties
