@@ -114,3 +114,10 @@ desktop.ini
 # 测试框架在构建时写入的性能采样产物（本工程资源一律放 Assets/Game/Content）
 [Aa]ssets/[Rr]esources/
 [Aa]ssets/[Rr]esources.meta
+
+# HybridCLR 探针产物（M10 批次 5 探针；探针未通过，工程已退回 Mono，目录不入库）
+HybridCLRData/
+
+# HybridCLR 生成物（探针遗留；不含 HybridCLR 类型，留盘但入库无意义）
+/Assets/HybridCLRGenerate/
+/Assets/HybridCLRGenerate.meta
