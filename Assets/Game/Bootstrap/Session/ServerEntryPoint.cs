@@ -147,6 +147,9 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 参数对三种运行形态都有效：更新源等参数在单机模式下也要能读到。
+            LaunchOptions.Current = options;
+
             if (!options.IsServerRequested)
             {
                 if (options.Mode == AppLaunchMode.Client)

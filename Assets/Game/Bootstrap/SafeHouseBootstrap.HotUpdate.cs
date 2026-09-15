@@ -82,9 +82,11 @@ namespace RaidDemo.Bootstrap
         /// <summary>取本次运行应使用的更新源（启动参数优先，其次默认值）。</summary>
         private static string ResolveUpdateSource()
         {
-            if (ClientMode.Options != null && !string.IsNullOrEmpty(ClientMode.Options.UpdateSource))
+            // 单机 / 联机 / 服务器三种形态都要能读到启动参数（见 LaunchOptions.Current 的说明）。
+            var options = LaunchOptions.Current ?? ClientMode.Options;
+            if (options != null && !string.IsNullOrEmpty(options.UpdateSource))
             {
-                return ClientMode.Options.UpdateSource;
+                return options.UpdateSource;
             }
 
             return LaunchOptions.DefaultUpdateSource;

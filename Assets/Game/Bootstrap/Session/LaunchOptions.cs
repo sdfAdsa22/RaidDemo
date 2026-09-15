@@ -57,6 +57,17 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public const string DefaultUpdateSource = "http://127.0.0.1:8090";
 
+        /// <summary>
+        /// 本进程启动时解析出的参数（单机 / 联机 / 服务器通用），由启动入口在场景加载前写入。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么不能只从 <c>ClientMode.Options</c> 取：</b>那个静态属性只在**联机客户端**
+        /// 激活时才有值，而"更新源"这类参数在单机模式下同样有意义（启动器拉起单机游戏也会传）。
+        /// 早期实现只读 <c>ClientMode</c>，于是单机启动时 <c>-updatesource</c> 被静默忽略、
+        /// 退回默认地址——实机日志里表现为"更新源是本机默认值而不是传入值"。</para>
+        /// </remarks>
+        public static LaunchOptions Current { get; internal set; }
+
         /// <summary>服务器状态页（Dashboard）的默认端口。0 表示关闭。</summary>
         public const int DefaultDashboardPort = 8080;
 

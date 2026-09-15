@@ -19,10 +19,11 @@ namespace RaidDemo.Bootstrap
         /// <summary>用当前生效的内容解析目录（本地缓存优先，其次本体自带）。</summary>
         private void ApplyHotUpdateContent()
         {
+            var options = LaunchOptions.Current ?? ClientMode.Options;
             var source = ServerMode.IsActive
                 ? string.Empty
-                : (ClientMode.Options != null && !string.IsNullOrEmpty(ClientMode.Options.UpdateSource)
-                    ? ClientMode.Options.UpdateSource
+                : (options != null && !string.IsNullOrEmpty(options.UpdateSource)
+                    ? options.UpdateSource
                     : LaunchOptions.DefaultUpdateSource);
 
             HotUpdateRuntime.Configure(source);
