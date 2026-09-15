@@ -130,6 +130,22 @@ namespace RaidDemo.Bootstrap
                         result.ConnectAddress = address;
                         break;
 
+                    case "-updatesource":
+                        if (!TryReadValue(list, ref i, arg, out var updateSource, out error))
+                        {
+                            return false;
+                        }
+
+                        var source = updateSource.Trim().TrimEnd('/');
+                        if (source.Length == 0)
+                        {
+                            error = $"参数 {arg} 不能为空。";
+                            return false;
+                        }
+
+                        result.UpdateSource = source;
+                        break;
+
                     case "-map":
                         if (!TryReadValue(list, ref i, arg, out var mapScene, out error))
                         {

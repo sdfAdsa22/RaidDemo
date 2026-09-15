@@ -71,6 +71,11 @@ namespace RaidDemo.Bootstrap
 
             Application.runInBackground = true;
 
+            // 热更：先用本地已下载的内容解析目录（毫秒级，不阻塞启动），
+            // 随后在后台检查更新；若内容有变化且玩家还在主菜单，会重载场景让它立即生效。
+            ApplyHotUpdateContent();
+            StartCoroutine(RunHotUpdate());
+
             // 与战局一致：会话作用域负责服务，场景只负责装配内容。
             // 联机时把创建者标签与日志等级对齐到客户端参数——排障时"这条日志来自哪个场景、
             // 哪个角色"要能一眼看出来（安全屋与战局是两个各自装配的客户端场景）。

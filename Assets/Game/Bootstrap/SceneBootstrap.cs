@@ -135,6 +135,7 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            ApplyHotUpdateContent();   // 客户端：先用当前生效的内容解析目录（本地缓存优先）
             Initialize();
         }
 

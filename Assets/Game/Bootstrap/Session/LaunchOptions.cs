@@ -48,6 +48,15 @@ namespace RaidDemo.Bootstrap
         /// <summary>默认存档目录（相对服务器进程的工作目录）。</summary>
         public const string DefaultSaveDirectory = "server_saves";
 
+        /// <summary>
+        /// 默认更新源地址（本机更新源）。
+        /// </summary>
+        /// <remarks>
+        /// 与启动器配置里的"本机"档案保持同一个默认值：直接双击游戏时也能连上本机更新源；
+        /// 启动器启动时会用 <c>-updatesource</c> 覆盖它（ADR-007 的"更新源可切换"）。
+        /// </remarks>
+        public const string DefaultUpdateSource = "http://127.0.0.1:8090";
+
         /// <summary>服务器状态页（Dashboard）的默认端口。0 表示关闭。</summary>
         public const int DefaultDashboardPort = 8080;
 
@@ -126,6 +135,17 @@ namespace RaidDemo.Bootstrap
         /// <summary>要连接的服务器地址（<c>主机[:端口]</c>）；为 null 表示不是联机客户端。</summary>
         /// <remarks>P1~P3 的临时加入路径；P4 的大厅上线后保留给自动化测试与快速调试。</remarks>
         public string ConnectAddress { get; private set; }
+
+        /// <summary>
+        /// 更新源地址（<c>-updatesource</c>）；为 null 表示使用默认值。
+        /// </summary>
+        /// <remarks>
+        /// <para>由启动器在拉起游戏时传入（ADR-007 第 4 条：更新源与默认服务器地址同源于启动器档案）。
+        /// 直接双击游戏时该参数缺席，此时退回 <see cref="DefaultUpdateSource"/>。</para>
+        ///
+        /// <para>允许 <c>http(s)://</c> 与本地目录两种形态：本地目录是"不依赖任何服务"的本机演示方式。</para>
+        /// </remarks>
+        public string UpdateSource { get; private set; }
 
         /// <summary>
         /// 联机客户端的昵称（<c>-nickname</c>）；为 null 表示由界面或自动流程取名。
