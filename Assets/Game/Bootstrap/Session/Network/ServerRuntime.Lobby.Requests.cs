@@ -110,10 +110,21 @@ namespace RaidDemo.Bootstrap
             SendRoomStateTo(client.ClientId);
         }
 
-        /// <summary>创建房间（仅空闲阶段）。</summary>
-        private void HandleLobbyCreateRoom(LobbyClient client, string roomName, string password)
+        /// <summary>
+        /// 创建房间（仅空闲阶段）。
+        /// </summary>
+        /// <param name="client">发起请求的客户端。</param>
+        /// <param name="roomName">房间名。</param>
+        /// <param name="password">房间密码（可空）。</param>
+        /// <param name="buildId">客户端上报的版本标识（M10 版本握手；空 = 老客户端未上报）。</param>
+        private void HandleLobbyCreateRoom(LobbyClient client, string roomName, string password, string buildId)
         {
             if (!RequireLobbyLogin(client, LobbyRequestKind.CreateRoom))
+            {
+                return;
+            }
+
+            if (!EnsureBuildCompatible(client, LobbyRequestKind.CreateRoom, buildId))
             {
                 return;
             }
@@ -143,10 +154,20 @@ namespace RaidDemo.Bootstrap
             ScheduleAutoStart();
         }
 
-        /// <summary>加入房间。</summary>
-        private void HandleLobbyJoinRoom(LobbyClient client, string password)
+        /// <summary>
+        /// 加入房间。
+        /// </summary>
+        /// <param name="client">发起请求的客户端。</param>
+        /// <param name="password">房间密码（房间未设密码时为空）。</param>
+        /// <param name="buildId">客户端上报的版本标识（M10 版本握手；空 = 老客户端未上报）。</param>
+        private void HandleLobbyJoinRoom(LobbyClient client, string password, string buildId)
         {
             if (!RequireLobbyLogin(client, LobbyRequestKind.JoinRoom))
+            {
+                return;
+            }
+
+            if (!EnsureBuildCompatible(client, LobbyRequestKind.JoinRoom, buildId))
             {
                 return;
             }
@@ -171,6 +192,40 @@ namespace RaidDemo.Bootstrap
             SendQuestStateTo(client.ClientId);
 
             BroadcastRoomState();
+        }
+
+        /// <summary>
+        /// 版本握手门禁：进"共享世界"（建房 / 加房）之前比对本体版本（M10 第 13.1 节）。
+        /// </summary>
+        /// <param name="client">发起请求的客户端。</param>
+        /// <param name="kind">触发本次检查的请求种类（决定失败结果回给哪条请求）。</param>
+        /// <param name="buildId">客户端上报的版本标识；空 = 老客户端未上报，按未知放行。</param>
+        /// <returns>允许继续时返回 true；被拒时结果已经发给客户端。</returns>
+        /// <remarks>
+        /// <para><b>为什么建房与加房都要查：</b>两条路径的终点是同一个共享世界。只查加房会留下
+        /// 一个自相矛盾的口子——版本不对的人当房主能建房，队友却进不来，房间成了死局。</para>
+        ///
+        /// <para><b>为什么不在登录时查：</b>版本不一致时玩家最需要的是"被告知去更新"，
+        /// 而登录成功才进得到能看到提示的大厅界面。把检查放在进门这一步，
+        /// 既给得出可读文案，又不影响"先连上看一眼服务器列表"这种无害操作。</para>
+        ///
+        /// <para>判定规则全部在 <see cref="BuildIdentity"/> 里（纯逻辑，有单元测试钉着），
+        /// 这里只负责把结果翻译成一条下行结果与一行服务器日志。</para>
+        /// </remarks>
+        private bool EnsureBuildCompatible(LobbyClient client, LobbyRequestKind kind, string buildId)
+        {
+            if (BuildIdentity.CheckCompatibility(buildId, BuildIdentity.Current, out var detail))
+            {
+                return true;
+            }
+
+            SendLobbyResult(client.ClientId, kind, false, LobbyError.VersionMismatch, detail);
+
+            var nickname = string.IsNullOrEmpty(client.Nickname) ? "未登录" : client.Nickname;
+            m_Session?.Log.Warning(
+                $"[服务器] 客户端 {client.ClientId}（{nickname}）被版本握手拒绝：{detail}"
+                + $"（本机标识 {BuildIdentity.Current}，对端上报「{buildId}」）");
+            return false;
         }
 
         /// <summary>

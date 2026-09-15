@@ -112,6 +112,14 @@ namespace RaidDemo.Bootstrap
         /// <param name="kind">请求种类。</param>
         /// <param name="fieldA">字段 A（登录=昵称 / 创建=房间名）。</param>
         /// <param name="fieldB">字段 B（登录=口令或 token / 创建与加入=房间密码）。</param>
+        /// <remarks>
+        /// <para>每条请求都自动带上本机的版本标识（<see cref="BuildIdentity.Current"/>）：
+        /// 服务器只在建房 / 加房时用它做握手判断（M10 第 13.1 节），
+        /// 但客户端不做"哪种请求才带"的判断——统一附带既少一处分支，
+        /// 也让后续要在别的请求上做版本检查时不必再改客户端。</para>
+        ///
+        /// <para>服务器日志里的版本不匹配因此能追到"是哪一次请求被拒"，而不是只看到一个连接编号。</para>
+        /// </remarks>
         private void SendLobbyRequest(LobbyRequestKind kind, string fieldA, string fieldB)
         {
             var messaging = m_Network != null ? m_Network.CustomMessagingManager : null;
@@ -129,6 +137,7 @@ namespace RaidDemo.Bootstrap
                 FieldA = fieldA ?? string.Empty,
                 FieldB = fieldB ?? string.Empty,
                 Sequence = m_Sequence,
+                BuildId = BuildIdentity.Current,
             };
 
             using (var writer = new FastBufferWriter(192, Allocator.Temp))

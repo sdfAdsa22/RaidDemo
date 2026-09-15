@@ -131,6 +131,12 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>该昵称已在服务器上游戏中（同一时刻不允许两个同名玩家）。</summary>
         NicknameOnline = 17,
+
+        /// <summary>
+        /// 客户端版本与服务器不一致（M10 版本握手）。说明文案里带着两个版本号，
+        /// 玩家据此知道"该更新哪一端"。
+        /// </summary>
+        VersionMismatch = 18,
     }
 
     /// <summary>

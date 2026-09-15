@@ -159,6 +159,21 @@ namespace RaidDemo.Bootstrap
         public string UpdateSource { get; private set; }
 
         /// <summary>
+        /// 本机版本标识（<c>-buildid</c>）；为 null 表示由游戏自己拼装（见 <see cref="BuildIdentity.Current"/>）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>谁传：</b>启动器在拉起游戏时把自己算出的标识传进来，这样"游戏上报的版本"与
+        /// "启动器装的那份清单"永远是同一个，不会出现"启动器说 0.10.1、游戏说 0.10.0"这种
+        /// 让版本握手变成猜谜的状态。</para>
+        ///
+        /// <para><b>为什么它可覆盖：</b>版本握手的验收需要"两端版本不一致"的场景，
+        /// 而为此各打一个包代价很高。用启动参数注入另一个版本号就能走完同样的判定路径——
+        /// 它只改本机<b>上报</b>的标识，不碰任何游戏规则。因此它不是安全机制：
+        /// 握手防的是版本错配导致的怪故障，不是恶意客户端（见 <see cref="BuildIdentity"/>）。</para>
+        /// </remarks>
+        public string BuildIdOverride { get; private set; }
+
+        /// <summary>
         /// 联机客户端的昵称（<c>-nickname</c>）；为 null 表示由界面或自动流程取名。
         /// </summary>
         /// <remarks>自动化验收需要两个不同昵称的客户端同时在线，因此昵称必须能从命令行指定。</remarks>
@@ -258,6 +273,11 @@ namespace RaidDemo.Bootstrap
             if (!string.IsNullOrEmpty(Nickname))
             {
                 description += $" ｜ 昵称 {Nickname}";
+            }
+
+            if (!string.IsNullOrEmpty(BuildIdOverride))
+            {
+                description += $" ｜ 版本标识 {BuildIdOverride}";
             }
 
             if (AutoRoom)

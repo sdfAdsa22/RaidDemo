@@ -120,7 +120,8 @@ namespace RaidDemo.Bootstrap
             m_ConnectDeadline = Time.realtimeSinceStartup + ConnectTimeoutSeconds;
             SetPhase(MultiplayerClientPhase.Connecting);
             StatusText = $"正在连接 {host}:{port} …";
-            Debug.Log($"[联机] 正在连接 {host}:{port}（昵称「{Nickname}」）。");
+            // 版本标识一起打出来：进不去房间时，"我这端认为自己是哪一版"是排查的第一条线索。
+            Debug.Log($"[联机] 正在连接 {host}:{port}（昵称「{Nickname}」，版本 {BuildIdentity.Current}）。");
             return true;
         }
 

@@ -113,6 +113,8 @@ namespace RaidDemo.Bootstrap.Editor
                 return;
             }
 
+            RemoveStaleCatalogs(contentDirectory, version);
+
             var contentVersion = BuildContentVersion(contentDirectory);
             UpdateManifestBuilder.Generate(
                 bodyDirectory,
@@ -123,6 +125,38 @@ namespace RaidDemo.Bootstrap.Editor
                 codeVersion: null);
 
             Debug.Log($"[M10 资源] 资源层版本号：{contentVersion}（由 catalog 哈希派生，内容变了版本号才会变）");
+        }
+
+        /// <summary>
+        /// 清掉资源产物目录里"不属于当前本体版本"的 catalog。
+        /// </summary>
+        /// <param name="contentDirectory">资源产物目录。</param>
+        /// <param name="bodyVersion">当前本体版本（<c>PlayerSettings.bundleVersion</c>）。</param>
+        /// <remarks>
+        /// <para><b>为什么需要它（M10 演练踩到）：</b>Addressables 的 catalog 文件名带版本号
+        /// （<c>catalog_0.10.0.bin</c>）。菜单 ⑤ 在构建前会清空输出目录，但<b>玩家构建（菜单 ①）
+        /// 也会往同一个目录写一份 catalog</b>，而它不清空——于是"① → ⑥"这种跳过 ⑤ 的顺序会让
+        /// 目录里同时躺着两个版本的 catalog，清单把它们全部收进去：客户端白下两个文件，
+        /// 而 <see cref="BuildContentVersion"/> 取到哪一个还是不保证的。</para>
+        ///
+        /// <para>删的是构建产物目录里的过期文件，不是源资产；判断依据只有一条——
+        /// 文件名里带不带当前版本号。</para>
+        /// </remarks>
+        private static void RemoveStaleCatalogs(string contentDirectory, string bodyVersion)
+        {
+            var marker = "_" + bodyVersion + ".";
+            var files = new DirectoryInfo(contentDirectory).GetFiles("catalog_*");
+
+            foreach (var file in files)
+            {
+                if (file.Name.Contains(marker))
+                {
+                    continue;
+                }
+
+                Debug.Log($"[M10 资源] 清理过期 catalog：{file.Name}（不属于本体 {bodyVersion}）");
+                file.Delete();
+            }
         }
 
         /// <summary>取资源产物目录（按当前构建目标分目录）。</summary>

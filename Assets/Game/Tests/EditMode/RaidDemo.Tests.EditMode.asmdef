@@ -18,6 +18,7 @@
         "RaidDemo.Raid",
         "RaidDemo.Meta",
         "RaidDemo.UI",
+        "RaidDemo.HotUpdate",
         "RaidDemo.Bootstrap.Editor",
         "Unity.TextMeshPro",
         "Unity.Collections",

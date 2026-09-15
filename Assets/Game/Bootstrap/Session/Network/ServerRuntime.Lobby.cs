@@ -84,6 +84,9 @@ namespace RaidDemo.Bootstrap
 
             m_Session.Log.Info(
                 $"[服务器] 大厅已就绪：默认房间名「{m_Options.RoomName}」，等待第一个客户端创建房间。");
+            // 版本标识是握手判定的依据，启动时就打出来：版本不一致时最需要的两行日志
+            // 就是"两端各自认为自己是哪一版"，没有它只能靠猜（M10 第 13.1 节）。
+            m_Session.Log.Info($"[服务器] 本机版本标识：{BuildIdentity.Current}（握手只比对本体版本段）");
             m_Session.Log.Info(
                 $"[服务器] 账号库已就绪：{m_Identities.AccountCount} 个账号（{m_Identities.FilePath}）。");
 
@@ -123,8 +126,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>收到一条大厅请求。</summary>
         private void OnLobbyRequestReceived(ulong senderId, FastBufferReader reader)
         {
-            var message = default(LobbyRequestMessage);
-            reader.ReadValueSafe(out message);
+            // 用消息自带的读取入口而不是整体 ReadValueSafe：尾部字段（版本标识）在老客户端上不存在，
+            // 整体读取会因缓冲区不足抛异常，表现为"这位玩家的请求服务器毫无反应"（M10 第 13.1 节）。
+            var message = LobbyRequestMessage.Read(reader);
             HandleLobbyRequest((int)senderId, in message);
         }
 
@@ -142,6 +146,7 @@ namespace RaidDemo.Bootstrap
             var kind = (LobbyRequestKind)message.Kind;
             var fieldA = message.FieldA.ToString();
             var fieldB = message.FieldB.ToString();
+            var buildId = message.BuildId.ToString();
 
             switch (kind)
             {
@@ -150,11 +155,11 @@ namespace RaidDemo.Bootstrap
                     break;
 
                 case LobbyRequestKind.CreateRoom:
-                    HandleLobbyCreateRoom(client, fieldA, fieldB);
+                    HandleLobbyCreateRoom(client, fieldA, fieldB, buildId);
                     break;
 
                 case LobbyRequestKind.JoinRoom:
-                    HandleLobbyJoinRoom(client, fieldB);
+                    HandleLobbyJoinRoom(client, fieldB, buildId);
                     break;
 
                 case LobbyRequestKind.StartRaid:
@@ -319,6 +324,9 @@ namespace RaidDemo.Bootstrap
                     return $"房间名需要 1~{LobbyLimits.MaxRoomNameLength} 个字符。";
                 case LobbyError.BadPasswordFormat:
                     return $"房间密码需要留空或 {LobbyLimits.RoomPasswordDigits} 位数字。";
+                case LobbyError.VersionMismatch:
+                    // 具体文案由握手规则给出（含两个版本号），这里只是错误码的兜底说明。
+                    return "客户端版本与服务器不一致，请更新客户端。";
                 default:
                     return "操作失败。";
             }

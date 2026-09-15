@@ -210,6 +210,29 @@ namespace RaidDemo.Bootstrap
                         result.Passphrase = passphrase;
                         break;
 
+                    case "-buildid":
+                        if (!TryReadValue(list, ref i, arg, out var buildId, out error))
+                        {
+                            return false;
+                        }
+
+                        var trimmedBuildId = buildId.Trim();
+                        if (trimmedBuildId.Length == 0)
+                        {
+                            error = $"参数 {arg} 不能为空（形如 0.10.0+c6f6221e7）。";
+                            return false;
+                        }
+
+                        if (trimmedBuildId.Length > BuildIdentity.MaxLength)
+                        {
+                            error = $"参数 {arg} 最长 {BuildIdentity.MaxLength} 个字符（协议字段上限），"
+                                + $"实际 {trimmedBuildId.Length} 个。";
+                            return false;
+                        }
+
+                        result.BuildIdOverride = trimmedBuildId;
+                        break;
+
                     case "-roompass":
                         if (!TryReadValue(list, ref i, arg, out var roomPass, out error))
                         {

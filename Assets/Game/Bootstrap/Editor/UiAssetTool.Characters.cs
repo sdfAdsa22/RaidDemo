@@ -18,12 +18,24 @@ namespace RaidDemo.Bootstrap.Editor
     /// </remarks>
     public static partial class UiAssetTool
     {
-        /// <summary>会直接产生玩家可见文案的源码目录。</summary>
+        /// <summary>
+        /// 会直接产生玩家可见文案的源码目录。
+        /// </summary>
+        /// <remarks>
+        /// <para>两个 <c>Bootstrap/Session</c> 子目录是 M10 版本握手时补进来的：大厅的
+        /// 失败原因（密码错、房间满、版本不一致…）由服务器侧拼装成中文，再原样显示在界面上，
+        /// 因此它们和 <c>Modules/UI</c> 一样是"界面文案的来源"。此前它们不在扫描范围里，
+        /// 字符是否齐全纯靠巧合——<c>BuildIdentity</c> 的握手文案就撞上了一个没烘进图集的字（致）。</para>
+        ///
+        /// <para>只跳过注释的原则不变：字符串字面量照收，注释里的汉字不进来。</para>
+        /// </remarks>
         private static readonly string[] CodeScanFolders =
         {
             "Assets/Game/Modules/UI",
             "Assets/Game/Modules/Meta",
             "Assets/Game/Modules/Data/Content",
+            "Assets/Game/Bootstrap/Session/Lobby",
+            "Assets/Game/Bootstrap/Session/Network",
         };
 
         /// <summary>包含物品/角色显示名的编辑器构建器（只取这两个文件，避免把工具报错文案也烘进图集）。</summary>

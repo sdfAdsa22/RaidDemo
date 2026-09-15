@@ -17,6 +17,10 @@ namespace RaidDemo.Bootstrap
     ///
     /// <para><b>长度上限：</b>64 字节的固定字符串能装下 16 个汉字或 32 个 token 字符，
     /// 与 <see cref="LobbyLimits"/> 的约束一致。固定长度让消息可以栈上分配，收发不产生垃圾。</para>
+    ///
+    /// <para><b>追加式演进（M10 版本握手）：</b>新字段一律<b>追加在尾部</b>，并配
+    /// <see cref="Read"/> 读取。这样"新服务器 + 老客户端"与"新客户端 + 老服务器"两种错配
+    /// 都不会把对端打哑：老客户端发的消息短一点，新服务器读到旧字段为止。</para>
     /// </remarks>
     public struct LobbyRequestMessage : INetworkSerializable
     {
@@ -32,6 +36,19 @@ namespace RaidDemo.Bootstrap
         /// <summary>请求序号（客户端单调递增，仅用于日志对齐与去重排查）。</summary>
         public uint Sequence;
 
+        /// <summary>
+        /// 客户端的版本标识（<c>buildId</c>，M10 第 13.1 节）。
+        /// </summary>
+        /// <remarks>
+        /// <para>所有请求都带上它（客户端只有一处发送入口），但服务器<b>只在进门的时候</b>
+        /// 用它判断兼容性：创建房间与加入房间。登录时不判断，是为了让版本不一致的玩家
+        /// 仍然能登上大厅、看到"该更新了"的说明，而不是连界面都进不去。</para>
+        ///
+        /// <para>空值 = 版本未知（老客户端没有这个字段），服务器按"未知"放行，
+        /// 见 <see cref="BuildIdentity.CheckCompatibility"/>。</para>
+        /// </remarks>
+        public FixedString64Bytes BuildId;
+
         /// <inheritdoc />
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -39,6 +56,39 @@ namespace RaidDemo.Bootstrap
             serializer.SerializeValue(ref FieldA);
             serializer.SerializeValue(ref FieldB);
             serializer.SerializeValue(ref Sequence);
+            serializer.SerializeValue(ref BuildId);
+        }
+
+        /// <summary>
+        /// 从字节流读取一条大厅请求：尾部字段缺失时按默认值处理。
+        /// </summary>
+        /// <param name="reader">收到的消息缓冲。</param>
+        /// <returns>解析出的请求。</returns>
+        /// <remarks>
+        /// <para><b>为什么不直接 <c>reader.ReadValueSafe(out LobbyRequestMessage)</c>：</b>
+        /// 整体读取要求缓冲区里每个字段都在，而 <see cref="BuildId"/> 是后加的：
+        /// 本次改动之前构建的老客户端不会发它。整体读取会因缓冲区不足抛异常，
+        /// 表现为"这位玩家的请求服务器完全没反应"——比拒绝更难查。</para>
+        ///
+        /// <para>兼容承诺因此只有两条：新字段一律追加在尾部；读取时按剩余字节决定要不要读它。
+        /// 判断依据用"还剩几个字节"而不是"长度够不够某个定值"，是因为定长字符串在协议里
+        /// 是变长编码（2 字节长度前缀 + 实际字节数），没有固定尺寸可算。</para>
+        /// </remarks>
+        public static LobbyRequestMessage Read(FastBufferReader reader)
+        {
+            var message = default(LobbyRequestMessage);
+
+            reader.ReadValueSafe(out message.Kind);
+            reader.ReadValueSafe(out message.FieldA);
+            reader.ReadValueSafe(out message.FieldB);
+            reader.ReadValueSafe(out message.Sequence);
+
+            if (reader.Length - reader.Position > 0)
+            {
+                reader.ReadValueSafe(out message.BuildId);
+            }
+
+            return message;
         }
     }
 

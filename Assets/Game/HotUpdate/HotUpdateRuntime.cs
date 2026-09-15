@@ -258,7 +258,22 @@ namespace RaidDemo.HotUpdate
             s_TransformInstalled = true;
         }
 
-        /// <summary>寻址重写实现（规则只有一条：本地有就用本地）。</summary>
+        /// <summary>
+        /// 寻址重写实现（规则：本地有就用本地，其次才是更新源 URL）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须区分"内容层地址"与"本地路径"（M10 真机演练发现）：</b>
+        /// Addressables 在加载远端 catalog 时，会顺手把 catalog 缓存成
+        /// <c>&lt;persistentDataPath&gt;/com.unity.addressables/&lt;哈希&gt;.bin</c>——
+        /// 那个路径<b>是要写进去的目标</b>，不是要下载的地址。早期实现只按"文件名"判断，
+        /// 于是它也被改写成更新源 URL，Addressables 随后把 URL 当目录去创建，
+        /// Windows 直接抛 <c>文件名、目录名或卷标语法不正确</c>，
+        /// 现象是"资源下载成功、catalog 却加载失败，内容退回本体自带"。</para>
+        ///
+        /// <para>因此判断顺序改为：本地缓存里有同名文件 → 用本地；否则只有确实属于内容层的地址
+        /// （<c>content/</c> 开头，与 Addressables 的 RemoteLoadPath 同一命名空间）才翻译成 URL；
+        /// 其余一律原样返回。</para>
+        /// </remarks>
         private static string TransformInternalId(IResourceLocation location)
         {
             var internalId = location?.InternalId;
@@ -273,6 +288,7 @@ namespace RaidDemo.HotUpdate
                 return internalId;
             }
 
+            // ① 本地缓存里有同名文件：无论这个地址长什么样，都用本地那份（离线可玩的实现）。
             if (!string.IsNullOrEmpty(s_State.contentVersion))
             {
                 var localPath = HotUpdatePaths.GetVersionFilePath(s_State.contentVersion, fileName);
@@ -282,14 +298,42 @@ namespace RaidDemo.HotUpdate
                 }
             }
 
-            if (HotUpdateClient.IsHttpSource(s_Source))
+            // ② 本地没有、且地址确实指向内容层：回落到更新源 URL。
+            if (IsContentLayerAddress(internalId) && HotUpdateClient.IsHttpSource(s_Source))
             {
                 // 缓存里没有（例如只下载了 catalog）：直接回落到更新源，
                 // 让 Addressables 自己走 UnityWebRequest 取——比"先下载再加载"少一层等待。
                 return s_Source.TrimEnd('/') + "/" + HotUpdateClient.ContentUrlPrefix + "/" + Uri.EscapeDataString(fileName);
             }
 
+            // ③ 其余地址（本地绝对路径、Addressables 自己的 catalog 缓存、包内资源）一律不动。
             return internalId;
+        }
+
+        /// <summary>
+        /// 判断一个地址是否属于"内容层"：与 Addressables 的 RemoteLoadPath（<c>content/[BuildTarget]</c>）
+        /// 同一个命名空间。
+        /// </summary>
+        /// <param name="internalId">Addressables 给的原始地址。</param>
+        /// <returns>属于内容层时返回 true；空值、本地路径、缓存路径一律返回 false。</returns>
+        /// <remarks>
+        /// 只看前缀而不是"能否取到文件名"，是因为取文件名对任何路径都成立——
+        /// 正是那种"看起来都能处理"的规则把本地缓存路径也改写成了 URL（见 <see cref="TransformInternalId"/> 的说明）。
+        /// 反斜杠先归一化：Addressables 在 Windows 上两种分隔符都可能给出；前导斜杠也去掉，
+        /// 让 <c>/content/…</c> 这种写法与 <c>content/…</c> 等价。
+        ///
+        /// <para>公开给测试用：这条判断是"内容热更能不能落地"的分水岭，
+        /// 而它出错时的现象（内容静默退回本体自带）在真机上要跑一整轮更新才看得到。</para>
+        /// </remarks>
+        public static bool IsContentLayerAddress(string internalId)
+        {
+            if (string.IsNullOrEmpty(internalId))
+            {
+                return false;
+            }
+
+            var normalized = internalId.Replace('\\', '/').TrimStart('/');
+            return normalized.StartsWith(HotUpdateClient.ContentUrlPrefix + "/", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>更新状态文本并回调。</summary>
