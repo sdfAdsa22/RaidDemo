@@ -24,11 +24,17 @@ namespace RaidDemo.Bootstrap.Editor
     /// </remarks>
     public static class ServerBuildMenu
     {
-        /// <summary>服务器产物目录（相对工程根，随 .gitignore 忽略）。</summary>
-        private const string OutputDirectory = "Builds/ServerWindows";
+        /// <summary>Windows 服务器产物目录（相对工程根，随 .gitignore 忽略）。</summary>
+        private const string WindowsOutputDirectory = "Builds/ServerWindows";
 
-        /// <summary>可执行文件名。Linux 版由 P6 的构建脚本另起名字。</summary>
-        private const string ExecutableName = "RaidDemoServer.exe";
+        /// <summary>Windows 可执行文件名。</summary>
+        private const string WindowsExecutableName = "RaidDemoServer.exe";
+
+        /// <summary>Linux 服务器产物目录（P6：上传到云主机的那一份）。</summary>
+        private const string LinuxOutputDirectory = "Builds/ServerLinux";
+
+        /// <summary>Linux 可执行文件名（Unity 对 StandaloneLinux64 的默认扩展名）。</summary>
+        private const string LinuxExecutableName = "RaidDemoServer.x86_64";
 
         /// <summary>
         /// 构建 Windows 专用服务器。
@@ -40,6 +46,35 @@ namespace RaidDemo.Bootstrap.Editor
         [MenuItem("RaidDemo/M9/构建专用服务器（Windows）")]
         public static void BuildWindowsServer()
         {
+            BuildServer(BuildTarget.StandaloneWindows64, WindowsOutputDirectory, WindowsExecutableName);
+        }
+
+        /// <summary>
+        /// 构建 Linux 专用服务器（P6：云主机部署用）。
+        /// </summary>
+        /// <remarks>
+        /// <para>与 Windows 版共用同一条构建路径（同一份源码、同一个 Server 子目标），
+        /// 差别只有目标平台与产物名。Linux 版上传到云主机后以
+        /// <c>-batchmode -nographics</c> 常驻运行。</para>
+        ///
+        /// <para>命令行调用示例：
+        /// <c>unity command --project-path &lt;工程&gt; menu --path "RaidDemo/M9/构建专用服务器（Linux）"</c>。
+        /// 首次为 Linux 构建时编辑器会切换活动平台（重新导入一次资源），耗时明显长于后续构建。</para>
+        /// </remarks>
+        [MenuItem("RaidDemo/M9/构建专用服务器（Linux）")]
+        public static void BuildLinuxServer()
+        {
+            BuildServer(BuildTarget.StandaloneLinux64, LinuxOutputDirectory, LinuxExecutableName);
+        }
+
+        /// <summary>
+        /// 构建指定平台的专用服务器（两个菜单入口共用）。
+        /// </summary>
+        /// <param name="target">目标平台。</param>
+        /// <param name="outputDirectory">产物目录（相对工程根）。</param>
+        /// <param name="executableName">可执行文件名。</param>
+        private static void BuildServer(BuildTarget target, string outputDirectory, string executableName)
+        {
             var scenes = CollectEnabledScenes();
             if (scenes.Length == 0)
             {
@@ -47,7 +82,7 @@ namespace RaidDemo.Bootstrap.Editor
                 return;
             }
 
-            Directory.CreateDirectory(OutputDirectory);
+            Directory.CreateDirectory(outputDirectory);
 
             var previousSubtarget = EditorUserBuildSettings.standaloneBuildSubtarget;
             var previousTarget = EditorUserBuildSettings.activeBuildTarget;
@@ -59,8 +94,8 @@ namespace RaidDemo.Bootstrap.Editor
                 var options = new BuildPlayerOptions
                 {
                     scenes = scenes,
-                    locationPathName = Path.Combine(OutputDirectory, ExecutableName),
-                    target = BuildTarget.StandaloneWindows64,
+                    locationPathName = Path.Combine(outputDirectory, executableName),
+                    target = target,
                     options = BuildOptions.None,
                 };
 
@@ -74,7 +109,7 @@ namespace RaidDemo.Bootstrap.Editor
                         $"大小 {summary.totalSize / (1024f * 1024f):F1} MB ｜ 用时 {summary.totalTime.TotalSeconds:F0} 秒");
                     Debug.Log(
                         "[服务器构建] 启动示例：" +
-                        $"{ExecutableName} -server -port 7777 -room 默认房间 -batchmode -nographics -logFile server.log");
+                        $"{executableName} -server -port 7777 -room 默认房间 -batchmode -nographics -logFile server.log");
                 }
                 else
                 {
