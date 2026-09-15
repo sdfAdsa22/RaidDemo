@@ -240,16 +240,24 @@ namespace RaidDemo.Bootstrap.Editor
 
         /// <summary>在资源层条目里挑出 catalog 入口（Addressables 的目录文件）。</summary>
         /// <remarks>
-        /// 识别规则是文件名以 <c>catalog</c> 开头、以 <c>.json</c> 结尾。
-        /// Addressables 的产物名由它自己生成（如 <c>catalog_0.10.0.3.json</c>），
-        /// 因此这里只做"形状匹配"，不做唯一性强制——批次 4 接线时若产物命名变化，改这里一处即可。
+        /// <para>识别规则：文件名以 <c>catalog</c> 开头，扩展名是 <c>.bin</c>（Addressables 2.x 的默认
+        /// 二进制目录）或 <c>.json</c>（文本目录）。**必须排除 <c>.hash</c>**——
+        /// 那是给运行时做增量判断用的伴随文件，不是入口。</para>
+        ///
+        /// <para>产物名由 Addressables 自己生成（如 <c>catalog_0.10.0.bin</c>），
+        /// 因此这里只做"形状匹配"，不做唯一性强制；命名规则变化时只改这一处。</para>
         /// </remarks>
         private static ManifestFileEntry PickCatalogEntry(List<ManifestFileEntry> entries)
         {
             foreach (var entry in entries)
             {
                 var name = Path.GetFileName(entry.path);
-                if (name.StartsWith("catalog", StringComparison.OrdinalIgnoreCase) &&
+                if (!name.StartsWith("catalog", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
                     name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                 {
                     return entry;

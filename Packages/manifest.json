@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.unity.addressables": "2.10.3",
     "com.unity.ai.assistant": "2.19.0-pre.2",
     "com.unity.ai.inference": "2.6.1",
     "com.unity.ai.navigation": "2.0.14",

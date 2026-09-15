@@ -1,0 +1,227 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: group-audio
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: group-audio
+  m_GUID: db09bea80a4bcbc4a9c0f370d03dcd66
+  m_SerializeEntries:
+  - m_GUID: 066837d57f62a1c4c8b4c4772249d6c7
+    m_Address: audio/sfx/weapons/magazinein
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0cbadeba6c6069941b6f161c9ed876d0
+    m_Address: audio/sfx/weapons/switch
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0fecaa6ffec05884abdaacb4443a584f
+    m_Address: audio/sfx/loot/pickup
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 10826d11df92957479605925a16c5ffd
+    m_Address: audio/sfx/impacts/hard_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1a4ad78ea34fdbe43a526423576847c0
+    m_Address: audio/sfx/weapons/magazineout
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c57a3e35ccb48940a2e3f529ef102c5
+    m_Address: audio/sfx/weapons/rifle_shot_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 25dbe4d859e1ff84da1f5f92ac60bb39
+    m_Address: audio/sfx/footsteps/hard_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 25f35483a69a5d841b7b48bc4dd2e062
+    m_Address: audio/sfx/weapons/shotgun_shot_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2a7f58ba6cdc30c4db0018efab6cbb11
+    m_Address: audio/sfx/impacts/hard_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2deee57b4108ec54c85475d1b8bbef9f
+    m_Address: audio/sfx/footsteps/grass_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4c8c6afc23148df4381faa762ab61abe
+    m_Address: audio/sfx/raid/extractiontick
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4cbdb88c1956a6445a44b95f2a4d622c
+    m_Address: audio/sfx/weapons/smg_shot_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4d04399b7200db64bb12cd793fe38f33
+    m_Address: audio/sfx/footsteps/grass_04
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 506796029a08b834b872ce8ca4c0a46c
+    m_Address: audio/sfx/weapons/pistol_shot_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 50cc473ed2367b04db8e59c7a350d159
+    m_Address: audio/sfx/footsteps/hard_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 58451aa6cc899804d852b8a32d26cf9d
+    m_Address: audio/sfx/impacts/flesh_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 59c964953bed7e445a10ade946792238
+    m_Address: audio/sfx/ui/panelclose
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 604e7a2ba0a56ca4ab7697537c3996b2
+    m_Address: audio/sfx/ui/locked
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6af8bb1f1bfaa774eb51baa52bcd0acc
+    m_Address: audio/sfx/footsteps/grass_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6e5ed06f257e9064abb28272948a87b8
+    m_Address: audio/sfx/loot/rummage_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7589bfb3fe099f447b7b540c2f586f62
+    m_Address: audio/sfx/footsteps/grass_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 79a365f756c1cea48b30c081555ec009
+    m_Address: audio/sfx/ui/confirm
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7ae14f604f7c70d4bbbe5c05e0e130f5
+    m_Address: audio/sfx/ui/cancel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 813485a02da262a4aa4d952200fa52b1
+    m_Address: audio/sfx/footsteps/hard_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 912fde5e53829ed41b1366a2c3ede76c
+    m_Address: audio/sfx/ui/tabswitch
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 919fdaf0126ffad41b9eb2e48318465a
+    m_Address: audio/sfx/loot/open
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 96a7adde75c774e4fb960d1b2fb456a3
+    m_Address: audio/sfx/raid/success
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 99e9c6ad6b98541418bf7e76592c8000
+    m_Address: audio/sfx/weapons/smg_shot_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a0db10da57f5f1c47b6420c0f06b2f06
+    m_Address: audio/sfx/weapons/boltclose
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a8a83a5f7bc2f53489275f17582cfa32
+    m_Address: audio/sfx/ui/click
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ab1abac438f9d864a90ef709b93a336f
+    m_Address: audio/sfx/impacts/hard_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bce10f2be21ad42428f89489f16c4f38
+    m_Address: audio/sfx/ui/buy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c14c1510aed01e74a85e15ec6b5fab2e
+    m_Address: audio/sfx/impacts/flesh_03
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d11c46a8f3fa01a4faa2b255de639b01
+    m_Address: audio/sfx/weapons/shotgun_shot_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6a4c3732c65c0248826e9319ef2c26e
+    m_Address: audio/sfx/raid/fail
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d73e0ee7c9936324ca12498bab2b7388
+    m_Address: audio/sfx/weapons/rifle_shot_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d8815c9c1b5cd1a4cba8933b6ce2c9c4
+    m_Address: audio/sfx/loot/rummage_01
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dab729997efa46a46af2cbebe0c94c91
+    m_Address: audio/sfx/weapons/dryfire
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: defbb65681db69d46860a16a75147275
+    m_Address: audio/sfx/ui/panelopen
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: df5af313e17dbac4896fed9b9cc9c281
+    m_Address: audio/sfx/impacts/flesh_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e5521a5b06fb36c4ab29934c65d00d32
+    m_Address: audio/sfx/weapons/pistol_shot_02
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: edcbd83d92f5a5b449bb7aadf2aa90e3, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 7f7bae66488ec154ca2787df90def3cb, type: 2}

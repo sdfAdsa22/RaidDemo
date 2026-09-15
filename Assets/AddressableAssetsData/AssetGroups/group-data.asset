@@ -1,0 +1,192 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: group-data
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: group-data
+  m_GUID: fe6026fb79550704db6aa32aef68b711
+  m_SerializeEntries:
+  - m_GUID: 04ba0439712bbf1429b10e7dcd82a44b
+    m_Address: data/behavior_medical.kit.field
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0b7508d1e3aeb874298b14041b748abd
+    m_Address: data/stats_weapon.pistol.pm
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0d952c4eab244954787abbd336a7913b
+    m_Address: data/stats_weapon.smg.uzi
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1090c1afcd229654eb9ef26cc4338771
+    m_Address: data/backpack.small
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 19fcea1bda7d0b343ae4f4cccc903294
+    m_Address: data/medical.bandage.small
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1f1ef6cfdfa5a4d49b82193e7f2551da
+    m_Address: data/stats_armor.vest.plate
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2fd220dd3ec390749bd4cd3f9a7af428
+    m_Address: data/loot.bolt.copper
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3f84d7783aabf9d4ab99845281d637bd
+    m_Address: data/weapon.pistol.pm
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4ca30fef89746f648b1bacd6617f433f
+    m_Address: data/loot.canister.fuel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4e9413daabfa63c469864a7b22269004
+    m_Address: data/stats_weapon.rifle.ak74
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 53f6769c15facbf4b885dfeea2ebafcc
+    m_Address: data/armor.helmet.steel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5db429cd0911bd749b1dc714453a8a4d
+    m_Address: data/stats_ammo.5.45.standard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 623ada472e07f9140a75441e6da18983
+    m_Address: data/stats_armor.vest.heavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 65e10dd63df11e242a16911d2b6c6632
+    m_Address: data/stats_armor.helmet.heavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6eecb9da7e9264848b78b270348b7e6a
+    m_Address: data/medical.kit.field
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6ef9327971b991e418bcef91343c67e3
+    m_Address: data/stats_ammo.12ga.buck
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7532ce5b4935d0c4083ccf08169a2c42
+    m_Address: data/backpack.raider
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7847872bda9d2bf4c895fc34738c2229
+    m_Address: data/audiocatalog
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 876986bb480265e40b3baa054298540d
+    m_Address: data/stats_armor.helmet.steel
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 96b82cc6d4e62ba43bd595431897b74b
+    m_Address: data/behavior_medical.bandage.small
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9a9db5ed04ff5584fbffb197b32e8436
+    m_Address: data/loot.watch.gold
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9b5e9ead7a9646b4782a8a080ce030e7
+    m_Address: data/presentationcatalog
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a02e93d4ea308504a964e417a49b6782
+    m_Address: data/stats_ammo.9x19.standard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b1fc3e70d8982f948a94b17badc4a06f
+    m_Address: data/ammo.5.45.standard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b3d7a7c31ff6bee4d9d70412cb98e2a6
+    m_Address: data/weapon.smg.uzi
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bd128a7a75826a74b8d8de5b2b87d033
+    m_Address: data/weapon.rifle.ak74
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bffa836e98269d2479c857afd8634e55
+    m_Address: data/weapon.shotgun.pump
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c135d597cbc731248bf139428fd9559d
+    m_Address: data/ammo.9x19.standard
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c78f8df07b1aa304db6a2ad2574712f9
+    m_Address: data/itemcatalog
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cf6ce8d94d2e3494c90cad4492f96643
+    m_Address: data/armor.vest.plate
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dfd671b9ca1fade4cadbed9d2049cc37
+    m_Address: data/ammo.12ga.buck
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f3b4af72d77bd4846851bebf52eaff80
+    m_Address: data/armor.vest.heavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f71eb420aa7f63249b475e6efc5df995
+    m_Address: data/armor.helmet.heavy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fb69876ec9d9f9b4daa368ea1e856ca1
+    m_Address: data/stats_weapon.shotgun.pump
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: edcbd83d92f5a5b449bb7aadf2aa90e3, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: e7420e18e612c7e47960b9372d34859a, type: 2}

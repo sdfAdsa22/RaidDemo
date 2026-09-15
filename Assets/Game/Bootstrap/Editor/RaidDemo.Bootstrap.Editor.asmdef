@@ -15,7 +15,9 @@
         "RaidDemo.UI",
         "Unity.InputSystem",
         "Unity.AI.Navigation",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "Unity.Addressables",
+        "Unity.Addressables.Editor"
     ],
     "includePlatforms": [
         "Editor"

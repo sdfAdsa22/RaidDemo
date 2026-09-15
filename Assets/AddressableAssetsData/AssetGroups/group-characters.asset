@@ -1,0 +1,137 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: group-characters
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: group-characters
+  m_GUID: 8655c23d18599894aab7645003aba485
+  m_SerializeEntries:
+  - m_GUID: 0ed8c0e5778cad642b6912da799e652a
+    m_Address: character/enemies/character_enemy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1257721d407cae14eadb4992a13e656e
+    m_Address: character/enemies/m_character_hazmat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 18ff5dcb09b6322408b9ab0ba7185c84
+    m_Address: character/enemies/character_hazmat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3cb1ceb7ac0eb194e8173daa5aafb7f3
+    m_Address: character/player/playercharacter_male_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 428faa5f9014498429a2694b3683a0c9
+    m_Address: character/enemies/character_soldier
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4b8da152e4e13144881acaf7a675437b
+    m_Address: character/player/playercharacter_female_a
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5fba92cc07c01654a9d770df6efc7e83
+    m_Address: character/player/playercharacter_male_f
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8ccc44976db9b01438f20b3d7bf67a33
+    m_Address: character/player/playercharacter_male_e
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a259351cbce57f84ba85b30c0fc1b7b4
+    m_Address: character/player/m_kenneycharacter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aec083e4cdbb78c4f8ad9910952cea05
+    m_Address: character/enemies/character_soldier
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b082828ca705b924db13c2d409f897d1
+    m_Address: character/player/playercharacter_female_c
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b3699a2945417474d8c21ba66c1d211e
+    m_Address: character/player/playercharacter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b682910afba7b484ea8ac7fe8fa1820b
+    m_Address: character/player/playercharacter_female_e
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bcb0fbd14c73c464d8ad9da918a4f887
+    m_Address: character/player/playercharacter_female_d
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ca2f2ca110728c04b85441986d65c82f
+    m_Address: character/player/playercharacter_male_d
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6e10c5fe5067c94c88642d8ffb57098
+    m_Address: character/enemies/m_character_enemy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dbd563d2964d4d44aa3511e7dbad8417
+    m_Address: character/enemies/m_character_soldier
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dd1310465712b71428feab42d54ad62c
+    m_Address: character/enemies/character_enemy
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ded1801e0f87b004296d96995297908a
+    m_Address: character/player/playercharacter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e52244713d619844a94aabc8cb781bb7
+    m_Address: character/player/playercharacter_female_f
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e6d687a4b35554c46b0cd22301f113a1
+    m_Address: character/enemies/character_hazmat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eeea17b0c30515b4bb210e4f7e54131c
+    m_Address: character/player/playercharacter_male_c
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f023150db3ac02548a9d3d41073da7bb
+    m_Address: character/player/playercharacter_female_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: edcbd83d92f5a5b449bb7aadf2aa90e3, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 81c09d8d564d9ce49992d162397e332c, type: 2}
