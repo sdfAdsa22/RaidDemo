@@ -131,6 +131,15 @@ namespace RaidDemo.Combat
                 return;
             }
 
+            // PVE 合作：玩家之间不造成伤害（2026-09-15 定稿，见 CombatRules 的说明）。
+            // 拦在这里而不是"扣完血再回滚"：不扣血、不发命中事件，客户端不会画出
+            // 与目标血量对不上的命中反馈。
+            if (m_World.TryGet(m_ShooterId, out var shooter)
+                && CombatRules.BlocksFriendlyDamage(shooter, combatant))
+            {
+                return;
+            }
+
             var isCritical = DamageCalculator.IsCriticalHit(hit.Point, hit.TargetCenter, m_Tuning);
             var outcome = combatant.ApplyDamage(
                 runtime.Weapon.BaseDamage,

@@ -189,7 +189,9 @@ namespace RaidDemo.Bootstrap
             // 头盔与背心各读一份：上部位命中由头盔挡，其余由背心挡。
             var vest = m_Loadout?.Equipment?.Get(EquipmentSlot.Body)?.Definition?.ArmorStats;
             var helmet = m_Loadout?.Equipment?.Get(EquipmentSlot.Head)?.Definition?.ArmorStats;
-            m_PlayerCombatantId = m_CombatWorld.Create(PlayerMaxHealth, vest);
+            // isPlayer: true —— 单机/客户端本地也要知道"我是玩家"，
+            // 这样友军免伤规则（CombatRules）在两端用的是同一份数据。
+            m_PlayerCombatantId = m_CombatWorld.Create(PlayerMaxHealth, vest, isPlayer: true);
             m_LastAppliedVest = vest;
             m_LastAppliedHelmet = helmet;
 

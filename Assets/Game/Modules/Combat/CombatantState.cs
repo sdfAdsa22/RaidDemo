@@ -65,14 +65,31 @@ namespace RaidDemo.Combat
         /// <param name="id">运行时标识，必须唯一且非 0。</param>
         /// <param name="maxHealth">最大生命值。</param>
         /// <param name="armor">护甲参数，可为 null 表示无甲。</param>
-        public CombatantState(int id, float maxHealth, IArmorStats armor = null)
+        /// <summary>创建战斗单位。</summary>
+        /// <param name="id">运行时标识。</param>
+        /// <param name="maxHealth">生命上限。</param>
+        /// <param name="armor">护甲参数（可为 null）。</param>
+        /// <param name="isPlayer">
+        /// 是不是玩家单位。
+        /// </param>
+        /// <remarks>
+        /// <b>为什么要知道"是不是玩家"：</b>PVE 合作的规则是"玩家之间不造成伤害"
+        /// （2026-09-15 定稿，见 <see cref="CombatRules"/>）——判定需要射手与目标两边的身份，
+        /// 而身份是单位的固有属性，不该靠调用方每次传一遍。
+        /// 默认 false 保持既有调用（AI 与测试）不变。
+        /// </remarks>
+        public CombatantState(int id, float maxHealth, IArmorStats armor = null, bool isPlayer = false)
         {
             m_Id = id;
             m_MaxHealth = maxHealth > 0f ? maxHealth : 0f;
             m_Health = m_MaxHealth;
+            IsPlayer = isPlayer;
 
             m_BodyArmor = ArmorState.From(armor);
         }
+
+        /// <summary>是不是玩家单位（用于 PVE 合作的友军免伤判定）。</summary>
+        public bool IsPlayer { get; }
 
         /// <summary>运行时标识。</summary>
         public int Id

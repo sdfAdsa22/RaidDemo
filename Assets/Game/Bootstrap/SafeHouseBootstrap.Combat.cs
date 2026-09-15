@@ -74,7 +74,8 @@ namespace RaidDemo.Bootstrap
             m_CommandRouter.Register<PlayerReloadIntent>(new ReloadCommandHandler(m_WeaponController));
 
             var armor = m_Loadout.Equipment?.Get(EquipmentSlot.Body)?.Definition?.ArmorStats;
-            m_PlayerCombatantId = m_CombatWorld.Create(PlayerMaxHealth, armor);
+            // isPlayer: true —— 与战局/服务器同一份身份标记（友军免伤规则用）。
+            m_PlayerCombatantId = m_CombatWorld.Create(PlayerMaxHealth, armor, isPlayer: true);
             if (m_PlayerMotor != null)
             {
                 var targetView = m_PlayerMotor.gameObject.AddComponent<CombatTargetView>();

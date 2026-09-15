@@ -62,7 +62,8 @@ namespace RaidDemo.Bootstrap
             // 战斗单位先建：控制器的事件里带的是**战斗单位编号**，
             // 而它必须与 AI 的事件编号处在同一个空间里（否则玩家 1 的子弹会被记成敌人 0 开的火，
             // 因为两者的战斗世界编号恰好都是 1）。
-            var combatantId = m_World.Create(DefaultMaxHealth);
+            // isPlayer: true —— PVE 合作里"玩家之间不造成伤害"的判定依据（CombatRules）。
+            var combatantId = m_World.Create(DefaultMaxHealth, armor: null, isPlayer: true);
             m_CombatantToPlayer[combatantId] = playerId;
 
             var controller = new PlayerWeaponController(

@@ -40,11 +40,12 @@ namespace RaidDemo.Combat
         /// </summary>
         /// <param name="maxHealth">最大生命值。</param>
         /// <param name="armor">护甲参数，可为 null。</param>
+        /// <param name="isPlayer">是不是玩家单位（PVE 合作的友军免伤判定要用）。</param>
         /// <returns>新单位的运行时标识。</returns>
-        public int Create(float maxHealth, IArmorStats armor = null)
+        public int Create(float maxHealth, IArmorStats armor = null, bool isPlayer = false)
         {
             var id = m_NextId++;
-            m_Combatants[id] = new CombatantState(id, maxHealth, armor);
+            m_Combatants[id] = new CombatantState(id, maxHealth, armor, isPlayer);
             return id;
         }
 

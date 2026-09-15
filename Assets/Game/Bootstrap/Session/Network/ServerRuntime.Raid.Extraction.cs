@@ -118,6 +118,18 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void HandleHealthDepleted(int playerId, RaidProgress progress)
         {
+            // 已经倒地的玩家不再走这条路径。
+            //
+            // 为什么必须显式挡这一下（U-86 的根因）：血量归零后**每个战局 tick** 都会
+            // 因为 !IsPlayerAlive 再次调到这里，而 MarkDowned 对"已经倒地的人"返回 false——
+            // 旧代码把 false 解释成"倒地失败 → 立即死亡"，于是倒地约 0.2 秒后就被结算阵亡，
+            // 之后队友的救援读条还会走完并把他"救起"（同一条命同时出现已阵亡与已救起）。
+            // 倒地之后的命运只由两条路决定：队友救起，或流血倒计时耗尽。
+            if (m_LifeStates.GetState(playerId) == PlayerLifeState.Downed)
+            {
+                return;
+            }
+
             var playerCount = m_World != null ? m_World.PlayerCount : 0;
 
             if (playerCount <= 1 || !m_LifeStates.MarkDowned(playerId))
@@ -161,6 +173,12 @@ namespace RaidDemo.Bootstrap
         /// <param name="playerId">玩家编号。</param>
         private void OnPlayerRevived(int playerId)
         {
+            // 结算之后迟到的"救起"不再生效（U-86 的兜底，与 TickRevives 的过滤同一条规矩）。
+            if (m_RaidProgress.TryGetValue(playerId, out var settled) && settled.Settled)
+            {
+                return;
+            }
+
             RestorePlayerHealth(playerId, PlayerLifeStateTracker.RevivedHealth);
 
             m_Session?.Log.Info(

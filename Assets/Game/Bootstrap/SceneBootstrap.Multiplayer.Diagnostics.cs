@@ -100,7 +100,9 @@ namespace RaidDemo.Bootstrap
             // 先找射程内最近的敌人；找不到再退回"盯着最近的队友"。
             // 打中谁不重要，重要的是"打中"这件事必须真的发生：只有命中了，
             // 才会走到"伤害结算 → 广播 → 客户端更新"这条链路上。
-            var aim = TryResolveEnemyAim(out var enemyAim)
+            var hasEnemyAim = TryResolveEnemyAim(out var enemyAim);
+            m_AutoWalkHasEnemyTarget = hasEnemyAim;
+            var aim = hasEnemyAim
                 ? enemyAim
                 : ResolveAutoAimDirection(new Vector2F(x, y));
             m_InputCollector.ScriptedLookDirection = aim;

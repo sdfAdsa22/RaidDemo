@@ -29,6 +29,15 @@ namespace RaidDemo.Bootstrap
         private MultiplayerContainerLink m_ContainerLink;
 
         private bool m_AutoWalk;
+
+        /// <summary>
+        /// 验收机器人本帧是否瞄着敌人（由 <c>UpdateAutoWalkInput</c> 写入）。
+        /// </summary>
+        /// <remarks>
+        /// 自动开火只在它为 true 时扣扳机：没有敌人时机器人会把朝向对准最近的队友，
+        /// "一律扣着扳机"的旧规则因此变成朝队友扫射（U-85）。
+        /// </remarks>
+        private bool m_AutoWalkHasEnemyTarget;
         private double m_NextNetworkReportTime;
 
         /// <summary>远端玩家视图为空时的常量空表（避免调用方到处判空）。</summary>

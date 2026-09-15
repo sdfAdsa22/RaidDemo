@@ -47,16 +47,23 @@ namespace RaidDemo.Bootstrap
 
             m_InputCollector.ReadCombatIntent(out var wantsToFire, out var wantsToReload);
 
-            // 验收模式下一律扣着扳机：无头进程没有键盘，但要让"开火 → 命中 → 掉血"
-            // 这条链路可以被自动验证。它走的是与真实输入完全相同的上报路径。
+            // 验收模式下的自动开火：只有在"确实瞄着敌人"时才扣扳机
+            //（m_AutoWalkHasEnemyTarget 由 UpdateAutoWalkInput 每帧写入）。
+            // 无头进程没有键盘，但要让"开火 → 命中 → 掉血"这条链路可以被自动验证；
+            // 它走的是与真实输入完全相同的上报路径。
             //
-            // 例外是 -rescueonly：那个模式的语义是"只救人、不主动交火"。
+            // 为什么不再"一律扣着扳机"（U-85 的教训）：没有敌人时机器人的瞄准方向会落到
+            // 最近的队友身上，于是它一路朝队友扫射——旧规则下真把房主打倒过。
+            // 玩家之间已经免伤（CombatRules），但朝队友与空地扫射仍然是浪费，
+            // 也会让真实队友以为被攻击。
+            //
+            // 另一个例外是 -rescueonly：那个模式的语义是"只救人、不主动交火"。
             // 第一版没有排除它，验收里的"乙"几秒就把"甲"打死，后续所有阶段全部失真
             // （2026-09-14 联机基础问题排查里踩过）。
             var rescueOnly = ClientMode.IsActive
                 && ClientMode.Options != null
                 && ClientMode.Options.RescueOnly;
-            m_NetworkTriggerHeld = wantsToFire || (m_AutoWalk && !rescueOnly);
+            m_NetworkTriggerHeld = wantsToFire || (m_AutoWalk && !rescueOnly && m_AutoWalkHasEnemyTarget);
 
             if (m_NetworkTriggerHeld != m_LastReportedTrigger)
             {

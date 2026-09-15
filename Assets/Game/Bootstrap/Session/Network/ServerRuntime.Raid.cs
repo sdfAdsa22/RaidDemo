@@ -149,6 +149,14 @@ namespace RaidDemo.Bootstrap
                     continue;
                 }
 
+                // 已经结算（阵亡 / 撤离）的人不再接受救援：结算是终态。
+                // 兜底另一半时序（U-86）：即使有一帧漏掉了"结算即移出世界"，
+                // 也不会再出现"结算之后又被救起"的日志与血量。
+                if (m_RaidProgress.TryGetValue(pair.Key, out var settled) && settled.Settled)
+                {
+                    continue;
+                }
+
                 downed ??= new List<int>();
                 downed.Add(pair.Key);
             }
@@ -229,6 +237,14 @@ namespace RaidDemo.Bootstrap
             // 放在广播之后：客户端先看到结算面板，服务器再落库——顺序反了的话，
             // 落库失败会让玩家看到"界面说带出来了、仓库里没有"，而这是最难解释的一类问题。
             ApplyOutcomeToProfile(playerId, outcome, carriedValue);
+
+            // U-87：结算即离开权威世界。
+            //
+            // 结算之后这名玩家的战局已经结束（撤离或阵亡），他的身体不该继续出现在快照里——
+            // 否则队友那一侧的验收机器人会把他当目标一直追（"已回屋的队友"在服务器世界里
+            // 仍有身体），既不撤离、也不结束战局。移除之后快照里不再有他，
+            // 远端玩家的表现会随快照自然消失。
+            RemovePlayerFromWorld(playerId);
 
             // 全员结算完就收尾回大厅（P4）：这里是"这一局什么时候算结束"的唯一判定入口。
             CheckRaidCompletion();

@@ -107,16 +107,15 @@ namespace RaidDemo.Tests.EditMode
                 "开火事件的射击者应当是本人的战斗单位编号（没有绑定时会退化成玩家编号或 0）。");
         }
 
-        /// <summary>命中另一名玩家时，服务器结算伤害并广播事件。</summary>
+        /// <summary>命中敌人时，服务器结算伤害并广播事件。</summary>
         [Test]
-        public void 命中造成伤害并广播()
+        public void 命中敌人造成伤害并广播()
         {
             m_Coordinator.TryAddPlayer(ShooterId, out _);
-            m_Coordinator.TryAddPlayer(TargetPlayerId, out _);
 
-            // 让探针把射击导向二号玩家的战斗单位。
-            var targetCombatant = m_Coordinator.GetCombatantId(TargetPlayerId);
-            Assert.AreNotEqual(0, targetCombatant, "目标应当已参战。");
+            // 用 AI 靶子验证伤害链路：PVE 合作里玩家之间免伤（CombatRules），
+            // 拿第二名玩家当目标在这条规则生效后不会掉血（那条路径另有测试覆盖）。
+            var targetCombatant = m_Coordinator.World.Create(ServerCombatCoordinator.DefaultMaxHealth);
             m_Probe.TargetId = targetCombatant;
 
             m_Coordinator.SubmitInput(ShooterId, triggerHeld: true, aimDirection: Vector2F.Right);
@@ -129,6 +128,31 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(targetCombatant, m_DamageEvents[0].TargetId);
             Assert.Greater(m_DamageEvents[0].Damage, 0f);
             Assert.Less(m_DamageEvents[0].RemainingHealth, ServerCombatCoordinator.DefaultMaxHealth);
+        }
+
+        /// <summary>玩家之间免伤：命中队友不产生任何伤害事件，队友血量不变（U-85 的回归）。</summary>
+        [Test]
+        public void 命中队友不产生伤害事件()
+        {
+            m_Coordinator.TryAddPlayer(ShooterId, out _);
+            m_Coordinator.TryAddPlayer(TargetPlayerId, out _);
+
+            var targetCombatant = m_Coordinator.GetCombatantId(TargetPlayerId);
+            Assert.AreNotEqual(0, targetCombatant, "目标应当已参战。");
+            m_Probe.TargetId = targetCombatant;
+
+            m_Coordinator.SubmitInput(ShooterId, triggerHeld: true, aimDirection: Vector2F.Right);
+            for (var i = 0; i < 30; i++)
+            {
+                m_Coordinator.Tick(1f / 60f);
+            }
+
+            Assert.AreEqual(0, m_DamageEvents.Count, "玩家之间不应产生任何伤害事件。");
+            Assert.IsTrue(m_Coordinator.World.TryGet(targetCombatant, out var targetState));
+            Assert.AreEqual(
+                ServerCombatCoordinator.DefaultMaxHealth,
+                targetState.Health,
+                "队友的血量必须保持满值（2026-09-15 定稿：PVE 合作没有友伤）。");
         }
 
         /// <summary>打到不该打的单位（没登记的目标）不会崩，也不会凭空造伤害。</summary>
