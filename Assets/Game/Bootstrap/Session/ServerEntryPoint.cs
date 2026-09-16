@@ -109,6 +109,25 @@ namespace RaidDemo.Bootstrap
             Address = options.ConnectAddress;
             Options = options;
         }
+
+        /// <summary>
+        /// 退出联机时调用：本进程不再以"联机客户端"身份运行。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么需要它：</b><see cref="IsActive"/> 从前是**进程级**的——只要启动时带了
+        /// <c>-connect</c>，它就永远为真。于是"从暂停菜单返回主菜单"之后，
+        /// 重新加载的安全屋仍然认为自己是联机进程：不显示主菜单、直接进入安全屋、
+        /// 并等着一个已经不存在的服务器世界来装配玩家——表现是画面里站着人、但没有武器、
+        /// 生命显示 <c>--/--</c>，而且完全不能动（负责人反馈的问题 9）。</para>
+        ///
+        /// <para><b>为什么不清理 <see cref="Options"/>：</b>日志等级这类设置来自它，
+        /// 退出联机后继续沿用同一份运行参数是合理的；真正需要失效的只有"是不是联机客户端"。</para>
+        /// </remarks>
+        public static void Deactivate()
+        {
+            IsActive = false;
+            Address = null;
+        }
     }
 
     /// <summary>

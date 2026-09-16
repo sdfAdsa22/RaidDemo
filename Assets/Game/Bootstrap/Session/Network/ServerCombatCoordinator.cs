@@ -10,6 +10,19 @@ using UnityEngine;
 namespace RaidDemo.Bootstrap
 {
     /// <summary>
+    /// 取某名玩家的权威世界坐标；返回 false 表示"此刻拿不到"。
+    /// </summary>
+    /// <param name="playerId">玩家编号。</param>
+    /// <param name="origin">枪口位置。</param>
+    /// <remarks>
+    /// 之所以不是简单的 <c>Func&lt;int, Vector3&gt;</c>：拿不到坐标时**必须能说出来**。
+    /// 退化成 <c>Vector3.zero</c> 会让子弹从地图原点飞出，
+    /// 表现正是"刚进图那一枪弹道和准星不在一条线上"（负责人反馈的问题 7）——
+    /// 与其打一发不知道飞哪去的子弹，不如这一帧不开火。
+    /// </remarks>
+    public delegate bool TryGetPlayerOrigin(int playerId, out Vector3 origin);
+
+    /// <summary>
     /// 服务器侧的战斗权威：为每名玩家持有一套武器控制器，开火与命中都在这里判定。
     /// </summary>
     /// <remarks>
@@ -32,7 +45,7 @@ namespace RaidDemo.Bootstrap
         public const float DefaultMaxHealth = 100f;
 
         /// <summary>取玩家世界坐标的回调：服务器用它决定子弹从哪发出。</summary>
-        private readonly Func<int, Vector3> m_OriginProvider;
+        private readonly TryGetPlayerOrigin m_OriginProvider;
 
         /// <summary>一名玩家的战斗相关状态。</summary>
         private sealed class Participant
@@ -62,13 +75,13 @@ namespace RaidDemo.Bootstrap
         /// <summary>创建战斗协调器。</summary>
         /// <param name="catalog">物品目录（提供武器与弹药的真实参数）。</param>
         /// <param name="events">会话事件总线：战斗结果通过它发布给网络层。</param>
-        /// <param name="originProvider">玩家世界坐标提供者。</param>
+        /// <param name="originProvider">玩家世界坐标提供者；拿不到时必须返回 false。</param>
         /// <param name="probe">命中查询实现（服务器侧用 PhysX）。</param>
         /// <param name="tuning">战斗调参。</param>
         public ServerCombatCoordinator(
             ItemCatalog catalog,
             EventBus events,
-            Func<int, Vector3> originProvider,
+            TryGetPlayerOrigin originProvider,
             IHitProbe probe,
             CombatTuning tuning = null)
         {
@@ -255,7 +268,17 @@ namespace RaidDemo.Bootstrap
 
                 // 子弹从玩家当前位置发出：俯视角下枪口高度对命中判定的影响可以忽略，
                 // 但位置必须跟得上，否则掩体边缘的判定会不对。
-                participant.Controller.SetMuzzlePosition(m_OriginProvider(participant.PlayerId));
+                // 拿不到权威位置时**这一帧不开火**：退回世界原点会让子弹从地图另一头飞出去，
+                // 表现就是"刚进图第一枪的弹道和准星不在一条线上"（负责人反馈的问题 7）。
+                if (!m_OriginProvider(participant.PlayerId, out var origin))
+                {
+                    participant.Controller.SetTriggerHeld(false);
+                    participant.Controller.SetAimDirection(participant.AimDirection);
+                    participant.Controller.Tick(deltaTime);   // 仍然推进冷却与换弹计时
+                    continue;
+                }
+
+                participant.Controller.SetMuzzlePosition(origin);
                 participant.Controller.SetAimDirection(participant.AimDirection);
                 participant.Controller.SetTriggerHeld(participant.TriggerHeld);
                 participant.Controller.Tick(deltaTime);

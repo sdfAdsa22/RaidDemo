@@ -77,6 +77,12 @@ namespace RaidDemo.Bootstrap
                 playerId: playerId);
 
             controller.BindCombatant(combatantId);
+            // 伤害规则用的射手编号必须和战斗单位一起绑（2026-09-16 修联机自伤）。
+            // 只绑战斗单位时，"规则里的射手"会退回用玩家编号，而玩家编号与战斗单位编号
+            // 是两个独立的编号空间（安全屋里靶子也占战斗单位编号）——
+            // 于是"打中自己"与"打中靶子"在规则层分不出来，
+            // 表现就是联机拿枪进安全屋一开火玩家倒地（负责人反馈的问题 6）。
+            controller.BindCombatantForRules(combatantId);
             controller.SyncEquippedWeapon(weaponDefinition.WeaponStats);
 
             m_Participants[playerId] = new Participant

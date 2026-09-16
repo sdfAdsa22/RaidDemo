@@ -192,6 +192,10 @@ namespace RaidDemo.UI
             var keyboard = Keyboard.current;
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
+                // 商人界面按 Esc 一定会做点什么（关确认框 / 关出售菜单 / 退出出售模式 / 关界面），
+                // 因此统一在这里标记"本帧的 Esc 用掉了"：装配层不会再多弹一个暂停菜单。
+                UiEscapeGuard.Consume();
+
                 if (m_ConfirmRoot != null && m_ConfirmRoot.activeSelf)
                 {
                     CancelSellConfirm();

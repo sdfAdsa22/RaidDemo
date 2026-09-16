@@ -248,9 +248,19 @@ namespace RaidDemo.Bootstrap
             m_LobbyScreen?.SetVisible(false);
 
             m_Session?.Disconnect();
-            ShowMainMenu();
+
+            // 与"暂停菜单 → 返回主菜单"走同一条路：改进程身份 + 重载安全屋。
+            // 只切状态的话，安全屋身上还挂着已经断开的移动/容器链路，
+            // 命令处理器也停在"只上行"的版本上——玩家会看到主菜单回来了，
+            // 但人物不动、仓库点不动（同一类缺陷的另一个入口）。
+            ClientMode.Deactivate();
 
             m_LeavingMultiplayer = false;
+
+            HidePauseMenu();
+            State = FlowState.MainMenu;
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(GameScenes.SafeHouse);
         }
 
         /// <summary>拆分"主机[:端口]"（用于把上次地址回填到界面）。</summary>

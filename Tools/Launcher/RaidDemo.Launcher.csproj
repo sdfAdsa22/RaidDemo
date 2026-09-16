@@ -40,8 +40,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 配置模板随产物一起输出：仓库里只有占位地址，真实地址写 launcher.config.local.json（不入库）。 -->
-    <None Update="launcher.config.json" CopyToOutputDirectory="PreserveNewest" />
+    <!--
+      配置模板随产物一起输出：仓库里只有占位地址，真实地址写 launcher.config.local.json（不入库）。
+      两个 Copy 属性都要写：CopyToOutputDirectory 管 bin/，CopyToPublishDirectory 管 publish/——
+      只写前者时，自包含单文件发布出来的目录里会**没有**这份模板，
+      而交付组装脚本正是从 publish/ 取它（实测踩过：交付目录里缺配置模板）。
+    -->
+    <None Update="launcher.config.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -77,8 +77,6 @@ namespace RaidDemo.UI
         private TextMeshProUGUI m_ArmorLabel;
         /// <summary>底部提示行：弹药口径提醒与换弹失败原因。</summary>
         private TextMeshProUGUI m_HintLabel;
-        private Image m_ReloadBarFill;
-        private RectTransform m_ReloadBarRoot;
         private string m_WeaponName = "无武器";
         private string m_CaliberId;
 
@@ -343,29 +341,5 @@ namespace RaidDemo.UI
             }
         }
 
-        /// <summary>刷新换弹进度条。</summary>
-        private void UpdateReloadBar(WeaponRuntime runtime)
-        {
-            var reloading = runtime.IsReloading;
-            SetBarVisible(reloading);
-            if (!reloading)
-            {
-                return;
-            }
-
-            UiFactory.SetBarProgress(
-                m_ReloadBarFill,
-                m_ReloadBarRoot.sizeDelta.x,
-                runtime.ReloadProgress01);
-        }
-
-        /// <summary>显示或隐藏换弹进度条。</summary>
-        private void SetBarVisible(bool visible)
-        {
-            if (m_ReloadBarRoot != null && m_ReloadBarRoot.gameObject.activeSelf != visible)
-            {
-                m_ReloadBarRoot.gameObject.SetActive(visible);
-            }
-        }
     }
 }

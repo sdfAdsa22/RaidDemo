@@ -133,6 +133,14 @@ namespace RaidDemo.UI
                 var close = Keyboard.current;
                 if (close != null && (close.escapeKey.wasPressedThisFrame || close.eKey.wasPressedThisFrame))
                 {
+                    // 用 Esc 关面板时要把这一次按键标记成"已消费"：
+                    // 否则装配层在同帧读到同一个 Esc，会顺手把暂停菜单也弹出来
+                    // （负责人反馈的现象：从操作说明返回后出现暂停菜单）。
+                    if (close.escapeKey.wasPressedThisFrame)
+                    {
+                        UiEscapeGuard.Consume();
+                    }
+
                     ClosePanel();
                 }
 

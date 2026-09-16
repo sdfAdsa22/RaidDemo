@@ -31,7 +31,8 @@ namespace RaidDemo.Bootstrap
             m_CodexScreen.Initialize(
                 m_ItemCatalog,
                 m_Progress != null ? m_Progress.Codex : null,
-                OnCodexClosed);
+                OnCodexClosed,
+                ApplyCursorLock);
 
             if (m_Progress != null)
             {

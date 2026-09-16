@@ -54,7 +54,7 @@ namespace RaidDemo.Bootstrap
             m_Combat = new ServerCombatCoordinator(
                 catalog,
                 m_Session.Events,
-                originProvider: ResolvePlayerOrigin,
+                originProvider: TryResolvePlayerOrigin,
                 probe: new PhysicsHitProbe());
 
             var bus = m_Session.Events;
@@ -85,17 +85,30 @@ namespace RaidDemo.Bootstrap
             m_Combat = null;
         }
 
-        /// <summary>子弹从玩家的权威位置发出。</summary>
-        private Vector3 ResolvePlayerOrigin(int playerId)
+        /// <summary>
+        /// 子弹从玩家的权威位置发出。
+        /// </summary>
+        /// <param name="playerId">玩家编号。</param>
+        /// <param name="origin">枪口位置。</param>
+        /// <returns>拿得到身体时返回 true；否则 false（调用方这一帧不开火）。</returns>
+        /// <remarks>
+        /// <b>拿不到就返回 false，绝不退回原点：</b>刚进图时身体可能还没登记，
+        /// 从世界原点开火会让子弹出现在地图另一头——那正是负责人反馈的
+        /// "刚进图第一枪弹道和准星不在一条线上"（问题 7）。
+        /// </remarks>
+        private bool TryResolvePlayerOrigin(int playerId, out Vector3 origin)
         {
+            origin = default;
+
             if (!m_PlayerBodies.TryGetValue(playerId, out var body) || body == null)
             {
-                return Vector3.zero;
+                return false;
             }
 
             // 枪口高度与客户端一致（SceneBootstrap 的 MuzzleHeight）：
             // 从脚底平射会让子弹贴着地面走，先打中地形、永远打不到站立的角色。
-            return body.position + (Vector3.up * MuzzleHeight);
+            origin = body.position + (Vector3.up * MuzzleHeight);
+            return true;
         }
 
         /// <summary>把一条上行输入同时交给移动与战斗。</summary>

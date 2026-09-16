@@ -237,7 +237,10 @@ namespace RaidDemo.Bootstrap
             // 安全屋里按 Esc 打开暂停菜单；界面打开时 Esc 先交给界面自己处理。
             if (!uiOpen
                 && flow.State == RaidFlowController.FlowState.SafeHouse
-                && escapePressed)
+                && escapePressed
+                // 界面可能在同一帧里刚用 Esc 关掉自己（并标记为已消费）：
+                // 此时 uiOpen 已经是 false，若不看这个标记就会"关界面的同时弹出暂停菜单"。
+                && !UiEscapeGuard.WasConsumedThisFrame)
             {
                 flow.ShowPauseMenu(warnAbandon: false);
                 return;

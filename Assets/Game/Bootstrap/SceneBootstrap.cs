@@ -203,9 +203,9 @@ namespace RaidDemo.Bootstrap
             var inventoryOpen = m_InventoryScreen != null && m_InventoryScreen.IsOpen;
             var resultOpen = flow.State == RaidFlowController.FlowState.Result;
 
-            if (!inventoryOpen && !resultOpen && escapePressed)
+            // Esc 打开暂停菜单的判定拆在 SceneBootstrap.Pause.cs：见那里的注释。
+            if (TryHandleRaidPauseInput(flow, escapePressed, inventoryOpen, resultOpen))
             {
-                flow.ShowPauseMenu(warnAbandon: true);
                 return;
             }
 

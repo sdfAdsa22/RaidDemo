@@ -85,6 +85,15 @@ namespace RaidDemo.UI
         private ItemCatalog m_Catalog;
         private Action m_OnClose;
 
+        /// <summary>
+        /// 光标锁定开关（由安全屋装配层注入）。
+        /// </summary>
+        /// <remarks>
+        /// 界面显示时放开光标、关闭时交还给装配层的锁定策略——与背包、商人同一条规则。
+        /// 图鉴最初漏了这一步，表现就是"界面开着但鼠标不在"，看得见却点不动。
+        /// </remarks>
+        private Action<bool> m_SetCursorLock;
+
         private GameObject m_ScreenRoot;
         private TextMeshProUGUI m_ProgressLabel;
         private readonly List<TabWidget> m_Tabs = new List<TabWidget>();
@@ -117,11 +126,12 @@ namespace RaidDemo.UI
         /// <param name="catalog">物品目录：决定图鉴里一共有哪些条目。</param>
         /// <param name="codex">收集进度。</param>
         /// <param name="onClose">关闭界面时调用。</param>
-        public void Initialize(ItemCatalog catalog, MetaCodex codex, Action onClose)
+        public void Initialize(ItemCatalog catalog, MetaCodex codex, Action onClose, Action<bool> setCursorLock)
         {
             m_Catalog = catalog;
             m_Codex = codex;
             m_OnClose = onClose;
+            m_SetCursorLock = setCursorLock;
 
             BuildLayout();
             RefreshAll();
@@ -197,6 +207,8 @@ namespace RaidDemo.UI
             var keyboard = Keyboard.current;
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
+                // 先标记"这帧的 Esc 用掉了"，装配层才不会在同帧把暂停菜单弹出来。
+                UiEscapeGuard.Consume();
                 Close();
                 return;
             }
@@ -219,6 +231,11 @@ namespace RaidDemo.UI
             {
                 m_ScreenRoot.SetActive(visible);
             }
+
+            // 与背包 / 商人同一条规则：界面显示时放开光标，关闭时交还给装配层的锁定策略。
+            // 图鉴之前漏了这一步，于是"界面开着但鼠标不在"——看得见、点不动
+            // （负责人反馈：图鉴界面没有鼠标无法点击）。
+            m_SetCursorLock?.Invoke(!visible);
         }
 
         private void OnDestroy()

@@ -93,6 +93,10 @@ namespace RaidDemo.Bootstrap
                 MultiplayerClientSession.Current.Disconnect();
             }
 
+            // 退出联机必须连"进程身份"一起改：否则重载后的安全屋仍按联机进程装配，
+            // 不显示主菜单、也不会创建本地玩家（负责人反馈的问题 9）。
+            ClientMode.Deactivate();
+
             m_RaidInProgress = false;
             SaveNow();
             HidePauseMenu();

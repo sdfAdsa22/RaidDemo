@@ -161,6 +161,10 @@ namespace RaidDemo.Bootstrap
                     if (message.SourceId == LocalNetworkPlayerId)
                     {
                         ApplyLocalMagazineAmmo(message.MagazineAmmo);
+
+                        // 换弹进度条：本地不跑换弹（服务器权威），
+                        // 因此由这条事件驱动、按武器规格的时长自己推进（负责人反馈的问题 8）。
+                        m_CombatHud?.NotifyReloadStateFromServer(message.IsReloading);
                     }
 
                     break;

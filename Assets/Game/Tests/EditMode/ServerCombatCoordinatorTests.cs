@@ -44,7 +44,7 @@ namespace RaidDemo.Tests.EditMode
             m_Coordinator = new ServerCombatCoordinator(
                 m_Catalog,
                 m_Events,
-                originProvider: _ => Vector3.zero,
+                originProvider: OriginAtZero,
                 probe: m_Probe);
 
             m_DamageEvents.Clear();
@@ -74,6 +74,39 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsFalse(m_Coordinator.SubmitInput(99, triggerHeld: true, aimDirection: Vector2F.Right));
             Assert.IsFalse(m_Coordinator.RequestReload(99, 1u, out var failure));
             Assert.AreEqual("not-in-combat", failure);
+        }
+
+        /// <summary>
+        /// 服务器侧射击自己不该产生任何伤害（联机安全屋"一开火就倒地"的回归用例）。
+        /// </summary>
+        /// <remarks>
+        /// <para>关键在于**让两个编号空间错开**：先造一个别的战斗单位占掉 1 号，
+        /// 玩家的战斗单位编号就不再等于玩家编号。</para>
+        ///
+        /// <para>只绑战斗单位、不绑"规则用的射手编号"时，规则会退回用玩家编号当射手，
+        /// 于是"射手就是自己"这条判定永远不成立——自伤直接穿过去。
+        /// 旧用例之所以没抓到，是因为测试里玩家编号恰好等于战斗单位编号，两个空间重合了。</para>
+        /// </remarks>
+        [Test]
+        public void 服务器侧射击自己不造成伤害()
+        {
+            // 先占掉 1 号战斗单位：这样玩家编号（1）与玩家的战斗单位编号（2）必然不同。
+            m_Coordinator.World.Create(ServerCombatCoordinator.DefaultMaxHealth);
+
+            Assert.IsTrue(m_Coordinator.TryAddPlayer(ShooterId, out var error), error);
+            var combatantId = m_Coordinator.GetCombatantId(ShooterId);
+            Assert.AreNotEqual(ShooterId, combatantId, "本用例需要两个编号空间错开才有意义。");
+
+            m_DamageEvents.Clear();
+            m_Probe.TargetId = combatantId;   // 安排成"打中的是自己"
+
+            m_Coordinator.SubmitInput(ShooterId, triggerHeld: true, aimDirection: Vector2F.Right);
+            for (var i = 0; i < 30; i++)
+            {
+                m_Coordinator.Tick(1f / 60f);
+            }
+
+            Assert.IsEmpty(m_DamageEvents, "打中自己不该产生伤害事件：自伤必须被规则拦住。");
         }
 
         /// <summary>扣动扳机之后弹药减少——扣弹药的权力在服务器。</summary>
@@ -241,6 +274,60 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsTrue(m_Coordinator.RemovePlayer(ShooterId));
             Assert.AreEqual(0, m_Coordinator.PlayerCount);
             Assert.IsFalse(m_Coordinator.TryGetAmmo(ShooterId, out _, out _));
+        }
+
+        /// <summary>
+        /// 固定返回原点的坐标提供者（这些用例不关心子弹从哪发出）。
+        /// </summary>
+        /// <remarks>
+        /// 真实实现允许返回 false（身体还没登记，此时这一帧不开火）；
+        /// 这里始终给得出坐标，因此不影响"输入 → 开火 → 结算"这些用例。
+        /// </remarks>
+        private static bool OriginAtZero(int playerId, out Vector3 origin)
+        {
+            origin = Vector3.zero;
+            return true;
+        }
+
+        /// <summary>永远拿不到坐标的提供者（模拟"刚进图、身体还没登记"）。</summary>
+        private static bool OriginUnavailable(int playerId, out Vector3 origin)
+        {
+            origin = default;
+            return false;
+        }
+
+        /// <summary>
+        /// 拿不到玩家坐标时**一枪都不该打出去**（刚进图、身体还没登记的那一帧）。
+        /// </summary>
+        /// <remarks>
+        /// 从前这里会退回世界原点：子弹从地图另一头飞出去，
+        /// 表现就是负责人反馈的"刚进图第一枪弹道和准星不在一条线上"（问题 7）。
+        /// 正确行为是这一帧不开火——既不扣弹药，也不发开火事件。
+        /// </remarks>
+        [Test]
+        public void 拿不到玩家坐标时不开火()
+        {
+            var coordinator = new ServerCombatCoordinator(
+                m_Catalog,
+                m_Events,
+                originProvider: OriginUnavailable,
+                probe: m_Probe);
+
+            Assert.IsTrue(coordinator.TryAddPlayer(ShooterId, out var error), error);
+            coordinator.TryGetAmmo(ShooterId, out var before, out _);
+
+            var fired = new List<WeaponFiredEvent>();
+            m_Events.Subscribe<WeaponFiredEvent>(evt => fired.Add(evt));
+
+            coordinator.SubmitInput(ShooterId, triggerHeld: true, aimDirection: Vector2F.Right);
+            for (var i = 0; i < 30; i++)
+            {
+                coordinator.Tick(1f / 60f);
+            }
+
+            coordinator.TryGetAmmo(ShooterId, out var after, out _);
+            Assert.AreEqual(before, after, "拿不到坐标时不该消耗弹药。");
+            Assert.IsEmpty(fired, "拿不到坐标时不该产生开火事件。");
         }
 
         /// <summary>按脚本返回命中结果的探针。</summary>
