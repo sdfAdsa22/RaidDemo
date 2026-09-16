@@ -1,26 +1,39 @@
 using System;
 using System.Drawing;
 using System.IO;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using RaidDemo.Kernel.Updates;
+using RaidDemo.Launcher.Theme;
 using RaidDemo.Launcher.Update;
 
 namespace RaidDemo.Launcher
 {
     /// <summary>
-    /// 启动器主界面。
+    /// 启动器主界面：一整张卡通主视觉 + 左下的主按钮区，设置收进右侧抽屉，日志收进独立窗口。
     /// </summary>
     /// <remarks>
-    /// <para><b>界面只做四件事：</b>选更新源、看版本、检查更新、更新并启动。
+    /// <para><b>界面仍然只做四件事：</b>选更新源、看版本、下载 / 检查更新、启动游戏。
     /// 它不承担任何业务判断——所有流程都在 <see cref="UpdateSession"/> 里，
     /// 界面只是把进度与结果显示出来。这样"界面上的行为"与"脚本里的行为"天然一致。</para>
     ///
     /// <para><b>所有耗时动作都在后台线程：</b>下载 158 MB 时界面必须保持可响应（可关闭、可看日志），
     /// 否则玩家会以为程序卡死并强杀进程——那正好会撞上"更新到一半"的最坏时机。</para>
+    ///
+    /// <para><b>为什么拆成多个分部文件：</b>布局、抽屉、动作三件事各自独立，
+    /// 全塞进一个文件会顶过工程规范的单文件 400 行上限（5.2 节），
+    /// 也会让"改一处按钮位置"要在几百行里找目标。</para>
     /// </remarks>
-    public sealed class LauncherForm : Form
+    public sealed partial class LauncherForm : Form
     {
+        /// <summary>窗口宽度（像素）。</summary>
+        private const int WindowWidth = 1000;
+
+        /// <summary>窗口高度（像素）。</summary>
+        private const int WindowHeight = 620;
+
+        /// <summary>窗口圆角半径（像素）。</summary>
+        private const int WindowCornerRadius = 14;
+
         /// <summary>是否已有任务在跑（防止重复点击）。</summary>
         private bool m_Busy;
 
@@ -33,100 +46,60 @@ namespace RaidDemo.Launcher
         /// <summary>日志器。</summary>
         private LauncherLog m_Log;
 
-        private readonly ComboBox m_SourceCombo = new ComboBox();
-        private readonly TextBox m_SourceText = new TextBox();
-        private readonly Label m_ServerLabel = new Label();
-        private readonly Label m_VersionLabel = new Label();
-        private readonly Button m_CheckButton = new Button();
-        private readonly Button m_DownloadButton = new Button();
-        private readonly Button m_UpdateButton = new Button();
-        private readonly ProgressBar m_Progress = new ProgressBar();
-        private readonly Label m_StatusLabel = new Label();
-        private readonly TextBox m_LogBox = new TextBox();
+        /// <summary>日志窗口（第一次点「日志」时才创建，关闭后置空）。</summary>
+        private LogWindowForm m_LogWindow;
 
-        /// <summary>"安装目录"一行（控件与校验逻辑都在 <see cref="InstallRootRow"/> 里）。</summary>
+        /// <summary>主视觉缓存（跟随窗口尺寸重建，避免每帧重画上百个图元）。</summary>
+        private Bitmap m_KeyArt;
+
+        /// <summary>图标按钮的悬停提示（图标本身不写字，必须给个说明）。</summary>
+        private readonly ToolTip m_ToolTip = new ToolTip();
+
+        // ---- 控件（在 LauncherForm.Layout.cs 里创建） ----
+        private FlatButton m_PlayButton;
+        private FlatButton m_DownloadButton;
+        private FlatButton m_CheckButton;
+        private FlatButton m_LogButton;
+        private FlatButton m_SettingsButton;
+        private FlatButton m_MinimizeButton;
+        private FlatButton m_CloseButton;
+        private Label m_BrandLabel;
+        private Label m_HeadlineLabel;
+        private Label m_StatusLabel;
+        private Label m_SpeedLabel;
+        private Label m_VersionLabel;
+        private FlatProgressBar m_ProgressBar;
+        private Panel m_Drawer;
+        private ComboBox m_SourceCombo;
+        private TextBox m_SourceText;
+        private Label m_ServerValueLabel;
         private InstallRootRow m_InstallRow;
 
         /// <summary>创建主窗口。</summary>
         public LauncherForm()
         {
             BuildLayout();
+            BuildChildren();
             Load += (_, __) => LoadConfiguration();
+            Shown += (_, __) => OnShownLayout();
         }
 
-        /// <summary>构建界面（纯代码布局，避免额外的设计器文件）。</summary>
-        private void BuildLayout()
+        /// <summary>
+        /// 给无边框窗口加系统投影。
+        /// </summary>
+        /// <remarks>
+        /// 不要这层投影，窗口会像一张贴纸粘在桌面上：主视觉的深色边缘直接与桌面相邻，
+        /// 分不出"窗口到哪结束"。
+        /// </remarks>
+        protected override CreateParams CreateParams
         {
-            Text = "RaidDemo 启动器";
-            StartPosition = FormStartPosition.CenterScreen;
-            // 最小宽度 700：保证"安装目录"那一行的浏览按钮（右边缘在 x=680）不会被拉出可视区。
-            MinimumSize = new Size(700, 540);
-            Size = new Size(720, 600);
-            Font = new Font("Microsoft YaHei UI", 9f);
-
-            var sourceLabel = new Label { Text = "更新源", Location = new Point(16, 20), AutoSize = true };
-            m_SourceCombo.Location = new Point(90, 16);
-            m_SourceCombo.Width = 200;
-            m_SourceCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            m_SourceCombo.SelectedIndexChanged += (_, __) => OnProfileChanged();
-
-            m_SourceText.Location = new Point(300, 16);
-            m_SourceText.Width = 380;
-            m_SourceText.Leave += (_, __) => PersistEditableSource();
-
-            var serverTitle = new Label { Text = "游戏服务器", Location = new Point(16, 88), AutoSize = true };
-            m_ServerLabel.Location = new Point(90, 88);
-            m_ServerLabel.AutoSize = true;
-            m_ServerLabel.ForeColor = Color.DimGray;
-
-            var versionTitle = new Label { Text = "本地版本", Location = new Point(16, 116), AutoSize = true };
-            m_VersionLabel.Location = new Point(90, 116);
-            m_VersionLabel.AutoSize = true;
-
-            m_CheckButton.Text = "检查更新";
-            m_CheckButton.Location = new Point(16, 150);
-            m_CheckButton.Size = new Size(130, 32);
-            m_CheckButton.Click += async (_, __) => await RunAsync(applyChanges: false);
-
-            // 「下载」= 只落盘不启动。它和「更新并启动」的差别只有最后那一步，
-            // 因此不再需要"更新后启动游戏"勾选框——按钮名说清了自己会做什么，
-            // 而勾选框曾经造成"名叫更新并启动却不启动"的歧义。
-            m_DownloadButton.Text = "下载";
-            m_DownloadButton.Location = new Point(156, 150);
-            m_DownloadButton.Size = new Size(130, 32);
-            m_DownloadButton.Click += async (_, __) => await RunAsync(applyChanges: true, launchAfterUpdate: false);
-
-            m_UpdateButton.Text = "更新并启动";
-            m_UpdateButton.Location = new Point(296, 150);
-            m_UpdateButton.Size = new Size(150, 32);
-            m_UpdateButton.Click += async (_, __) => await RunAsync(applyChanges: true, launchAfterUpdate: true);
-
-            m_Progress.Location = new Point(16, 196);
-            m_Progress.Size = new Size(664, 18);
-            m_Progress.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-
-            m_StatusLabel.Location = new Point(16, 222);
-            m_StatusLabel.Size = new Size(664, 22);
-            m_StatusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            m_StatusLabel.Text = "就绪";
-
-            m_LogBox.Location = new Point(16, 250);
-            m_LogBox.Multiline = true;
-            m_LogBox.ReadOnly = true;
-            m_LogBox.ScrollBars = ScrollBars.Vertical;
-            m_LogBox.Size = new Size(664, 300);
-            m_LogBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            m_LogBox.BackColor = Color.FromArgb(28, 30, 34);
-            m_LogBox.ForeColor = Color.Gainsboro;
-
-            Controls.AddRange(new Control[]
+            get
             {
-                sourceLabel, m_SourceCombo, m_SourceText,
-                serverTitle, m_ServerLabel,
-                versionTitle, m_VersionLabel,
-                m_CheckButton, m_DownloadButton, m_UpdateButton,
-                m_Progress, m_StatusLabel, m_LogBox,
-            });
+                const int CsDropShadow = 0x00020000;
+                var parameters = base.CreateParams;
+                parameters.ClassStyle |= CsDropShadow;
+                return parameters;
+            }
         }
 
         /// <summary>加载配置并刷新界面。</summary>
@@ -139,9 +112,10 @@ namespace RaidDemo.Launcher
                 UpdateApplier.GetMetadataDirectory(m_InstallRoot),
                 UpdateApplier.LogFileName));
 
-            // "安装目录"一行需要配置对象，因此在这里（而不是布局阶段）创建并挂上窗体。
-            m_InstallRow = new InstallRootRow(m_Config, this, AppendLog, new Point(16, 50));
-            m_InstallRow.AddTo(this);
+            // "安装目录"一行需要配置对象，因此在这里（而不是布局阶段）创建并挂到抽屉上。
+            m_InstallRow = new InstallRootRow(
+                m_Config, this, AppendLog, m_DrawerFieldHost.ClientSize.Width);
+            m_InstallRow.AddTo(m_DrawerFieldHost);
             m_InstallRow.ShowCurrent(m_InstallRoot);
             m_InstallRow.Changed += OnInstallRootChanged;
 
@@ -172,80 +146,11 @@ namespace RaidDemo.Launcher
             // 连接用的地址始终来自档案本身，所以隐藏不影响更新与联机。
             m_SourceText.Text = profile.HideAddress ? string.Empty : profile.ManifestSource;
             m_SourceText.ReadOnly = !profile.Editable;
-            m_ServerLabel.Text = profile.HideAddress
+            m_ServerValueLabel.Text = profile.HideAddress
                 ? "(已隐藏)"
                 : (string.IsNullOrWhiteSpace(profile.GameServer) ? "(未设置)" : profile.GameServer);
 
             m_Config.SelectedSource = profile.Name;
-        }
-
-        /// <summary>自定义源的地址修改后保存配置。</summary>
-        private void PersistEditableSource()
-        {
-            var profile = GetSelectedProfile();
-            if (profile == null || !profile.Editable)
-            {
-                return;
-            }
-
-            profile.ManifestSource = m_SourceText.Text.Trim();
-            try
-            {
-                m_Config.Save(AppContext.BaseDirectory);
-                AppendLog("已保存自定义更新源：" + profile.ManifestSource);
-            }
-            catch (Exception exception)
-            {
-                AppendLog("保存配置失败：" + exception.Message);
-            }
-        }
-
-        /// <summary>
-        /// 安装目录切换成功后的收尾（由 <see cref="InstallRootRow.Changed"/> 触发）。
-        /// </summary>
-        /// <param name="installRoot">新的安装根绝对路径。</param>
-        /// <remarks>
-        /// <para><b>为什么日志器要重建：</b>每个安装各自一份 <c>.raiddemo/launcher.log</c>，
-        /// 日志跟着安装目录走，删除某份安装时不会在别处留下"孤儿日志"，
-        /// 排查时也总能找到"当时那份安装"的记录。</para>
-        ///
-        /// <para><b>校验与落盘已在 <see cref="InstallRootRow"/> 里完成：</b>
-        /// 这里只做"界面与运行时状态"的收尾——换日志器、刷新版本显示。
-        /// 分工清楚的好处是：路径规则只有一处实现，不会出现"两个地方各校验一遍、规则还不一样"。</para>
-        /// </remarks>
-        private void OnInstallRootChanged(string installRoot)
-        {
-            m_InstallRoot = installRoot;
-            m_Log = new LauncherLog(Path.Combine(
-                UpdateApplier.GetMetadataDirectory(m_InstallRoot),
-                UpdateApplier.LogFileName));
-
-            AppendLog("当前安装目录：" + m_InstallRoot);
-            RefreshLocalVersion();
-        }
-
-        /// <summary>刷新"本地版本"显示。</summary>
-        private void RefreshLocalVersion()
-        {
-            var local = UpdateApplier.LoadLocalManifest(m_InstallRoot);
-            if (local == null)
-            {
-                m_VersionLabel.Text = "未安装（首次运行将全量下载）";
-                return;
-            }
-
-            var text = "本体 " + (string.IsNullOrEmpty(local.body?.version) ? "未知" : local.body.version);
-            if (local.HasContentLayer)
-            {
-                text += " / 资源 " + local.content.version;
-            }
-
-            if (local.HasCodeLayer)
-            {
-                text += " / 代码 " + local.code.version;
-            }
-
-            m_VersionLabel.Text = text;
         }
 
         /// <summary>取当前选中的档案对象。</summary>
@@ -259,137 +164,61 @@ namespace RaidDemo.Launcher
             return m_Config.Sources[m_SourceCombo.SelectedIndex];
         }
 
-        /// <summary>执行一次检查 / 下载 / 更新并启动。</summary>
-        /// <param name="applyChanges">是否真正下载并应用（false = 只比对）。</param>
-        /// <param name="launchAfterUpdate">更新成功后是否启动游戏（只有"更新并启动"按钮传 true）。</param>
-        /// <remarks>
-        /// 三个按钮共用这一条流程，差别只在两个开关上：这样"检查 / 下载 / 更新并启动"走的
-        /// 是同一套比对与落盘代码，不会出现"某个按钮少做了一步校验"这类只在某个入口暴露的缺陷。
-        /// </remarks>
-        private async Task RunAsync(bool applyChanges, bool launchAfterUpdate = false)
+        /// <summary>刷新版本显示与主按钮文案。</summary>
+        private void RefreshLocalVersion()
         {
-            if (m_Busy)
+            var local = UpdateApplier.LoadLocalManifest(m_InstallRoot);
+            if (local == null)
             {
+                m_VersionLabel.Text = "未安装";
+                m_HeadlineLabel.Text = "准备进入战局";
+                m_StatusLabel.Text = "首次启动会先下载本体";
+                m_SpeedLabel.Text = string.Empty;
                 return;
             }
 
-            var profile = GetSelectedProfile();
-            var source = profile?.Editable == true ? m_SourceText.Text.Trim() : profile?.ManifestSource;
-            if (string.IsNullOrWhiteSpace(source))
+            var text = "本体 " + (string.IsNullOrEmpty(local.body?.version) ? "未知" : local.body.version);
+            if (local.HasContentLayer)
             {
-                MessageBox.Show(this, "请先选择或填写更新源地址。", "更新源为空", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                text += " · 资源 " + local.content.version;
             }
 
-            if (applyChanges && UpdateSession.IsGameRunning("RaidDemo"))
+            m_VersionLabel.Text = text;
+
+            if (!m_Busy)
             {
-                MessageBox.Show(
-                    this,
-                    "检测到 RaidDemo 正在运行。Windows 下运行中的文件无法被覆盖，请先退出游戏再更新。",
-                    "游戏正在运行",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            SetBusy(true);
-            AppendLog($"=== {(applyChanges ? "更新" : "检查")}开始：{source} ===");
-
-            // 声明为接口类型：Progress<T> 对 Report 是显式实现，用具体类型调用不到。
-            IProgress<UpdateProgress> progress = new Progress<UpdateProgress>(OnProgress);
-            var session = new UpdateSession(
-                m_InstallRoot,
-                source,
-                update => progress.Report(update),
-                AppendLog);
-
-            var result = await Task.Run(() => session.Run(applyChanges));
-
-            AppendLog(result.Summary);
-            m_StatusLabel.Text = result.Summary;
-            RefreshLocalVersion();
-            SetBusy(false);
-
-            if (!result.Success)
-            {
-                MessageBox.Show(this, result.Summary, "更新失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            if (applyChanges && launchAfterUpdate)
-            {
-                LaunchGame(source);
+                m_HeadlineLabel.Text = "准备进入战局";
+                m_StatusLabel.Text = "本地版本已就绪";
+                m_SpeedLabel.Text = string.Empty;
             }
         }
 
-        /// <summary>启动游戏。</summary>
-        private void LaunchGame(string source)
-        {
-            var baseDirectory = AppContext.BaseDirectory;
-            var executable = m_Config.GetGameExecutablePath(baseDirectory);
-            if (!File.Exists(executable))
-            {
-                MessageBox.Show(this, "找不到游戏可执行文件：" + executable, "无法启动", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            var arguments = $"-updatesource \"{source}\"";
-            var profile = GetSelectedProfile();
-            if (profile != null && !string.IsNullOrWhiteSpace(profile.GameServer))
-            {
-                arguments += $" -connect \"{profile.GameServer}\"";
-            }
-
-            if (!string.IsNullOrWhiteSpace(m_Config.ExtraGameArguments))
-            {
-                arguments += " " + m_Config.ExtraGameArguments;
-            }
-
-            AppendLog($"启动游戏：{executable} {arguments}");
-            UpdateSession.LaunchGame(executable, arguments);
-        }
-
-        /// <summary>进度回调（已在 UI 线程）。</summary>
-        private void OnProgress(UpdateProgress progress)
-        {
-            m_Progress.Style = ProgressBarStyle.Continuous;
-            m_Progress.Value = (int)Math.Round(progress.Ratio * 100);
-            m_StatusLabel.Text = progress.Message;
-        }
-
-        /// <summary>切换忙碌状态。</summary>
+        /// <summary>切换忙碌状态（三个按钮 + 抽屉一起禁用，防止改到一半的参数混进流程）。</summary>
+        /// <param name="busy">是否忙碌。</param>
         private void SetBusy(bool busy)
         {
             m_Busy = busy;
-            m_CheckButton.Enabled = !busy;
+            m_PlayButton.Enabled = !busy;
             m_DownloadButton.Enabled = !busy;
-            m_UpdateButton.Enabled = !busy;
-            m_SourceCombo.Enabled = !busy;
-            m_InstallRow.SetBusy(busy);
+            m_CheckButton.Enabled = !busy;
+            m_SettingsButton.Enabled = !busy;
+            m_InstallRow?.SetBusy(busy);
+            m_ProgressBar.Visible = busy;
 
             if (!busy)
             {
-                m_Progress.Value = 0;
+                m_ProgressBar.Ratio = 0f;
             }
         }
 
-        /// <summary>追加一行日志（界面 + 文件）。</summary>
+        /// <summary>追加一行日志（只落文件；界面上看日志要打开日志窗口）。</summary>
+        /// <param name="message">内容。</param>
         private void AppendLog(string message)
         {
-            if (string.IsNullOrEmpty(message))
+            if (!string.IsNullOrEmpty(message))
             {
-                return;
+                m_Log?.Write(message);
             }
-
-            m_Log?.Write(message);
-
-            if (m_LogBox.InvokeRequired)
-            {
-                m_LogBox.BeginInvoke(new Action(() => AppendLog(message)));
-                return;
-            }
-
-            m_LogBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
         }
     }
 }

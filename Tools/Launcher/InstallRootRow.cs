@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using RaidDemo.Launcher.Theme;
 
 namespace RaidDemo.Launcher
 {
@@ -24,14 +25,14 @@ namespace RaidDemo.Launcher
     /// </remarks>
     internal sealed class InstallRootRow
     {
-        /// <summary>文本框宽度（像素）。</summary>
-        private const int TextWidth = 470;
-
         /// <summary>浏览按钮宽度（像素）。</summary>
-        private const int ButtonWidth = 110;
+        private const int ButtonWidth = 96;
 
-        /// <summary>文本框与按钮的固定高度（像素），保证两者基线对齐。</summary>
-        private const int ControlHeight = 25;
+        /// <summary>输入行高度（像素）：文本框与按钮必须一样高才对齐。</summary>
+        private const int ControlHeight = 28;
+
+        /// <summary>文本框与按钮之间的间隙（像素）。</summary>
+        private const int ControlGap = 8;
 
         /// <summary>配置对象（安装根的唯一真源）。</summary>
         private readonly LauncherConfig m_Config;
@@ -42,9 +43,8 @@ namespace RaidDemo.Launcher
         /// <summary>日志回调（主窗体注入，写界面日志框 + 当日日志文件）。</summary>
         private readonly Action<string> m_Log;
 
-        private readonly Label m_Label = new Label();
         private readonly TextBox m_Text = new TextBox();
-        private readonly Button m_Browse = new Button();
+        private readonly FlatButton m_Browse = new FlatButton(FlatButtonStyle.Ghost);
 
         /// <summary>当前生效的安装根（绝对路径）。</summary>
         private string m_Current = string.Empty;
@@ -58,29 +58,29 @@ namespace RaidDemo.Launcher
         /// <param name="config">启动器配置。</param>
         /// <param name="owner">父窗口。</param>
         /// <param name="log">日志回调。</param>
-        /// <param name="origin">这一行左上角在窗体上的位置。</param>
+        /// <param name="width">这一行的可用宽度（像素）：文本框会自动占满按钮之外的部分。</param>
         /// <remarks>
-        /// 只创建控件、不加入窗体：加入的时机与顺序由主窗体决定（它还要保证
-        /// 控件都挂上去之后才做布局与锚定）。位置参数化则让"把这一行挪到别处"
-        /// 不需要改本类。
+        /// 只创建控件、不加入容器：加入的时机由主窗体决定（它还要保证控件都挂上去之后才做布局）。
+        /// 宽度参数化，是为了让同一行既能放进主界面，也能放进更窄的设置抽屉。
         /// </remarks>
-        public InstallRootRow(LauncherConfig config, IWin32Window owner, Action<string> log, Point origin)
+        public InstallRootRow(LauncherConfig config, IWin32Window owner, Action<string> log, int width)
         {
             m_Config = config;
             m_Owner = owner;
             m_Log = log;
 
-            m_Label.Text = "安装目录";
-            m_Label.AutoSize = true;
-            m_Label.Location = new Point(origin.X, origin.Y + 8);
-
-            m_Text.Location = new Point(origin.X + 74, origin.Y + 1);
-            m_Text.Width = TextWidth;
+            m_Text.Location = new Point(0, 0);
+            m_Text.Size = new Size(Math.Max(80, width - ButtonWidth - ControlGap), ControlHeight);
+            m_Text.BorderStyle = BorderStyle.FixedSingle;
+            m_Text.BackColor = Color.White;
+            m_Text.ForeColor = LauncherTheme.Ink;
+            m_Text.Font = LauncherTheme.BodyFont;
             // 失焦时才校验：打字途中每敲一个字符就弹一次错没法用。
             m_Text.Leave += (_, __) => Apply(m_Text.Text);
 
-            m_Browse.Text = "浏览...";
-            m_Browse.Location = new Point(origin.X + 74 + TextWidth + 10, origin.Y);
+            m_Browse.Text = "浏览…";
+            m_Browse.Font = LauncherTheme.SecondaryButtonFont;
+            m_Browse.Location = new Point(width - ButtonWidth, 0);
             m_Browse.Size = new Size(ButtonWidth, ControlHeight);
             m_Browse.Click += (_, __) => Browse();
         }
@@ -89,7 +89,7 @@ namespace RaidDemo.Launcher
         /// <param name="parent">目标容器。</param>
         public void AddTo(Control parent)
         {
-            parent.Controls.AddRange(new Control[] { m_Label, m_Text, m_Browse });
+            parent.Controls.AddRange(new Control[] { m_Text, m_Browse });
         }
 
         /// <summary>刷新文本框显示的当前安装根（不触发切换）。</summary>
