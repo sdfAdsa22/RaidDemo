@@ -135,6 +135,22 @@ function Copy-Client {
     # "Container cannot be copied onto existing leaf item"（PowerShell 的已知行为）。
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
     Copy-Item (Join-Path $ClientDirectory "*") -Destination $directory -Recurse -Force
+
+    # 把资源层（Addressables 内容包）一并放进交付客户端。
+    #
+    # 为什么必须这一步：构建客户端时"资源"被拆成独立的内容层（content/ 目录，
+    # 由启动器或热更从更新源下载到本地缓存）。交付目录里如果只有本体，
+    # 一旦遇到"下载了新内容、本次进图却先用本体 catalog 解析地址"的时刻，
+    # Addressables 会去 StreamingAssets/aa/<平台>/ 找内容包——那里只有两个内建包，
+    # 于是报 Invalid path in AssetBundleProvider，进图直接失败（M12 云上 4 人局实测）。
+    # 放进内容层之后：解压即玩（离线可用），更新源可用时仍照常热更。
+    $contentSource = Join-Path $buildsRoot "Update\$Version\content"
+    $contentTarget = Join-Path $directory "RaidDemo_Data\StreamingAssets\aa\StandaloneWindows64"
+    if (Test-Path $contentSource) {
+        Write-Host "-> 客户端资源层：$contentSource"
+        New-Item -ItemType Directory -Path $contentTarget -Force | Out-Null
+        Copy-Item (Join-Path $contentSource "*") -Destination $contentTarget -Recurse -Force
+    }
 }
 
 <# 服务端：Windows 一键开服包 + Linux 云主机包，各占一个子目录。 #>
