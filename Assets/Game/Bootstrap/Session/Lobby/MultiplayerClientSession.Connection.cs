@@ -58,6 +58,10 @@ namespace RaidDemo.Bootstrap
         /// <returns>参数合法并已发起连接时返回 true。</returns>
         private bool BeginConnect(string address, string nickname, string passphrase, bool isReconnect)
         {
+            // 重新连接意味着旧会话的"已断开"终态作废：同实例复用（例如界面重试）时
+            // 必须把它清掉，否则 IsActive 会一直为 false。
+            m_Disconnected = false;
+
             if (IsConnected)
             {
                 SetError("已经连接到服务器了。");

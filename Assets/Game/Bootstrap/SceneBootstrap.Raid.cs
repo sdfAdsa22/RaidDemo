@@ -274,52 +274,6 @@ namespace RaidDemo.Bootstrap
             }
         }
 
-        /// <summary>把战局状态写进界面。</summary>
-        private void UpdateRaidHud(bool playerAlive)
-        {
-            if (m_RaidHud == null)
-            {
-                return;
-            }
-
-            m_RaidHud.SetTimer(m_RaidSession.RemainingSeconds, m_RaidSession.IsActive);
-            m_RaidHud.SetKills(m_RaidSession.Kills);
-
-            var searching = m_LootSearch != null && m_LootSearch.IsSearching;
-            var searchingContainer = searching ? FindLootContainer(m_LootSearch.TargetContainerId) : null;
-            m_RaidHud.SetSearchProgress(
-                searching,
-                m_LootSearch != null ? m_LootSearch.Progress01 : 0f,
-                searchingContainer != null ? $"搜刮中：{searchingContainer.Definition.DisplayName}" : "搜刮中…");
-
-            var usingItem = m_ItemUse != null && m_ItemUse.IsUsing;
-            m_RaidHud.SetUseProgress(
-                usingItem,
-                usingItem ? m_ItemUse.Progress01 : 0f,
-                usingItem ? $"使用中：{m_ItemUse.DisplayName}" : null);
-
-            if (m_InventoryScreen != null && m_InventoryScreen.IsOpen)
-            {
-                // 背包打开时不需要交互提示与撤离提示：玩家的注意力在物品上，
-                // 而且此时输入被屏蔽，提示会变成无法执行的噪声。
-                m_RaidHud.SetInteractionPrompt(null);
-                m_RaidHud.SetExtraction(false, null, 0f);
-                return;
-            }
-
-            var prompt = !searching && playerAlive && m_NearbyLoot != null
-                ? $"按 E 搜索 {m_NearbyLoot.Definition.DisplayName}"
-                : null;
-            m_RaidHud.SetInteractionPrompt(prompt);
-
-            var zone = m_ExtractionTracker != null ? m_ExtractionTracker.ActiveZone : null;
-            var extracting = zone != null && m_ExtractionTracker.ProgressSeconds > 0f;
-            m_RaidHud.SetExtraction(
-                extracting,
-                zone != null ? zone.DisplayName : string.Empty,
-                m_ExtractionTracker != null ? m_ExtractionTracker.Progress01 : 0f);
-        }
-
         /// <summary>玩家当前是否存活。</summary>
         private bool IsPlayerAlive()
         {

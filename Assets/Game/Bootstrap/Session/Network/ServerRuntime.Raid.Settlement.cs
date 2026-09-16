@@ -98,9 +98,12 @@ namespace RaidDemo.Bootstrap
                 ? Mathf.Max(0f, Time.realtimeSinceStartup - m_RaidStartedAt)
                 : 0f;
 
+            // AR-05：死亡/超时结算的金额是"损失价值"，不是"带出价值"。
+            // 旧文案对三种结局一律写"带出价值"，与下一行的"随身携带物已清空"自相矛盾。
+            var valueLabel = outcome == RaidOutcome.Extracted ? "带出价值" : "损失价值";
             m_Session?.Log.Info(
                 $"[服务器] 结算：玩家 {playerId} {DescribeOutcome(outcome)}，"
-                + $"带出价值 {carriedValue}，击杀 {progress.Kills}，用时 {elapsed:F0} 秒。");
+                + $"{valueLabel} {carriedValue}，击杀 {progress.Kills}，用时 {elapsed:F0} 秒。");
 
             BroadcastRaidOutcome(new RaidOutcomeMessage
             {

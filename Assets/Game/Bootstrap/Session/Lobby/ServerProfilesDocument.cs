@@ -53,5 +53,16 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>该账号的局外进度（金币、任务、随身装备、图鉴、角色选择）。</summary>
         public MetaSaveData progress;
+
+        /// <summary>
+        /// 该账号是否已经领过基础装备（AR-08）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么需要它：</b>基础装备（AK74 + 弹药）是"从零开始"的兜底配发，
+        /// 每个账号只该领一次。没有这个标记时，任何"进度被重建"的路径都会再发一套，
+        /// 而撤离会把随身装备全部入库——等于凭空多出一套装备。</para>
+        /// <para>老档没有这个字段时按 false 处理：至多再补领一次，属可接受。</para>
+        /// </remarks>
+        public bool starterKitIssued;
     }
 }

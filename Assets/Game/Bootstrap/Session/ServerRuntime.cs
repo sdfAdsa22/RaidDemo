@@ -161,6 +161,8 @@ namespace RaidDemo.Bootstrap
 
             // 权威世界的推进独立于心跳：每帧都要走，心跳只是周期性日志。
             TickWorld();
+            // 登录口令哈希的收尾（AR-07）：后台算完的结果必须回到主线程处理。
+            TickLoginJobs();
             TickProfiles(Time.deltaTime);
             TickLobby();
             TickServerIntegrations();

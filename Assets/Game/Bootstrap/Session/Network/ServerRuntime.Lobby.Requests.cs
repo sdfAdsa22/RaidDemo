@@ -25,89 +25,25 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            if (!m_Identities.TryLogin(
-                    nickname,
-                    secret,
-                    out var error,
-                    out var detail,
-                    out var token,
-                    out var created))
+            // 两段式登录（AR-07）：这一步只做便宜判断，PBKDF2 不在这里跑。
+            var attempt = m_Identities.BeginLogin(nickname, secret);
+            if (attempt.IsImmediate)
             {
-                var reason = string.IsNullOrEmpty(detail) ? DescribeLoginError(error) : detail;
-                SendLobbyResult(client.ClientId, LobbyRequestKind.Login, false, error, reason);
-                m_Session?.Log.Info(
-                    $"[服务器] 客户端 {client.ClientId} 登录失败（{(nickname ?? string.Empty).Trim()}）：{reason}");
-                return;
-            }
-
-            var displayName = (nickname ?? string.Empty).Trim();
-
-            // 重连接管（P5）：如果这个昵称正处在掉线宽限里，本次登录就是"回来接管自己"，
-            // 而不是一次新的登录。必须排在"昵称是否在线"之前判断——宽限中的那条记录
-            // 在名册上仍然是 LoggedIn，不区分的话会被判成"昵称已被占用"。
-            var graced = FindGracedClient(displayName, client.ClientId, out var graceKey);
-            if (graced != null)
-            {
-                client.Nickname = displayName;
-                client.LoggedIn = true;
-
-                if (TryResumeGracedSession(graced, graceKey, client))
+                if (!attempt.ImmediateSuccess)
                 {
-                    SendLobbyResult(
-                        client.ClientId,
-                        LobbyRequestKind.Login,
-                        true,
-                        LobbyError.None,
-                        "已重连回原来的房间。",
-                        token);
+                    SendLobbyLoginFailure(client, nickname, attempt.ImmediateError, attempt.ImmediateDetail);
                     return;
                 }
 
-                // 接管失败（例如房间已经解散）：按普通登录继续走下面的流程。
-                client.Nickname = null;
-                client.LoggedIn = false;
-            }
-
-            if (IsNicknameOnline(displayName, client.ClientId))
-            {
-                SendLobbyResult(client.ClientId, LobbyRequestKind.Login, false,
-                    LobbyError.NicknameOnline, "该昵称已在服务器上游戏中，请换一个昵称。");
+                FinishLobbyLogin(
+                    client, attempt.Nickname, attempt.ImmediateDetail,
+                    attempt.ImmediateToken, attempt.ImmediateCreated);
                 return;
             }
 
-            client.Nickname = displayName;
-            client.LoggedIn = true;
-
-            SendLobbyResult(
-                client.ClientId,
-                LobbyRequestKind.Login,
-                true,
-                LobbyError.None,
-                string.IsNullOrEmpty(detail) ? "登录成功。" : detail,
-                token);
-
-            m_Session?.Log.Info(
-                $"[服务器] 玩家 {client.ClientId} 以「{displayName}」登录{(created ? "（新建账号）" : "（老账号）")}。");
-
-            // 登录即把该账号的进度（金币 / 任务 / 随身装备）从服务端存档里取出来（P5）。
-            // 仓库是房间级共享的，不在这里取。
-            var profile = ResolveProfile(displayName);
-            if (profile != null)
-            {
-                m_Session?.Log.Info(
-                    $"[服务器] 账号「{displayName}」的进度已就绪：金币 {profile.Money}，"
-                    + $"随身背包 {profile.Loadout.Backpack.Items.Count} 件，"
-                    + $"共享仓库 {profile.Stash.Items.Count} 件。");
-            }
-            else
-            {
-                // 目录还没交接到（极早期登录）：不阻塞登录，进度会在后续操作里按需补上。
-                m_Session?.Log.Warning(
-                    $"[服务器] 账号「{displayName}」的进度暂不可用（物品目录或存档未就绪），稍后重试。");
-            }
-
-            // 登录成功后才点对点发房间状态：此时对方的处理器一定已经注册好了（P-20）。
-            SendRoomStateTo(client.ClientId);
+            // 需要 PBKDF2：投给后台线程，算完在 Update 里收尾；
+            // 主线程在这期间继续跑帧（否则 0.7 秒停顿会把别人打成"掉线"）。
+            EnqueuePendingLogin(client, attempt);
         }
 
         /// <summary>

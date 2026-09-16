@@ -20,10 +20,13 @@ namespace RaidDemo.Bootstrap
     /// <para><b>它与游戏进度无关：</b>本类只回答"你是谁"。仓库、金币、任务的落库属于 P5，
     /// 那部分与联机存档的隔离策略一起设计，不能顺手塞进这里。</para>
     ///
-    /// <para><b>线程约束：</b>只在主线程调用（与项目其余部分一致）。写文件在登录时发生，
-    /// 一次登录一次写入：账号数量级很小，不值得为此引入异步。</para>
+    /// <para><b>线程约束（AR-07 起）：</b>账号表与落盘只在主线程访问；
+    /// 唯一的例外是 <see cref="ComputeHashHex"/>——它是纯函数，被服务器编排层
+    /// 放到后台线程执行，避免 10 万次 PBKDF2 阻塞主线程（那会让 NGO 心跳超时）。
+    /// 登录因此拆成 <see cref="BeginLogin"/> / <see cref="CompleteLogin"/> 两段，
+    /// <see cref="TryLogin"/> 保留为同步包装（测试与简单调用方使用）。</para>
     /// </remarks>
-    public sealed class ServerIdentityStore
+    public sealed partial class ServerIdentityStore
     {
         /// <summary>默认文件名（放在服务器的存档目录下）。</summary>
         public const string DefaultFileName = "accounts.json";
@@ -128,16 +131,41 @@ namespace RaidDemo.Bootstrap
             out string token,
             out bool createdAccount)
         {
-            error = LobbyError.None;
-            detail = null;
-            token = null;
-            createdAccount = false;
+            // 同步路径：给测试与"没有后台编排"的调用方用。
+            // 服务器实际走 BeginLogin / CompleteLogin 两段式（见 ServerRuntime.Lobby.Login.cs）。
+            var attempt = BeginLogin(nickname, secret);
+            if (attempt.IsImmediate)
+            {
+                error = attempt.ImmediateError;
+                detail = attempt.ImmediateDetail;
+                token = attempt.ImmediateToken;
+                createdAccount = attempt.ImmediateCreated;
+                return attempt.ImmediateSuccess;
+            }
 
+            var hash = ComputeHashHex(attempt.Passphrase, attempt.Salt, attempt.Iterations);
+            return CompleteLogin(attempt, hash, out error, out detail, out token, out createdAccount);
+        }
+
+        /// <summary>
+        /// 登录第一步（主线程、无重计算）：做便宜的判断，或者给出后台算哈希的输入。
+        /// </summary>
+        /// <param name="nickname">昵称。</param>
+        /// <param name="secret">口令或 token。</param>
+        /// <returns>两段式登录的第一步结果。</returns>
+        /// <remarks>
+        /// 这一步不做任何 PBKDF2 计算，因此可以在登录请求到达的那一帧直接调用而不卡顿。
+        /// 昵称不合法、token 快速路径、格式错误都会在这里直接给出结论。
+        /// </remarks>
+        public ServerLoginAttempt BeginLogin(string nickname, string secret)
+        {
             if (!LobbyLimits.IsValidNickname(nickname))
             {
-                error = LobbyError.BadNickname;
-                detail = $"昵称需要 1~{LobbyLimits.MaxNicknameLength} 个字符，且不能包含竖线。";
-                return false;
+                return ServerLoginAttempt.Immediate(
+                    null,
+                    false,
+                    LobbyError.BadNickname,
+                    $"昵称需要 1~{LobbyLimits.MaxNicknameLength} 个字符，且不能包含竖线。");
             }
 
             var key = nickname.Trim();
@@ -146,14 +174,91 @@ namespace RaidDemo.Bootstrap
                 // 首次登录＝建号：必须给出合法口令，token 不可能凭空出现。
                 if (!LobbyLimits.IsValidPassphrase(secret))
                 {
-                    error = LobbyError.BadPasswordFormat;
-                    detail =
+                    return ServerLoginAttempt.Immediate(
+                        key,
+                        false,
+                        LobbyError.BadPasswordFormat,
                         $"第一次使用昵称「{key}」需要设置 "
-                        + $"{LobbyLimits.MinPassphraseDigits}~{LobbyLimits.MaxPassphraseDigits} 位数字口令。";
-                    return false;
+                        + $"{LobbyLimits.MinPassphraseDigits}~{LobbyLimits.MaxPassphraseDigits} 位数字口令。");
                 }
 
-                account = CreateAccount(key, secret);
+                // 盐在这里生成：后台线程只做纯计算，不碰随机源与共享状态。
+                return ServerLoginAttempt.PendingHash(
+                    key, secret, RandomBytes(SaltBytes), DefaultHashIterations, creatingAccount: true);
+            }
+
+            if (LobbyLimits.IsValidToken(secret))
+            {
+                if (string.Equals(account.Token, secret, StringComparison.OrdinalIgnoreCase))
+                {
+                    return ServerLoginAttempt.Immediate(
+                        key, true, LobbyError.None, $"欢迎回来，{key}。", account.Token);
+                }
+
+                return ServerLoginAttempt.Immediate(
+                    key, false, LobbyError.BadSecret, "登录令牌已失效，请输入口令重新登录。");
+            }
+
+            if (!LobbyLimits.IsValidPassphrase(secret))
+            {
+                return ServerLoginAttempt.Immediate(
+                    key,
+                    false,
+                    LobbyError.BadPasswordFormat,
+                    $"口令需要 {LobbyLimits.MinPassphraseDigits}~{LobbyLimits.MaxPassphraseDigits} 位数字，"
+                    + "或直接回车使用上次保存的登录令牌。");
+            }
+
+            byte[] salt;
+            try
+            {
+                salt = Convert.FromBase64String(account.Salt);
+            }
+            catch (FormatException)
+            {
+                // 存档里的盐坏了：按"口令不正确"处理，避免把内部状态暴露给客户端。
+                return ServerLoginAttempt.Immediate(
+                    key, false, LobbyError.NicknameTaken, DescribeWrongPassphrase(key));
+            }
+
+            var iterations = account.Iterations > 0 ? account.Iterations : DefaultHashIterations;
+            return ServerLoginAttempt.PendingHash(key, secret, salt, iterations, creatingAccount: false);
+        }
+
+        /// <summary>
+        /// 登录第二步（主线程）：用后台算好的哈希收尾。
+        /// </summary>
+        /// <param name="attempt">第一步的结果（必须是 PendingHash 形态）。</param>
+        /// <param name="hashHex">后台线程算出的哈希（十六进制小写）。</param>
+        /// <param name="error">失败原因。</param>
+        /// <param name="detail">给玩家看的说明。</param>
+        /// <param name="token">自动登录令牌（成功时）。</param>
+        /// <param name="createdAccount">本次是否新建了账号。</param>
+        /// <returns>登录成功返回 true。</returns>
+        public bool CompleteLogin(
+            ServerLoginAttempt attempt,
+            string hashHex,
+            out LobbyError error,
+            out string detail,
+            out string token,
+            out bool createdAccount)
+        {
+            error = LobbyError.None;
+            detail = null;
+            token = null;
+            createdAccount = false;
+
+            if (attempt == null || attempt.IsImmediate)
+            {
+                error = LobbyError.BadSecret;
+                detail = "登录流程状态异常，请重试。";
+                return false;
+            }
+
+            var key = attempt.Nickname;
+            if (attempt.CreatingAccount)
+            {
+                var account = CreateAccount(key, attempt.Salt, hashHex);
                 m_Accounts[key] = account;
                 createdAccount = true;
                 token = account.Token;
@@ -169,39 +274,23 @@ namespace RaidDemo.Bootstrap
                 return true;
             }
 
-            if (LobbyLimits.IsValidToken(secret))
-            {
-                if (string.Equals(account.Token, secret, StringComparison.OrdinalIgnoreCase))
-                {
-                    token = account.Token;
-                    detail = $"欢迎回来，{key}。";
-                    return true;
-                }
-
-                error = LobbyError.BadSecret;
-                detail = "登录令牌已失效，请输入口令重新登录。";
-                return false;
-            }
-
-            if (!LobbyLimits.IsValidPassphrase(secret))
-            {
-                error = LobbyError.BadPasswordFormat;
-                detail =
-                    $"口令需要 {LobbyLimits.MinPassphraseDigits}~{LobbyLimits.MaxPassphraseDigits} 位数字，"
-                    + "或直接回车使用上次保存的登录令牌。";
-                return false;
-            }
-
-            if (!Verify(account, secret))
+            if (!m_Accounts.TryGetValue(key, out var existing)
+                || !FixedTimeEquals(hashHex, existing.Hash))
             {
                 error = LobbyError.NicknameTaken;
-                detail = $"昵称「{key}」已被占用：口令不正确。请换个昵称，或输入正确口令。";
+                detail = DescribeWrongPassphrase(key);
                 return false;
             }
 
-            token = account.Token;
+            token = existing.Token;
             detail = $"欢迎回来，{key}。";
             return true;
+        }
+
+        /// <summary>口令错误时给玩家的统一说明（不区分"账号不存在"与"口令不对"，防止昵称枚举）。</summary>
+        private static string DescribeWrongPassphrase(string key)
+        {
+            return $"昵称「{key}」已被占用：口令不正确。请换个昵称，或输入正确口令。";
         }
 
         /// <summary>把账号写入磁盘。失败时返回 false 并给出原因。</summary>
@@ -265,84 +354,18 @@ namespace RaidDemo.Bootstrap
             }
         }
 
-        /// <summary>用随机盐生成一个新账号。</summary>
-        private static AccountRecord CreateAccount(string nickname, string passphrase)
+        /// <summary>用给定的盐与哈希生成一条新账号记录（哈希由调用方在后台算好）。</summary>
+        private static AccountRecord CreateAccount(string nickname, byte[] salt, string hashHex)
         {
-            var salt = RandomBytes(SaltBytes);
             return new AccountRecord
             {
                 Nickname = nickname,
                 Salt = Convert.ToBase64String(salt),
-                Hash = ComputeHashHex(passphrase, salt, DefaultHashIterations),
+                Hash = hashHex,
                 Token = ToHex(RandomBytes(TokenBytes)),
                 Iterations = DefaultHashIterations,
             };
         }
 
-        /// <summary>校验口令是否与该账号匹配。</summary>
-        private static bool Verify(AccountRecord account, string passphrase)
-        {
-            byte[] salt;
-            try
-            {
-                salt = Convert.FromBase64String(account.Salt);
-            }
-            catch (FormatException)
-            {
-                return false;
-            }
-
-            var iterations = account.Iterations > 0 ? account.Iterations : DefaultHashIterations;
-            var candidate = ComputeHashHex(passphrase, salt, iterations);
-
-            // 定长比较：不同长度直接返回 false，不做早期退出的逐字符比较。
-            return FixedTimeEquals(candidate, account.Hash);
-        }
-
-        /// <summary>
-        /// 定长字符串比较。
-        /// </summary>
-        /// <remarks>
-        /// 常规的 <c>==</c> 会在第一个不同的字符处返回，理论上能通过计时差逐字节试出哈希。
-        /// 这条通道延迟很高、噪声很大，但修它的成本是几行代码，没有理由留着。
-        /// </remarks>
-        private static bool FixedTimeEquals(string left, string right)
-        {
-            if (left == null || right == null || left.Length != right.Length)
-            {
-                return false;
-            }
-
-            var difference = 0;
-            for (var i = 0; i < left.Length; i++)
-            {
-                difference |= left[i] ^ right[i];
-            }
-
-            return difference == 0;
-        }
-
-        /// <summary>取密码学安全的随机字节。</summary>
-        private static byte[] RandomBytes(int count)
-        {
-            var buffer = new byte[count];
-            RandomNumberGenerator.Fill(buffer);
-            return buffer;
-        }
-
-        /// <summary>字节 → 小写十六进制。</summary>
-        private static string ToHex(byte[] bytes)
-        {
-            var chars = new char[bytes.Length * 2];
-            const string Digits = "0123456789abcdef";
-
-            for (var i = 0; i < bytes.Length; i++)
-            {
-                chars[i * 2] = Digits[bytes[i] >> 4];
-                chars[(i * 2) + 1] = Digits[bytes[i] & 0x0F];
-            }
-
-            return new string(chars);
-        }
     }
 }

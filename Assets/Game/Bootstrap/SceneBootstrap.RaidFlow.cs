@@ -39,7 +39,7 @@ namespace RaidDemo.Bootstrap
 
             UpdateLootSearch(deltaTime, playerPosition, playerAlive, inputBlocked);
             UpdateItemUse(deltaTime, playerAlive, inputBlocked);
-            UpdateRaidHud(playerAlive);
+            UpdateRaidHud(playerAlive, playerPosition);
         }
 
         /// <summary>

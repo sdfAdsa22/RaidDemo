@@ -148,5 +148,42 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(0, extracted.LostValue);
             Assert.AreEqual(0, extracted.LostItems.Count);
         }
+
+        [Test]
+        public void 阵亡结算的损失清单包含弹药挂且合计等于逐行之和()
+        {
+            // AR-02 的复验用例：M11 报告里"损失 1,800、清单只列 1,300"的疑点，
+            // 需要一条能一眼看穿的断言——清单必须覆盖弹药挂，且总价值 = 清单逐行相加。
+            var backpack = new InventoryGrid(3, 3, "测试背包");
+            var pouch = new InventoryGrid(5, 1, "测试弹药挂", acceptedCategory: ItemCategory.Ammo);
+            var equipment = new EquipmentLoadout();
+            var factory = new ItemFactory();
+
+            var pistol = new TestItemDefinition(
+                "weapon.pistol.pm", ItemCategory.Weapon, baseValue: 1300, rarity: RarityTier.Common);
+            var ammo = new TestItemDefinition(
+                "ammo.9x19.standard", ItemCategory.Ammo,
+                baseValue: 5, maxStack: 100, rarity: RarityTier.Common);
+
+            equipment.Equip(factory.Create(pistol, 1), EquipmentSlot.PrimaryWeapon);
+            pouch.AutoPlace(factory.Create(ammo, 100));
+            var loadout = new PlayerLoadout(backpack, equipment, pouch);
+
+            var expected = 1300 + (5 * 100);
+            Assert.AreEqual(expected, RaidResult.ComputeCarriedValue(loadout), "带入价值必须含弹药挂");
+
+            var killed = RaidResult.Create(
+                RaidOutcome.TimeExpired, kills: 0, elapsedSeconds: 480f, expected, loadout);
+            Assert.AreEqual(expected, killed.LostValue, "超时结算按损失计");
+            Assert.AreEqual(2, killed.LostItems.Count, "清单必须同时包含手枪与弹药（弹药挂不能丢）");
+
+            var sum = 0;
+            for (var i = 0; i < killed.LostItems.Count; i++)
+            {
+                sum += killed.LostItems[i].TotalValue;
+            }
+
+            Assert.AreEqual(killed.LostValue, sum, "合计必须等于清单逐行相加");
+        }
     }
 }

@@ -292,7 +292,10 @@ namespace RaidDemo.Bootstrap
             // P5.5：击杀类任务（如「清道夫」）在服务器推进——联机时客户端那份任务进度
             // 只是服务器快照的镜像，写它等于写了个下一帧就被覆盖的数字。
             var killerPlayerId = ResolvePlayerId(evt.KillerId);
-            if (killerPlayerId > 0)
+            // AR-05：编号空间可能串号（玩家编号与战斗单位编号是两套），
+            // 只靠 ResolvePlayerId 会把"AI 打 AI"记到某个玩家头上（云上出现过
+            // 全程未开火的玩家结算出 1 次击杀）。因此必须再确认杀手真的是玩家单位。
+            if (killerPlayerId > 0 && IsPlayerCombatant(evt.KillerId))
             {
                 // 结算里的击杀数（RD-AUD-045）：这个字段以前只被读、从来没人写，
                 // 于是服务器下发的击杀数恒为 0，而客户端又用本地数据盖住了它——

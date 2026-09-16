@@ -153,5 +153,52 @@ namespace RaidDemo.Tests.EditMode
             Assert.IsTrue(json.Contains("Hash"), "账号文件里没有哈希字段。");
             Assert.IsTrue(json.Contains("Salt"), "账号文件里没有盐字段。");
         }
+
+        [Test]
+        public void 两段式登录_第一步不计算哈希_第二步用哈希收尾()
+        {
+            // AR-07：主线程只做便宜判断（格式 / token 快速路径），PBKDF2 交给调用方放进后台。
+            var store = new ServerIdentityStore(m_Directory);
+
+            var attempt = store.BeginLogin("小明", "123456");
+            Assert.IsFalse(attempt.IsImmediate, "首次登录需要后台算哈希");
+            Assert.IsTrue(attempt.CreatingAccount);
+            Assert.IsNotNull(attempt.Salt, "第一步必须把盐准备好，后台线程只做纯计算");
+            Assert.AreEqual(ServerIdentityStore.DefaultHashIterations, attempt.Iterations);
+
+            var hash = ServerIdentityStore.ComputeHashHex(
+                attempt.Passphrase, attempt.Salt, attempt.Iterations);
+            var ok = store.CompleteLogin(
+                attempt, hash, out var error, out var detail, out var token, out var created);
+
+            Assert.IsTrue(ok, string.IsNullOrEmpty(detail) ? error.ToString() : detail);
+            Assert.IsTrue(created);
+            Assert.IsFalse(string.IsNullOrEmpty(token));
+
+            // token 快速路径必须立即返回（不进后台队列）。
+            var fast = store.BeginLogin("小明", token);
+            Assert.IsTrue(fast.IsImmediate, "token 自动登录不应再算一次哈希");
+            Assert.IsTrue(fast.ImmediateSuccess);
+        }
+
+        [Test]
+        public void 两段式登录_错误口令在收尾阶段被拒()
+        {
+            var store = new ServerIdentityStore(m_Directory);
+
+            var first = store.BeginLogin("小红", "1234");
+            var firstHash = ServerIdentityStore.ComputeHashHex(
+                first.Passphrase, first.Salt, first.Iterations);
+            Assert.IsTrue(store.CompleteLogin(first, firstHash, out _, out _, out _, out _));
+
+            var attempt = store.BeginLogin("小红", "9999");
+            Assert.IsFalse(attempt.IsImmediate);
+            var wrongHash = ServerIdentityStore.ComputeHashHex(
+                attempt.Passphrase, attempt.Salt, attempt.Iterations);
+            var ok = store.CompleteLogin(attempt, wrongHash, out var error, out _, out _, out _);
+
+            Assert.IsFalse(ok);
+            Assert.AreEqual(LobbyError.NicknameTaken, error);
+        }
     }
 }

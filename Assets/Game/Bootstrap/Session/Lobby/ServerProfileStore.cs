@@ -50,6 +50,9 @@ namespace RaidDemo.Bootstrap
         private readonly InventoryGrid m_SharedStash;
         private readonly Dictionary<string, MetaProgress> m_Profiles =
             new Dictionary<string, MetaProgress>(StringComparer.Ordinal);
+        /// <summary>已领过基础装备的账号（AR-08；随进度文档落盘）。</summary>
+        private readonly Dictionary<string, bool> m_StarterKitIssued =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
         private readonly List<string> m_LoadProblems = new List<string>();
 
         private IItemDefinitionLookup m_Catalog;
@@ -149,7 +152,19 @@ namespace RaidDemo.Bootstrap
             // 新账号发一套基础装备（P5）：否则在"商店尚未服务端权威化"的阶段，
             // 联机新玩家手里什么都没有、也买不到东西，连一局都打不了。
             // 装备填进"随身装备"而不是仓库：玩家进图就能用，撤离时又会按规则入共享仓库。
-            var granted = ServerStarterKit.Apply(created.Loadout, m_Catalog, new ItemFactory());
+            //
+            // AR-08：每个账号只发一次。标记随进度文档落盘——撤离把装备搬进仓库之后，
+            // 进度文档仍在，"再建一份空进度"的路径不会又发一套（那正是"空手进图→撤离入库"
+            // 反复刷装备的入口）。
+            var granted = 0;
+            if (!WasStarterKitIssued(key))
+            {
+                granted = ServerStarterKit.Apply(created.Loadout, m_Catalog, new ItemFactory());
+                if (granted > 0)
+                {
+                    m_StarterKitIssued[key] = true;
+                }
+            }
 
             m_Profiles[key] = created;
             MarkDirty();
@@ -173,6 +188,17 @@ namespace RaidDemo.Bootstrap
             }
 
             return m_Profiles.TryGetValue(nickname.Trim(), out var progress) ? progress : null;
+        }
+
+        /// <summary>该账号是否已领过基础装备（AR-08）。</summary>
+        public bool WasStarterKitIssued(string nickname)
+        {
+            if (string.IsNullOrWhiteSpace(nickname))
+            {
+                return false;
+            }
+
+            return m_StarterKitIssued.TryGetValue(nickname.Trim(), out var issued) && issued;
         }
 
         /// <summary>标记"有改动待落盘"。</summary>
@@ -253,6 +279,7 @@ namespace RaidDemo.Bootstrap
                 {
                     nickname = pair.Key,
                     progress = data,
+                    starterKitIssued = WasStarterKitIssued(pair.Key),
                 });
             }
 
@@ -303,6 +330,10 @@ namespace RaidDemo.Bootstrap
                 }
 
                 m_Profiles[record.nickname.Trim()] = progress;
+                if (record.starterKitIssued)
+                {
+                    m_StarterKitIssued[record.nickname.Trim()] = true;
+                }
 
                 for (var p = 0; p < problems.Count; p++)
                 {

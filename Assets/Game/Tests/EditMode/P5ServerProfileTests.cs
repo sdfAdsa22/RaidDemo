@@ -5,6 +5,7 @@ using RaidDemo.Data;
 using RaidDemo.Inventory;
 using RaidDemo.Kernel;
 using RaidDemo.Meta;
+using RaidDemo.Shared;
 
 namespace RaidDemo.Tests.EditMode
 {
@@ -126,6 +127,43 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(1, document.sharedStash.Length, "共享仓库写在文档级。");
             Assert.AreEqual(1, document.profiles.Length);
             Assert.AreEqual(0, document.profiles[0].progress.stash.Length, "账号记录里不该再写一份仓库。");
+        }
+
+        [Test]
+        public void 基础装备每个账号只发一次()
+        {
+            // AR-08：基础装备是"从零开始"的一次性兜底，撤离入库之后不得再发一套。
+            var catalog = new TestItemLookup()
+                .Add(new TestItemDefinition(
+                    "weapon.rifle.ak74", category: ItemCategory.Weapon,
+                    width: 2, height: 1, baseValue: 1000, weaponStats: new TestWeaponStats()))
+                .Add(new TestItemDefinition(
+                    "ammo.5.45.standard", category: ItemCategory.Ammo, baseValue: 10, maxStack: 60));
+
+            var store = new ServerProfileStore(m_Directory);
+            Assert.IsTrue(store.Configure(catalog));
+
+            var profile = store.GetOrCreate("新兵");
+            Assert.IsTrue(store.WasStarterKitIssued("新兵"), "建号时应当记为已发。");
+            Assert.IsNotNull(
+                profile.Loadout.Equipment.Get(EquipmentSlot.PrimaryWeapon), "建号应配发一把武器。");
+
+            // 模拟撤离：随身装备全部进共享仓库，随身变空。
+            var deposited = profile.DepositLoadoutToStash();
+            Assert.Greater(deposited, 0, "先模拟撤离入库。");
+
+            var again = store.GetOrCreate("新兵");
+            Assert.AreSame(profile, again);
+            Assert.IsNull(
+                again.Loadout.Equipment.Get(EquipmentSlot.PrimaryWeapon),
+                "撤离之后不得再发一套基础装备。");
+
+            // 重启后标记也要读得回来（否则重建进度时会再发一套）。
+            Assert.IsTrue(store.SaveAll(), "落盘应成功。");
+            var reopened = new ServerProfileStore(m_Directory);
+            Assert.IsTrue(reopened.Configure(catalog));
+            reopened.GetOrCreate("新兵");
+            Assert.IsTrue(reopened.WasStarterKitIssued("新兵"), "重启后仍应记得已经发过。");
         }
     }
 }

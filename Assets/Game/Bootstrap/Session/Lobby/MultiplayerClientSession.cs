@@ -68,8 +68,19 @@ namespace RaidDemo.Bootstrap
         /// <summary>当前会话（进程内唯一）。</summary>
         public static MultiplayerClientSession Current { get; private set; }
 
-        /// <summary>是否存在活动的联机会话。</summary>
-        public static bool IsActive => Current != null;
+        /// <summary>
+        /// 是否存在活动的联机会话。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么要排除"已主动断开"的会话（AR-06）：</b>退出联机时
+        /// <see cref="Disconnect"/> 只关了网络与房间状态，而 <see cref="Current"/> 仍然非空
+        /// （只有 <c>OnDestroy</c> 才会清空）。于是"返回主菜单"重载安全屋后，
+        /// <c>SafeHouseBootstrap.IsMultiplayerProcess</c> 依旧为真，安全屋按联机进程装配：
+        /// 不显示主菜单、直接进入安全屋，Esc 只能弹出暂停菜单。</para>
+        /// <para>现在把"主动断开"记成终态：它一旦置位，本会话就不再算活动会话，
+        /// 重载后的安全屋会走"显示主菜单"那条分支。</para>
+        /// </remarks>
+        public static bool IsActive => Current != null && !Current.m_Disconnected;
 
         /// <summary>网络管理器（战局装配根会借用它）。</summary>
         public NetworkManager Network => m_Network;
@@ -150,13 +161,33 @@ namespace RaidDemo.Bootstrap
         private bool m_AutoRoomRequested;
         private bool m_RaidStartSeen;
 
+        /// <summary>
+        /// 是否已被玩家主动断开（终态）。
+        /// </summary>
+        /// <remarks>
+        /// 与"连接意外断开"区分：后者会走自动重连（<c>Reconnecting</c> 阶段），
+        /// 本标记只由 <see cref="Disconnect"/> 置位，且只能通过销毁重建来清除。
+        /// </remarks>
+        private bool m_Disconnected;
+
+        /// <summary>本会话是否已主动断开（供界面与测试读取）。</summary>
+        public bool IsDisconnected => m_Disconnected;
+
         /// <summary>取得（必要时创建）唯一的联机会话。</summary>
         /// <remarks>宿主对象跨场景存活：大厅在安全屋、战局在地图场景，连接必须活过这次切换。</remarks>
         public static MultiplayerClientSession Ensure()
         {
             if (Current != null)
             {
-                return Current;
+                if (!Current.m_Disconnected)
+                {
+                    return Current;
+                }
+
+                // 旧会话已主动断开：它不是可复用的活动会话，销毁后重建，
+                // 否则"退出联机 → 再次联机"会拿到一个已死掉的会话。
+                UnityEngine.Object.Destroy(Current.gameObject);
+                Current = null;
             }
 
             var host = new GameObject("MultiplayerClient");
@@ -216,6 +247,10 @@ namespace RaidDemo.Bootstrap
             m_RaidStartSeen = false;
             SetPhase(MultiplayerClientPhase.Offline);
             StatusText = string.Empty;
+
+            // 终态标记必须最后置位：上面的清理过程里还会读 Phase / 状态，
+            // 提前置位会让"断开中"的半成品状态被当成已断开。
+            m_Disconnected = true;
         }
 
         /// <summary>清空提示（界面切换时用）。</summary>

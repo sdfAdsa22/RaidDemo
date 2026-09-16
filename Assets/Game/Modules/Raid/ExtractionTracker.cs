@@ -134,6 +134,38 @@ namespace RaidDemo.Raid
         }
 
         /// <summary>
+        /// 找出"靠近但还没进入判定圈"的最近撤离点（仅用于接近提示，AR-03）。
+        /// </summary>
+        /// <param name="position">玩家当前位置。</param>
+        /// <param name="extraRangeMeters">判定圈之外还允许的接近距离（米）。</param>
+        /// <returns>范围内最近的撤离点；都在范围外时返回 null。</returns>
+        /// <remarks>
+        /// 它不参与读秒判定——读秒仍然只认 <see cref="FindZone"/>。
+        /// 45° 视角下角色视觉站位与脚下坐标有偏差，没有这句提示时玩家容易站在圈外干等。
+        /// </remarks>
+        public ExtractionZone FindNearest(Vector2F position, float extraRangeMeters)
+        {
+            ExtractionZone nearest = null;
+            var bestDistance = float.MaxValue;
+            var range = extraRangeMeters > 0f ? extraRangeMeters : 0f;
+
+            for (var i = 0; i < m_Zones.Count; i++)
+            {
+                var zone = m_Zones[i];
+                var distance = Vector2F.Distance(position, zone.Center);
+                if (distance > zone.Radius + range || distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = distance;
+                nearest = zone;
+            }
+
+            return nearest;
+        }
+
+        /// <summary>
         /// 结束当前这次读秒并广播清零。
         /// </summary>
         /// <param name="zoneId">刚离开的撤离点编号，0 表示本来就不在任何点内。</param>

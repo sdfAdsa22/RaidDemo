@@ -124,10 +124,14 @@ namespace RaidDemo.Bootstrap.Editor
         {
             // 横向位置必须与地形剖面的坡道中心一致，否则玩家爬到顶也踩不到撤离区；
             // 它们同样必须落在真正的空地上（批次 2 初期东/西坡道撞上集装箱与厂房，撤离点被堵死）。
-            (1, "北坡顶", new Vector2(BasinTerrainProfile.NorthRampCenterX, 34f), BasinTerrainProfile.RimHeight, 2.0f),
-            (2, "东坡顶", new Vector2(34f, BasinTerrainProfile.EastRampCenterZ), BasinTerrainProfile.RimHeight, 2.0f),
-            (3, "西坡顶", new Vector2(-34f, BasinTerrainProfile.WestRampCenterZ), BasinTerrainProfile.RimHeight, 2.0f),
-            (4, "南谷口", new Vector2(BasinTerrainProfile.SouthCanyonCenterX, -29.5f), 0f, 2.0f),
+            // AR-03：半径从 2.0 提到 3.5 米。2 米只比角色体积大一点，45° 视角下
+            // 角色"看起来站在圈中心"时脚下实际坐标可能已贴边——玩家会以为读秒坏了。
+            // 3.5 米是组件默认值与 ExtractionZone 注释里写的设计意图；地面色块按
+            // radius×2 自动同步，因此视觉不会与判定脱节。
+            (1, "北坡顶", new Vector2(BasinTerrainProfile.NorthRampCenterX, 34f), BasinTerrainProfile.RimHeight, 3.5f),
+            (2, "东坡顶", new Vector2(34f, BasinTerrainProfile.EastRampCenterZ), BasinTerrainProfile.RimHeight, 3.5f),
+            (3, "西坡顶", new Vector2(-34f, BasinTerrainProfile.WestRampCenterZ), BasinTerrainProfile.RimHeight, 3.5f),
+            (4, "南谷口", new Vector2(BasinTerrainProfile.SouthCanyonCenterX, -29.5f), 0f, 3.5f),
         };
 
         /// <summary>

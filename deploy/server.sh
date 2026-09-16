@@ -123,8 +123,22 @@ start() {
     # 参数用数组承载（房间名等可能带空格，字符串拼接会被再次分词拆坏）。
     local -a app_args=(-server)
 
+    # AR-01：chroot 模式下 -config 必须传 rootfs 内的路径。
+    # 直接传宿主路径时 chroot 里看不到文件，服务器读不到配置、启动失败，
+    # 甚至会退化成单机客户端（云主机上踩过一次，表现为 7777 不监听）。
+    local config_path="$CONFIG_FILE"
+    if [ -n "$CHROOT_DIR" ]; then
+        config_path="/raid-demo/server.config.json"
+    fi
+
     if [ -f "$CONFIG_FILE" ]; then
-        app_args+=(-config "$CONFIG_FILE")
+        if [ -n "$CHROOT_DIR" ] && ! chroot "$CHROOT_DIR" /bin/bash -c "test -f '$config_path'"; then
+            echo "chroot 内看不到配置文件 $config_path" >&2
+            echo "请检查 setup_chroot.sh 建立的 bind mount，或先跑一次 /raid-demo/server.sh --check。" >&2
+            exit 1
+        fi
+
+        app_args+=(-config "$config_path")
     else
         app_args+=(
             -port "$PORT"
