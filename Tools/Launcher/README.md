@@ -47,12 +47,13 @@ dotnet publish Tools/Launcher/RaidDemo.Launcher.csproj -c Release -o Builds/Tool
 
 | 字段 | 含义 |
 | --- | --- |
-| `installRoot` | 游戏安装根。默认 `Game`（相对启动器目录）；在界面上选过目录后写成绝对路径（只落在被忽略的 `launcher.config.local.json` 里） |
+| `installRoot` | 游戏安装根。默认 `RaidDemo`（相对启动器目录）；在界面上选过目录后写成"所选目录 + `RaidDemo`"的绝对路径（只落在被忽略的 `launcher.config.local.json` 里） |
 | `gameExecutable` | 游戏可执行文件名（相对安装根） |
 | `selectedSource` | 默认选中的更新源名称 |
 | `sources[].manifestSource` | 更新源地址：`http(s)://…` 或本地目录（本机演示可不起服务） |
 | `sources[].gameServer` | 该源对应的默认游戏服务器地址（启动游戏时作为 `-connect` 传入） |
 | `sources[].editable` | 是否允许在界面上直接编辑地址（自定义源） |
+| `sources[].hideAddress` | 是否在界面上隐藏该源的地址（默认 `false`；模板里的 `云主机` 为 `true`，避免演示时拍到公网 IP） |
 | `extraGameArguments` | 追加给游戏的额外参数（空格分隔，可留空） |
 
 安装根下的运行时目录：
@@ -72,7 +73,18 @@ dotnet publish Tools/Launcher/RaidDemo.Launcher.csproj -c Release -o Builds/Tool
 ### 5.1 图形界面（玩家）
 
 直接双击 `RaidDemo.Launcher.exe`：选更新源 → 选安装目录 → 看本地版本 →
-`检查更新` / `更新并启动`。更新期间界面保持可响应，日志实时显示。
+`检查更新` / `下载` / `更新并启动`。更新期间界面保持可响应，日志实时显示。
+
+三个按钮的差别只在"做多少"：
+
+| 按钮 | 比对 | 下载并落盘 | 启动游戏 |
+| --- | --- | --- | --- |
+| 检查更新 | ✅ | — | — |
+| 下载 | ✅ | ✅ | — |
+| 更新并启动 | ✅ | ✅ | ✅ |
+
+> 曾经用「更新后启动游戏」勾选框控制最后一步，但加上「下载」之后它与按钮名互相打架，
+> 已去掉：现在按钮名就是它做的事。
 
 **安装目录（2026-09-16 新增）**：
 
@@ -80,7 +92,16 @@ dotnet publish Tools/Launcher/RaidDemo.Launcher.csproj -c Release -o Builds/Tool
 - 文本框也可以直接粘贴路径（相对路径按"启动器所在目录"解析），在失去焦点时校验；
 - 校验失败（空、非法字符、选到了文件）会弹出原因并把文本框退回旧值——避免"界面显示 A、实际更新到 B"；
 - 切换时会立即尝试创建目录，把"没有写权限"这类问题提前暴露，而不是等下载几十兆后才失败；
-- 选择结果写入 `launcher.config.local.json`；`检查更新` / `更新并启动` 与命令行 `--root` 共用同一套解析逻辑。
+- **选中的目录只是"父目录"**：真正的安装根是它下面的 `RaidDemo` 子目录
+  （选 `D:\daoban` → 装到 `D:\daoban\RaidDemo`），文本框显示的是换算后的最终路径；
+  末尾已经是 `RaidDemo` 就不再追加，手动输入与 `浏览...` 同一规则；
+- 默认安装根也是 `<启动器目录>\RaidDemo`；已有安装不会被搬家（写进配置的路径继续生效）；
+- 选择结果写入 `launcher.config.local.json`；界面与命令行 `--root`（**不追加子目录**，脚本写什么就是什么）
+  共用同一套路径校验。
+
+**隐藏更新源地址**：档案支持 `hideAddress`。置 `true` 时（模板里的`云主机`默认就是）
+该源选中后地址框留空、`游戏服务器`显示"（已隐藏）"——演示视频与截图里不会拍到公网 IP。
+连接用的地址始终取自档案本身，隐藏不影响更新与联机。
 
 ### 5.2 命令行（验收脚本 / CI）
 

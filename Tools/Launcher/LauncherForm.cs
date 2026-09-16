@@ -38,8 +38,8 @@ namespace RaidDemo.Launcher
         private readonly Label m_ServerLabel = new Label();
         private readonly Label m_VersionLabel = new Label();
         private readonly Button m_CheckButton = new Button();
+        private readonly Button m_DownloadButton = new Button();
         private readonly Button m_UpdateButton = new Button();
-        private readonly CheckBox m_LaunchCheck = new CheckBox();
         private readonly ProgressBar m_Progress = new ProgressBar();
         private readonly Label m_StatusLabel = new Label();
         private readonly TextBox m_LogBox = new TextBox();
@@ -85,18 +85,21 @@ namespace RaidDemo.Launcher
 
             m_CheckButton.Text = "检查更新";
             m_CheckButton.Location = new Point(16, 150);
-            m_CheckButton.Size = new Size(140, 32);
+            m_CheckButton.Size = new Size(130, 32);
             m_CheckButton.Click += async (_, __) => await RunAsync(applyChanges: false);
 
-            m_UpdateButton.Text = "更新并启动";
-            m_UpdateButton.Location = new Point(170, 150);
-            m_UpdateButton.Size = new Size(140, 32);
-            m_UpdateButton.Click += async (_, __) => await RunAsync(applyChanges: true);
+            // 「下载」= 只落盘不启动。它和「更新并启动」的差别只有最后那一步，
+            // 因此不再需要"更新后启动游戏"勾选框——按钮名说清了自己会做什么，
+            // 而勾选框曾经造成"名叫更新并启动却不启动"的歧义。
+            m_DownloadButton.Text = "下载";
+            m_DownloadButton.Location = new Point(156, 150);
+            m_DownloadButton.Size = new Size(130, 32);
+            m_DownloadButton.Click += async (_, __) => await RunAsync(applyChanges: true, launchAfterUpdate: false);
 
-            m_LaunchCheck.Text = "更新后启动游戏";
-            m_LaunchCheck.Location = new Point(330, 156);
-            m_LaunchCheck.AutoSize = true;
-            m_LaunchCheck.Checked = true;
+            m_UpdateButton.Text = "更新并启动";
+            m_UpdateButton.Location = new Point(296, 150);
+            m_UpdateButton.Size = new Size(150, 32);
+            m_UpdateButton.Click += async (_, __) => await RunAsync(applyChanges: true, launchAfterUpdate: true);
 
             m_Progress.Location = new Point(16, 196);
             m_Progress.Size = new Size(664, 18);
@@ -121,7 +124,7 @@ namespace RaidDemo.Launcher
                 sourceLabel, m_SourceCombo, m_SourceText,
                 serverTitle, m_ServerLabel,
                 versionTitle, m_VersionLabel,
-                m_CheckButton, m_UpdateButton, m_LaunchCheck,
+                m_CheckButton, m_DownloadButton, m_UpdateButton,
                 m_Progress, m_StatusLabel, m_LogBox,
             });
         }
@@ -165,9 +168,13 @@ namespace RaidDemo.Launcher
                 return;
             }
 
-            m_SourceText.Text = profile.ManifestSource;
+            // 隐藏地址的档案（通常是云主机：公网 IP 不该出现在演示视频与截图里）只把输入框留空；
+            // 连接用的地址始终来自档案本身，所以隐藏不影响更新与联机。
+            m_SourceText.Text = profile.HideAddress ? string.Empty : profile.ManifestSource;
             m_SourceText.ReadOnly = !profile.Editable;
-            m_ServerLabel.Text = string.IsNullOrWhiteSpace(profile.GameServer) ? "(未设置)" : profile.GameServer;
+            m_ServerLabel.Text = profile.HideAddress
+                ? "(已隐藏)"
+                : (string.IsNullOrWhiteSpace(profile.GameServer) ? "(未设置)" : profile.GameServer);
 
             m_Config.SelectedSource = profile.Name;
         }
@@ -252,9 +259,14 @@ namespace RaidDemo.Launcher
             return m_Config.Sources[m_SourceCombo.SelectedIndex];
         }
 
-        /// <summary>执行一次检查或更新。</summary>
-        /// <param name="applyChanges">是否真正下载并应用。</param>
-        private async Task RunAsync(bool applyChanges)
+        /// <summary>执行一次检查 / 下载 / 更新并启动。</summary>
+        /// <param name="applyChanges">是否真正下载并应用（false = 只比对）。</param>
+        /// <param name="launchAfterUpdate">更新成功后是否启动游戏（只有"更新并启动"按钮传 true）。</param>
+        /// <remarks>
+        /// 三个按钮共用这一条流程，差别只在两个开关上：这样"检查 / 下载 / 更新并启动"走的
+        /// 是同一套比对与落盘代码，不会出现"某个按钮少做了一步校验"这类只在某个入口暴露的缺陷。
+        /// </remarks>
+        private async Task RunAsync(bool applyChanges, bool launchAfterUpdate = false)
         {
             if (m_Busy)
             {
@@ -304,7 +316,7 @@ namespace RaidDemo.Launcher
                 return;
             }
 
-            if (applyChanges && m_LaunchCheck.Checked)
+            if (applyChanges && launchAfterUpdate)
             {
                 LaunchGame(source);
             }
@@ -350,6 +362,7 @@ namespace RaidDemo.Launcher
         {
             m_Busy = busy;
             m_CheckButton.Enabled = !busy;
+            m_DownloadButton.Enabled = !busy;
             m_UpdateButton.Enabled = !busy;
             m_SourceCombo.Enabled = !busy;
             m_InstallRow.SetBusy(busy);

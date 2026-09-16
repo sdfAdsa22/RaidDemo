@@ -30,6 +30,22 @@ namespace RaidDemo.Launcher
         /// <summary>是否为自定义源（界面上允许直接编辑地址）。</summary>
         public bool Editable { get; set; }
 
+        /// <summary>
+        /// 是否在界面上隐藏该源的地址（默认 false = 照常显示）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>解决什么：</b>录制演示视频或截图时，"更新源"右边那行会直接把公网 IP 拍进去；
+        /// 云主机档案通常属于这种情况，而本机档案（127.0.0.1）没有隐藏的必要。</para>
+        ///
+        /// <para><b>只影响显示，不影响行为：</b>连接用的地址始终取自本档案的
+        /// <see cref="ManifestSource"/> / <see cref="GameServer"/>，与文本框里有没有字无关——
+        /// 所以隐藏之后更新与联机全都照常工作。</para>
+        ///
+        /// <para><b>为什么做成配置项而不是"名字叫云主机就隐藏"：</b>写死名字的话，
+        /// 改个档案名、或者再加第三个源，行为就悄悄变了；配置项让"隐藏哪一份"这件事看得见、可调整。</para>
+        /// </remarks>
+        public bool HideAddress { get; set; }
+
         /// <summary>显示用文本：名称 + 地址。</summary>
         public override string ToString()
         {
@@ -58,10 +74,20 @@ namespace RaidDemo.Launcher
         public const string LocalOverrideFileName = "launcher.config.local.json";
 
         /// <summary>
+        /// 游戏文件夹名：玩家选中的目录下面总是再建一个同名文件夹，游戏本体放在里面。
+        /// </summary>
+        /// <remarks>
+        /// <para>玩家在界面上选的是"盘 / 父目录"（例如 <c>D:\daoban</c>），实际安装到
+        /// <c>D:\daoban\RaidDemo</c>。这样游戏永远独占一个干净目录：要删除、要搬到别的盘、
+        /// 要同时放两份版本，都只动一个文件夹，而不是把一堆 Unity 产物散进玩家自己挑的目录里。</para>
+        /// </remarks>
+        public const string DefaultGameFolderName = "RaidDemo";
+
+        /// <summary>
         /// 游戏安装根：本体文件（exe 与数据目录）直接放在这里面。
         /// </summary>
         /// <remarks>
-        /// <para><b>两种写法都支持：</b>默认值 <c>Game</c> 是相对启动器所在目录的相对路径
+        /// <para><b>两种写法都支持：</b>默认值 <c>RaidDemo</c> 是相对启动器所在目录的相对路径
         /// （开箱即用、不挑盘符）；玩家在界面上选了别的目录之后，这里会被改写成绝对路径。
         /// <see cref="Path.Combine(string, string)"/> 遇到绝对路径会**原样返回**，
         /// 因此两种形态在读取侧是同一段代码，不需要分支判断。</para>
@@ -70,7 +96,7 @@ namespace RaidDemo.Launcher
         /// <c>launcher.config.local.json</c>，入库的 <c>launcher.config.json</c> 永远保持
         /// 相对路径 + 占位地址——否则别人克隆下来就带着一台陌生机器的目录。</para>
         /// </remarks>
-        public string InstallRoot { get; set; } = "Game";
+        public string InstallRoot { get; set; } = DefaultGameFolderName;
 
         /// <summary>游戏可执行文件名（相对安装根）。</summary>
         public string GameExecutable { get; set; } = "RaidDemo.exe";
@@ -221,6 +247,43 @@ namespace RaidDemo.Launcher
             return true;
         }
 
+        /// <summary>
+        /// 把"玩家选的目录"换算成"游戏自己的目录"：末尾补一层 <see cref="DefaultGameFolderName"/>。
+        /// </summary>
+        /// <param name="candidate">玩家选的或输入的目录（可以是绝对路径，也可以是相对启动器的路径）。</param>
+        /// <returns>补好子目录之后的路径；输入为空时原样返回（留给后续校验去报错）。</returns>
+        /// <remarks>
+        /// <para><b>规则只有一句：末尾那一段已经叫 <c>RaidDemo</c> 就不再加一层。</b>
+        /// 否则玩家先选 <c>D:\daoban</c> 得到 <c>D:\daoban\RaidDemo</c>，
+        /// 再手动把文本框改成 <c>D:\daoban\RaidDemo</c>，就会变成 <c>…\RaidDemo\RaidDemo</c>——
+        /// 一个只有"改过两次"才会出现的路径，排查时很难想到。</para>
+        ///
+        /// <para><b>为什么按斜杠切分而不是用 <c>Path.GetFileName</c>：</b>盘符根
+        /// （<c>D:\</c>）与"带尾斜杠的目录"在这类 API 上的返回值各不相同，
+        /// 而这里真正需要的只是"最后一段文本是什么"——直接切分最不容易出错。
+        /// 大小写不敏感：Windows 上 <c>raiddemo</c> 与 <c>RaidDemo</c> 是同一个目录。</para>
+        /// </remarks>
+        public static string EnsureGameFolder(string candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                return candidate;
+            }
+
+            var trimmed = candidate.Trim();
+            var segments = trimmed.Split(
+                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            if (segments.Length > 0
+                && string.Equals(segments[segments.Length - 1], DefaultGameFolderName, StringComparison.OrdinalIgnoreCase))
+            {
+                return trimmed;
+            }
+
+            return Path.Combine(trimmed, DefaultGameFolderName);
+        }
+
         /// <summary>生成内置默认配置（占位地址，可直接被 local 覆盖）。</summary>
         private static LauncherConfig CreateDefault()
         {
@@ -239,6 +302,8 @@ namespace RaidDemo.Launcher
                         Name = "云主机",
                         ManifestSource = "http://<云主机IP>:8090",
                         GameServer = "<云主机IP>",
+                        // 公网地址不该出现在演示视频与截图里；连接用的地址仍取自本档案。
+                        HideAddress = true,
                     },
                     new UpdateSourceProfile
                     {

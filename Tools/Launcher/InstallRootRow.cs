@@ -140,6 +140,11 @@ namespace RaidDemo.Launcher
         /// 玩家随后点"更新并启动"时会以为更新进了那个目录，而实际写的是旧目录。
         /// 界面显示与实际行为不一致是排障成本最高的一类问题，所以宁可把输入退回去。</para>
         ///
+        /// <para><b>选中的目录并不是安装目录：</b>玩家选的是"盘 / 父目录"，
+        /// 真正的安装根是它下面的 <see cref="LauncherConfig.DefaultGameFolderName"/> 子目录
+        /// （见 <see cref="LauncherConfig.EnsureGameFolder"/>）。文本框显示的是换算后的最终路径，
+        /// 让人一眼看到"文件到底会落在哪"。</para>
+        ///
         /// <para><b>为什么切换时就把目录建出来：</b>把"没有写权限"（例如误选
         /// <c>C:\Program Files</c>）这类错误提前到切换的这一刻报出来，
         /// 而不是让玩家等下载了几十兆之后才失败。空目录的创建是幂等的，没有副作用。</para>
@@ -153,7 +158,8 @@ namespace RaidDemo.Launcher
                 return;
             }
 
-            if (!m_Config.TrySetInstallRoot(candidate, AppContext.BaseDirectory, out var resolved, out var error))
+            var gameDirectory = LauncherConfig.EnsureGameFolder(candidate);
+            if (!m_Config.TrySetInstallRoot(gameDirectory, AppContext.BaseDirectory, out var resolved, out var error))
             {
                 Report("安装目录无效", error);
                 return;
