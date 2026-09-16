@@ -255,6 +255,13 @@ namespace RaidDemo.UI
                 return;
             }
 
+            // 「整理仓库」按钮：只在右栏确实是仓库时出现。它消费点击后必须让路，
+            // 否则这次点击会继续走到下面的拖拽分支，被当成"点空格子"。
+            if (UpdateSortStashButton(pointer, mouse.leftButton.wasPressedThisFrame))
+            {
+                return;
+            }
+
             if (m_IsDragging && keyboard != null && keyboard.rKey.wasPressedThisFrame)
             {
                 m_DragRotated = !m_DragRotated;
@@ -262,7 +269,7 @@ namespace RaidDemo.UI
 
             if (keyboard != null && keyboard.fKey.wasPressedThisFrame)
             {
-                DispatchSort();
+                DispatchSort(m_BackpackContainerId);
             }
 
             if (mouse.leftButton.wasPressedThisFrame)

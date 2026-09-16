@@ -85,6 +85,7 @@ namespace RaidDemo.UI
         private TextMeshProUGUI m_SellInfoLabel;
         private UiButton m_SellToggleButton;
         private UiButton m_SellCancelButton;
+        private UiButton m_SortStashButton;
         private GameObject m_SellMenuRoot;
         private UiButton m_SellMenuButton;
         private UiButton m_SellMenuCancelButton;
@@ -276,6 +277,13 @@ namespace RaidDemo.UI
                 new Vector2(RightX + 196f, top + 32f),
                 new Vector2(130f, 46f));
             m_SellCancelButton.Rect.gameObject.SetActive(false);
+
+            // 整理仓库紧挨着「出售」那一组：两件事都作用在同一个仓库上，
+            // 玩家买完 / 卖完顺手就能把家底排齐，不必再跑回仓库界面。
+            m_SortStashButton = UiFactory.CreateButton(
+                panel, "整理仓库",
+                new Vector2(RightX + 342f, top + 32f),
+                new Vector2(150f, 46f));
         }
 
         /// <summary>右键物品后弹出的出售菜单。</summary>

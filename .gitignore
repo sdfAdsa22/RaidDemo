@@ -121,3 +121,8 @@ HybridCLRData/
 # HybridCLR 生成物（探针遗留；不含 HybridCLR 类型，留盘但入库无意义）
 /Assets/HybridCLRGenerate/
 /Assets/HybridCLRGenerate.meta
+
+# Linux 专用服务器的 Addressables 内容状态（构建平台产物，随构建变化）
+# 规则：与已入库的 Windows/ 不同，Linux 版只用于云主机部署，不入库；
+# 需要重建时跑菜单「构建专用服务器（Linux）」会重新生成。
+[Aa]ssets/[Aa]ddressableAssetsData/Linux*

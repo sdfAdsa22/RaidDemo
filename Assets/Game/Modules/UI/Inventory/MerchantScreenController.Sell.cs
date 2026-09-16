@@ -87,6 +87,19 @@ namespace RaidDemo.UI
             m_SellToggleButton.SetVariant(highlighted ? UiButtonKind.Primary : UiButtonKind.Normal);
             m_SellToggleButton.SetHovered(hovered);
 
+            // 「整理仓库」是仓库上的动作，和出售互斥：批量出售模式下位置会被选中物品的
+            // 高亮抢走注意力，此时再整理一次会让已经选好的格子错位，所以出售模式下直接禁用。
+            if (m_SortStashButton != null)
+            {
+                var sortHovered = !m_SellMode && m_SortStashButton.Contains(pointer);
+                m_SortStashButton.SetHovered(sortHovered);
+                if (sortHovered && Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    m_Router.Dispatch(new InventorySortIntent(0, m_StashContainerId));
+                    return;
+                }
+            }
+
             if (hovered && Mouse.current.leftButton.wasPressedThisFrame)
             {
                 if (m_SellMode)

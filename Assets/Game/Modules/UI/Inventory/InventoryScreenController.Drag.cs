@@ -238,9 +238,10 @@ namespace RaidDemo.UI
         }
 
         /// <summary>发出整理命令。</summary>
-        private void DispatchSort()
+        /// <param name="containerId">要整理的容器 ID。F 键整理随身背包，标题栏按钮整理仓库。</param>
+        private void DispatchSort(int containerId)
         {
-            m_Router.Dispatch(new InventorySortIntent(0, m_BackpackContainerId));
+            m_Router.Dispatch(new InventorySortIntent(0, containerId));
         }
 
         /// <summary>结束拖拽状态并清掉所有预览。</summary>
