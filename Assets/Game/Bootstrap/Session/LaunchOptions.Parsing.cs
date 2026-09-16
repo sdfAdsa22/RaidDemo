@@ -8,17 +8,35 @@ namespace RaidDemo.Bootstrap
     {
 
         /// <summary>
-        /// 解析命令行参数。
+        /// 解析命令行参数（不读配置文件）。
         /// </summary>
         /// <param name="args">命令行参数（通常是 <see cref="Environment.GetCommandLineArgs"/>）。</param>
         /// <param name="options">解析结果。解析失败时为 null。</param>
         /// <param name="error">失败原因；成功时为 null。</param>
         /// <returns>参数合法时返回 true。非服务器启动同样返回 true（只是 <see cref="IsServerRequested"/> 为 false）。</returns>
         /// <remarks>
-        /// 只有「本类认识的参数取值非法」才算失败：端口不是数字、存档目录是绝对路径等。
-        /// 完全不认识的参数一律忽略——引擎会往命令行里塞大量自有参数。
+        /// <para>只有「本类认识的参数取值非法」才算失败：端口不是数字、存档目录是绝对路径等。
+        /// 完全不认识的参数一律忽略——引擎会往命令行里塞大量自有参数。</para>
+        ///
+        /// <para>需要连服务器配置文件一起读的调用方（真实的玩家进程入口）用
+        /// <see cref="TryParseWithServerConfig"/>；本方法保持"只认命令行"的历史语义，
+        /// 供客户端路径与既有测试使用。</para>
         /// </remarks>
         public static bool TryParse(string[] args, out LaunchOptions options, out string error)
+        {
+            return TryParseFlat(args, out options, out error);
+        }
+
+        /// <summary>
+        /// 解析主体：按顺序扫一遍参数，"后面出现的取值覆盖前面的"。
+        /// </summary>
+        /// <remarks>
+        /// 覆盖语义是配置文件合并的基础：把"配置文件生成的等效参数"放在数组前面、
+        /// 真实命令行放在后面，就自然得到「命令行 &gt; 配置文件 &gt; 内置默认」，
+        /// 且配置项与命令行项走的是**同一套校验规则与同一批报错文案**——
+        /// 不需要为配置文件再抄一遍范围检查。
+        /// </remarks>
+        private static bool TryParseFlat(string[] args, out LaunchOptions options, out string error)
         {
             options = null;
             error = null;

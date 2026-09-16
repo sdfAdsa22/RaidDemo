@@ -91,7 +91,24 @@ cd /root/raid-demo
 ./server.sh restart
 ```
 
-可配置项（环境变量，均有默认值）：
+**配置方式一（推荐）：`server.config.json`**
+
+同目录放一份 `server.config.json` 时，端口 / 房间名 / 存档目录 / 状态页端口等**全部以它为准**，
+与 Windows 面板包、Windows 服务器面板用的是同一份格式（字段表见
+[`Tools/ServerHost/README.md`](../Tools/ServerHost/README.md)）。改完执行 `./server.sh restart` 即可。
+
+```bash
+cp server.config.json server.config.json.bak   # 备份（可选）
+vi server.config.json                          # 改 port / room / dashboardPort …
+./server.sh restart
+./server.sh status                             # 会按配置文件里的端口去查监听
+```
+
+> 为什么脚本在有配置文件时不再拼 `-port` 等参数：游戏侧优先级是
+> **命令行 > 配置文件 > 内置默认**，脚本一传参数就会把配置文件压掉——
+> 那正是"改了文件却不生效"的经典坑。
+
+**配置方式二：环境变量**（没有 `server.config.json` 时生效，均有默认值）
 
 ```bash
 RAIDDEMO_PORT=7777 RAIDDEMO_ROOM=周末车队 RAIDDEMO_GRACE=60 ./server.sh start
@@ -119,9 +136,9 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/root/raid-demo
-ExecStart=/root/raid-demo/RaidDemoServer.x86_64 -server -port 7777 -room 默认房间 \
-    -saveDir server_saves -dashboardPort 8080 -grace 60 -watchdog 2.5 \
-    -batchmode -nographics -logFile /root/raid-demo/server.log
+# 有 server.config.json 时用 -config（配置在这里改）；没有则按老写法逐个参数给。
+ExecStart=/root/raid-demo/RaidDemoServer.x86_64 -server -config /root/raid-demo/server.config.json \
+    -batchmode -nographics -logFile /root/raid-demo/Logs/server.log
 Restart=on-failure
 RestartSec=5
 
@@ -156,7 +173,7 @@ http://<云主机IP>:8080/status.json  ← 同数据的 JSON 版本（脚本用�
 
 ```bash
 ss -tuln | grep -E ':(7777|8080)'      # 端口在不在听
-tail -n 100 /root/raid-demo/server.log # 服务器日志
+tail -n 100 /root/raid-demo/Logs/server.log # 服务器日志（与 Windows 面板同一个相对位置）
 curl -s localhost:8080/status.json     # 云主机本机看状态页数据
 ```
 

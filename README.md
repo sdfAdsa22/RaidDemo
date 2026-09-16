@@ -13,8 +13,8 @@
 ![平台](https://img.shields.io/badge/platform-Windows-blue)
 ![渲染管线](https://img.shields.io/badge/URP-17.6.0-green)
 
-> **当前开发状态（2026-09-15）**：`M9 联机` 与 `M10 热更新与分发` 均已完成，
-> **682 项 EditMode 测试全绿**。历史里程碑的测试快照：M7 末 407 → M8 批次 1 / 2 / 基线冻结
+> **当前开发状态（2026-09-16）**：`M9 联机` 与 `M10 热更新与分发` 均已完成，
+> **707 项 EditMode 测试全绿**。历史里程碑的测试快照：M7 末 407 → M8 批次 1 / 2 / 基线冻结
 > 415 / 425 / 428 → M9 P0~P6 648；本节只维护"当前值"，历史数字不再逐个刷新。
 >
 > **联机（M9 · P0 ~ P6，已完成）**：统一客户端 + 独立专用服务器（单机 = 本机内嵌服务器），
@@ -153,7 +153,13 @@
 
 ### 联机模式（专用服务器）
 
-**本机联调（1 服务器 + 2 客户端）**：
+**一键开服（推荐）**：双击服务器包里的 `RaidDemo.ServerHost.exe`（Windows）或
+`./server.sh start`（Linux）——端口、房间名、存档目录等在 `server.config.json` 里改，
+面板上能看到在线人数、当前世界与实时日志，并可一键复制连接信息给队友。
+服务器包用 `pwsh -File Tools/ServerHost/pack_server_package.ps1 -Zip` 生成
+（详见 [`Docs/Modules/10_联机.md`](Docs/Modules/10_联机.md) 第 34 节）。
+
+**手工联调（1 服务器 + 2 客户端）**：
 
 ```powershell
 # 服务器（普通构建 + -server；也可用菜单 RaidDemo/M9/构建专用服务器（Windows）出独立服务器包）

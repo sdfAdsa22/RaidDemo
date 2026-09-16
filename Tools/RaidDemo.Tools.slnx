@@ -5,4 +5,7 @@
   <Folder Name="/UpdateSource/">
     <Project Path="UpdateSource/RaidDemo.UpdateSource.csproj" />
   </Folder>
+  <Folder Name="/ServerHost/">
+    <Project Path="ServerHost/RaidDemo.ServerHost.csproj" />
+  </Folder>
 </Solution>

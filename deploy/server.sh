@@ -23,13 +23,23 @@
 # 示例：
 #   RAIDDEMO_ROOM=周末车队 ./server.sh start
 #   RAIDDEMO_CHROOT=/root/ubuntu-2204 ./server.sh start
+#
+# 配置文件（推荐，与 Windows 面板同一份格式）：
+#   同目录存在 server.config.json 时，端口 / 房间名 / 存档目录 / 状态页端口等
+#   **全部以该文件为准**，脚本不再拼这些参数（游戏侧优先级：命令行 > 配置文件 > 内置默认，
+#   因此脚本一传 -port 就会把配置文件压掉——那正是"改了文件却不生效"的经典坑）。
+#   RAIDDEMO_EXTRA_ARGS 仍然最后追加，优先级最高，留给临时覆盖用。
+#   没有该文件时保持旧行为：由上面的环境变量决定。
 
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="${RAIDDEMO_BIN:-$APP_DIR/RaidDemoServer.x86_64}"
 PID_FILE="$APP_DIR/server.pid"
-LOG_FILE="$APP_DIR/server.log"
+CONFIG_FILE="$APP_DIR/server.config.json"
+# 日志放在 Logs/ 下：与 Windows 面板使用同一个相对位置，
+# "日志在哪"在两个系统上是同一个答案，排障时不用先问"你那边是哪个包"。
+LOG_FILE="$APP_DIR/Logs/server.log"
 
 PORT="${RAIDDEMO_PORT:-7777}"
 ROOM="${RAIDDEMO_ROOM:-默认房间}"
@@ -39,6 +49,18 @@ GRACE="${RAIDDEMO_GRACE:-60}"
 WATCHDOG="${RAIDDEMO_WATCHDOG:-2.5}"
 EXTRA_ARGS="${RAIDDEMO_EXTRA_ARGS:-}"
 CHROOT_DIR="${RAIDDEMO_CHROOT:-}"
+
+# 从配置文件里取一个数字字段（面板生成的文件是"一行一个字段"，sed 足够；
+# 手写文件只要保持同样的写法也能解析）。取不到返回非零，调用方回退环境变量。
+config_number() {
+    [ -f "$CONFIG_FILE" ] || return 1
+
+    local value
+    value="$(sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" "$CONFIG_FILE" | head -n 1)"
+    [ -n "$value" ] || return 1
+
+    printf '%s' "$value"
+}
 
 # chroot 模式下，rootfs 内的挂载点（由 setup_chroot.sh 建立，这里做自检与补挂）。
 ensure_chroot_mounts() {
@@ -90,22 +112,31 @@ start() {
     # 与宿主上的同一文件）；直接运行则用宿主路径。
     local log_path="$LOG_FILE"
     if [ -n "$CHROOT_DIR" ]; then
-        log_path="/raid-demo/server.log"
+        log_path="/raid-demo/Logs/server.log"
     fi
+
+    # 日志目录要先建出来：Unity 会创建日志"文件"，但不会创建它所在的目录，
+    # 目录不存在时现象是"没有日志"，而那正是排查启动失败唯一要看的东西。
+    mkdir -p "$APP_DIR/Logs"
 
     # -batchmode -nographics：无窗口、无图形设备运行（云主机没有显示环境）。
     # 参数用数组承载（房间名等可能带空格，字符串拼接会被再次分词拆坏）。
-    local -a app_args=(
-        -server
-        -port "$PORT"
-        -room "$ROOM"
-        -saveDir "$SAVE_DIR"
-        -dashboardPort "$DASHBOARD_PORT"
-        -grace "$GRACE"
-        -watchdog "$WATCHDOG"
-        -batchmode -nographics
-        -logFile "$log_path"
-    )
+    local -a app_args=(-server)
+
+    if [ -f "$CONFIG_FILE" ]; then
+        app_args+=(-config "$CONFIG_FILE")
+    else
+        app_args+=(
+            -port "$PORT"
+            -room "$ROOM"
+            -saveDir "$SAVE_DIR"
+            -dashboardPort "$DASHBOARD_PORT"
+            -grace "$GRACE"
+            -watchdog "$WATCHDOG"
+        )
+    fi
+
+    app_args+=(-batchmode -nographics -logFile "$log_path")
 
     if [ -n "$EXTRA_ARGS" ]; then
         local -a extra=()
@@ -136,7 +167,11 @@ start() {
     local waited=0
     while [ "$waited" -lt 30 ]; do
         if grep -q "已就绪" "$LOG_FILE" 2>/dev/null; then
-            echo "服务器已启动（PID $(cat "$PID_FILE")，UDP $PORT，状态页 TCP $DASHBOARD_PORT）。"
+            if [ -f "$CONFIG_FILE" ]; then
+                echo "服务器已启动（PID $(cat "$PID_FILE")；端口与房间名以 $CONFIG_FILE 为准）。"
+            else
+                echo "服务器已启动（PID $(cat "$PID_FILE")，UDP $PORT，状态页 TCP $DASHBOARD_PORT）。"
+            fi
             echo "日志：$LOG_FILE"
             return 0
         fi
@@ -182,8 +217,17 @@ status() {
         echo "未运行。"
     fi
 
+    # 端口以配置文件为准（它优先于环境变量）；取不到才回退。
+    # 否则"改完配置再 status"会对着旧端口找监听，得到一句误导人的"未看到监听"。
+    local status_port status_dashboard
+    status_port="$(config_number port || true)"
+    status_port="${status_port:-$PORT}"
+    status_dashboard="$(config_number dashboardPort || true)"
+    status_dashboard="${status_dashboard:-$DASHBOARD_PORT}"
+
     echo "--- 端口监听 ---"
-    ss -tuln 2>/dev/null | grep -E ":(udp|tcp)" | grep -E ":($PORT|$DASHBOARD_PORT)\b" || echo "（未看到 $PORT/udp 或 $DASHBOARD_PORT/tcp 的监听）"
+    ss -tuln 2>/dev/null | grep -E ":(udp|tcp)" | grep -E ":($status_port|$status_dashboard)\b" \
+        || echo "（未看到 $status_port/udp 或 $status_dashboard/tcp 的监听）"
 
     if [ -f "$LOG_FILE" ]; then
         echo "--- 日志尾部 ---"

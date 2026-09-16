@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RaidDemo 服务器面板（M9 补充：Windows 玩家的一键开服入口）。
+
+    为什么要有这个工程：
+      Unity 的专用服务器构建（Builds/ServerWindows）没有界面。玩家要开服就得敲
+      `RaidDemoServer.exe -server -port 7777 -logFile …`，记不住、敲错了还看不出来。
+      面板负责"改 server.config.json + 启动/停止 + 看日志"，配置的权威定义只有一份，
+      Linux 侧对应物是 start-server.sh（同一份配置格式、同一套启动参数）。
+
+    为什么用链接文件共享配置模型：
+      Assets/Game/Kernel/Pure/Server/ServerConfigDocument.cs 只依赖 System，不依赖 UnityEngine，
+      因此可以被 Unity 与面板同时编译。字段名一旦发布就是文件名里的协议，两处各写一份必然漂移
+      （与更新清单 UpdateManifest 的做法一致）。
+
+    为什么必须支持命令行模式：
+      打包脚本（pack_server_package.ps1）要调 write-default-config 生成默认配置，
+      验收脚本要调 check / render 取判据。界面只能人点，判据就跑不起来——
+      这是本项目对可复现的一贯要求（启动器同样提供命令行形态）。
+
+    为什么是自包含单文件：
+      包是发给玩家的（Builds/ServerPackage-Windows-<版本>.zip），对方机器上不一定装了 .NET；
+      打包脚本也只拷贝 publish 目录里的这一个 exe。
+  -->
+
+  <PropertyGroup>
+    <!--
+      为什么是 Exe（控制台子系统）而不是 WinExe：
+        PowerShell 对 **GUI 子系统** 的进程不会等待——`& RaidDemo.ServerHost.exe write-default-config …`
+        会立刻返回，于是打包脚本读到的 `$LASTEXITCODE` 还是上一条命令的值（脚本会误判成功/失败），
+        验收脚本也拿不到 stdout。控制台子系统则总是被等待，退出码与输出都可靠。
+        代价是双击时 Windows 会给进程建一个控制台窗口，因此 Main 里第一件事就是
+        `ConsoleBridge.HideOwnConsoleWindow()` 把自己建的那个窗口藏起来
+        （只藏"本进程独占"的窗口，从脚本调用时共用父窗口，绝不能动）。
+    -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>RaidDemo.ServerHost</AssemblyName>
+    <RootNamespace>RaidDemo.ServerHost</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Version>1.0.0</Version>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 与 Unity 侧共用同一份配置模型（只读链接，不产生副本）。 -->
+    <Compile Include="..\..\Assets\Game\Kernel\Pure\Server\ServerConfigDocument.cs" Link="Shared\ServerConfigDocument.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -135,7 +136,11 @@ namespace RaidDemo.Bootstrap
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void DetectServerMode()
         {
-            if (!LaunchOptions.TryParse(Environment.GetCommandLineArgs(), out var options, out var error))
+            if (!LaunchOptions.TryParseWithServerConfig(
+                    Environment.GetCommandLineArgs(),
+                    ResolveExecutableDirectory(),
+                    out var options,
+                    out var error))
             {
                 Debug.LogError($"[启动] 命令行参数解析失败：{error}");
 
@@ -167,6 +172,25 @@ namespace RaidDemo.Bootstrap
             Application.runInBackground = true;
 
             Debug.Log($"[启动] 以服务器模式运行 ｜ {options.Describe()}");
+        }
+
+        /// <summary>
+        /// 取"可执行文件所在目录"：服务器配置文件的默认查找位置，也是 <c>-config</c> 相对路径的基准。
+        /// </summary>
+        /// <remarks>
+        /// <para>玩家进程里 <c>Application.dataPath</c> 指向 <c>&lt;游戏&gt;_Data</c>，
+        /// 它的父目录才是 exe 所在目录；编辑器里它指向 <c>&lt;工程&gt;/Assets</c>，父目录是工程根——
+        /// 两种情况都落在"程序旁边"，语义一致。</para>
+        ///
+        /// <para><b>为什么不用当前工作目录：</b>双击、快捷方式、计划任务、从别的盘符敲命令，
+        /// 工作目录各不相同；跟着它走会让"我的配置文件到底被读到没有"变成猜谜。
+        /// 以 exe 所在目录为基准，才有"配置和服务器放在一起"这条稳定规则。</para>
+        /// </remarks>
+        private static string ResolveExecutableDirectory()
+        {
+            var dataPath = Application.dataPath;
+            var directory = string.IsNullOrEmpty(dataPath) ? null : Path.GetDirectoryName(dataPath);
+            return string.IsNullOrEmpty(directory) ? Directory.GetCurrentDirectory() : directory;
         }
 
         /// <summary>
