@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed966e54209cdf044ae4ba1c9f93a2e2, type: 3}
   m_Name: Stats_weapon.rifle.ak74
   m_EditorClassIdentifier: RaidDemo.Data.Content::RaidDemo.Data.WeaponStats
-  m_BaseDamage: 77
+  m_BaseDamage: 35
   m_RoundsPerMinute: 600
   m_FireMode: 2
   m_BurstCount: 3

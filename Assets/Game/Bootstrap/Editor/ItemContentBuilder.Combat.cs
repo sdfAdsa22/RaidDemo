@@ -133,7 +133,11 @@ namespace RaidDemo.Bootstrap.Editor
                     baseSpread: 2.5f, spreadPerShot: 0.8f, maxSpread: 6f, spreadRecovery: 5f,
                     rangeMeters: 8f),
                 ["weapon.rifle.ak74"] = new WeaponSpec(
-                    "5.45", damage: 25f, roundsPerMinute: 600f, fireMode: WeaponFireMode.Auto,
+                    // 35 点：对 2 级甲敌人（100 血 / 护甲值 20 / 减伤 35% / 耐久 45）的算例是
+                    // 躯干 4 枪、爆头 2 枪、无甲目标 3 枪。这个值在 2026-09-16 定下，
+                    // 取代了 M10 做资源热更演示时临时改上去的 77（那次是 25 → 77，
+                    // 只为让"热更后数值明显变化"肉眼可见，不是平衡值）。
+                    "5.45", damage: 35f, roundsPerMinute: 600f, fireMode: WeaponFireMode.Auto,
                     burstCount: 3, magazineCapacity: 30, reloadSeconds: 2.2f,
                     baseSpread: 1.5f, spreadPerShot: 0.5f, maxSpread: 6f, spreadRecovery: 4f,
                     rangeMeters: 12f),
