@@ -57,7 +57,19 @@ namespace RaidDemo.Launcher
         /// <summary>本机私有配置文件名（覆盖默认配置；被 .gitignore 忽略）。</summary>
         public const string LocalOverrideFileName = "launcher.config.local.json";
 
-        /// <summary>游戏安装根（相对启动器目录），本体文件直接放在这里面。</summary>
+        /// <summary>
+        /// 游戏安装根：本体文件（exe 与数据目录）直接放在这里面。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>两种写法都支持：</b>默认值 <c>Game</c> 是相对启动器所在目录的相对路径
+        /// （开箱即用、不挑盘符）；玩家在界面上选了别的目录之后，这里会被改写成绝对路径。
+        /// <see cref="Path.Combine(string, string)"/> 遇到绝对路径会**原样返回**，
+        /// 因此两种形态在读取侧是同一段代码，不需要分支判断。</para>
+        ///
+        /// <para><b>绝对路径不会进仓库：</b>它只写进被 .gitignore 忽略的
+        /// <c>launcher.config.local.json</c>，入库的 <c>launcher.config.json</c> 永远保持
+        /// 相对路径 + 占位地址——否则别人克隆下来就带着一台陌生机器的目录。</para>
+        /// </remarks>
         public string InstallRoot { get; set; } = "Game";
 
         /// <summary>游戏可执行文件名（相对安装根）。</summary>
@@ -140,6 +152,73 @@ namespace RaidDemo.Launcher
         public string GetInstallRootPath(string baseDirectory)
         {
             return Path.GetFullPath(Path.Combine(baseDirectory, InstallRoot));
+        }
+
+        /// <summary>
+        /// 校验并切换安装根目录（界面上"安装目录"那一行的唯一入口）。
+        /// </summary>
+        /// <param name="rawInput">候选路径：可以是相对启动器目录的相对路径，也可以是绝对路径。</param>
+        /// <param name="baseDirectory">启动器所在目录（相对路径的基准）。</param>
+        /// <param name="resolvedPath">规范化之后的绝对路径；失败时为 <c>null</c>。</param>
+        /// <param name="error">失败原因（给玩家看的中文说明）；成功时为 <c>null</c>。</param>
+        /// <returns>是否切换成功。</returns>
+        /// <remarks>
+        /// <para><b>只在成功时写回属性：</b>界面在失败时会继续用旧目录工作，
+        /// 所以这里绝不能"改一半"——要么整体生效，要么配置原样不动。
+        /// 半个生效的配置（属性改了、但保存失败）会让"界面显示"与"实际更新位置"分家，
+        /// 那是最难排查的一类故障。</para>
+        ///
+        /// <para><b>为什么要把末尾的分隔符去掉：</b>玩家从对话框选出来的路径通常不带尾斜杠，
+        /// 但手工输入很容易带上（<c>D:\Games\RaidDemo\</c>）。两种写法指向同一个目录，
+        /// 却会被当作"切换了目录"反复触发切换日志；规范化之后比较才有意义。
+        /// 盘符根（<c>D:\</c>）是唯一不能裁剪的形态——裁成 <c>D:</c> 会变成"该盘的当前目录"，
+        /// 完全是另一个位置。</para>
+        ///
+        /// <para><b>这里不碰文件系统：</b>本方法只做"路径语法与语义"层面的判断（空、非法字符、指向文件）。
+        /// 目录是否可创建、是否可写由调用方在真正切换时验证——保持这个类可被纯逻辑测试覆盖。</para>
+        /// </remarks>
+        public bool TrySetInstallRoot(string rawInput, string baseDirectory, out string resolvedPath, out string error)
+        {
+            resolvedPath = null;
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(rawInput))
+            {
+                error = "安装目录不能为空。";
+                return false;
+            }
+
+            try
+            {
+                resolvedPath = Path.GetFullPath(Path.Combine(baseDirectory, rawInput.Trim()));
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException ||
+                exception is NotSupportedException ||
+                exception is PathTooLongException)
+            {
+                error = "路径格式不合法：" + exception.Message;
+                return false;
+            }
+
+            var root = Path.GetPathRoot(resolvedPath);
+            if (!string.Equals(resolvedPath, root, StringComparison.OrdinalIgnoreCase))
+            {
+                resolvedPath = resolvedPath.TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+            }
+
+            // 指向已存在的"文件"是最常见的误选（玩家把 exe 当成了目录）。
+            // 此刻拦下来，比让更新流程在"创建目录"那一步抛 IO 异常要清楚得多。
+            if (File.Exists(resolvedPath))
+            {
+                error = "该路径是一个文件，不能作为安装目录：" + resolvedPath;
+                return false;
+            }
+
+            InstallRoot = resolvedPath;
+            return true;
         }
 
         /// <summary>生成内置默认配置（占位地址，可直接被 local 覆盖）。</summary>

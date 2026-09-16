@@ -44,6 +44,9 @@ namespace RaidDemo.Launcher
         private readonly Label m_StatusLabel = new Label();
         private readonly TextBox m_LogBox = new TextBox();
 
+        /// <summary>"安装目录"一行（控件与校验逻辑都在 <see cref="InstallRootRow"/> 里）。</summary>
+        private InstallRootRow m_InstallRow;
+
         /// <summary>创建主窗口。</summary>
         public LauncherForm()
         {
@@ -56,8 +59,9 @@ namespace RaidDemo.Launcher
         {
             Text = "RaidDemo 启动器";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(620, 460);
-            Size = new Size(720, 520);
+            // 最小宽度 700：保证"安装目录"那一行的浏览按钮（右边缘在 x=680）不会被拉出可视区。
+            MinimumSize = new Size(700, 540);
+            Size = new Size(720, 600);
             Font = new Font("Microsoft YaHei UI", 9f);
 
             var sourceLabel = new Label { Text = "更新源", Location = new Point(16, 20), AutoSize = true };
@@ -70,44 +74,44 @@ namespace RaidDemo.Launcher
             m_SourceText.Width = 380;
             m_SourceText.Leave += (_, __) => PersistEditableSource();
 
-            var serverTitle = new Label { Text = "游戏服务器", Location = new Point(16, 56), AutoSize = true };
-            m_ServerLabel.Location = new Point(90, 56);
+            var serverTitle = new Label { Text = "游戏服务器", Location = new Point(16, 88), AutoSize = true };
+            m_ServerLabel.Location = new Point(90, 88);
             m_ServerLabel.AutoSize = true;
             m_ServerLabel.ForeColor = Color.DimGray;
 
-            var versionTitle = new Label { Text = "本地版本", Location = new Point(16, 84), AutoSize = true };
-            m_VersionLabel.Location = new Point(90, 84);
+            var versionTitle = new Label { Text = "本地版本", Location = new Point(16, 116), AutoSize = true };
+            m_VersionLabel.Location = new Point(90, 116);
             m_VersionLabel.AutoSize = true;
 
             m_CheckButton.Text = "检查更新";
-            m_CheckButton.Location = new Point(16, 118);
+            m_CheckButton.Location = new Point(16, 150);
             m_CheckButton.Size = new Size(140, 32);
             m_CheckButton.Click += async (_, __) => await RunAsync(applyChanges: false);
 
             m_UpdateButton.Text = "更新并启动";
-            m_UpdateButton.Location = new Point(170, 118);
+            m_UpdateButton.Location = new Point(170, 150);
             m_UpdateButton.Size = new Size(140, 32);
             m_UpdateButton.Click += async (_, __) => await RunAsync(applyChanges: true);
 
             m_LaunchCheck.Text = "更新后启动游戏";
-            m_LaunchCheck.Location = new Point(330, 124);
+            m_LaunchCheck.Location = new Point(330, 156);
             m_LaunchCheck.AutoSize = true;
             m_LaunchCheck.Checked = true;
 
-            m_Progress.Location = new Point(16, 164);
+            m_Progress.Location = new Point(16, 196);
             m_Progress.Size = new Size(664, 18);
             m_Progress.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
-            m_StatusLabel.Location = new Point(16, 190);
+            m_StatusLabel.Location = new Point(16, 222);
             m_StatusLabel.Size = new Size(664, 22);
             m_StatusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             m_StatusLabel.Text = "就绪";
 
-            m_LogBox.Location = new Point(16, 218);
+            m_LogBox.Location = new Point(16, 250);
             m_LogBox.Multiline = true;
             m_LogBox.ReadOnly = true;
             m_LogBox.ScrollBars = ScrollBars.Vertical;
-            m_LogBox.Size = new Size(664, 240);
+            m_LogBox.Size = new Size(664, 300);
             m_LogBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             m_LogBox.BackColor = Color.FromArgb(28, 30, 34);
             m_LogBox.ForeColor = Color.Gainsboro;
@@ -131,6 +135,12 @@ namespace RaidDemo.Launcher
             m_Log = new LauncherLog(Path.Combine(
                 UpdateApplier.GetMetadataDirectory(m_InstallRoot),
                 UpdateApplier.LogFileName));
+
+            // "安装目录"一行需要配置对象，因此在这里（而不是布局阶段）创建并挂上窗体。
+            m_InstallRow = new InstallRootRow(m_Config, this, AppendLog, new Point(16, 50));
+            m_InstallRow.AddTo(this);
+            m_InstallRow.ShowCurrent(m_InstallRoot);
+            m_InstallRow.Changed += OnInstallRootChanged;
 
             m_SourceCombo.Items.Clear();
             foreach (var profile in m_Config.Sources)
@@ -181,6 +191,30 @@ namespace RaidDemo.Launcher
             {
                 AppendLog("保存配置失败：" + exception.Message);
             }
+        }
+
+        /// <summary>
+        /// 安装目录切换成功后的收尾（由 <see cref="InstallRootRow.Changed"/> 触发）。
+        /// </summary>
+        /// <param name="installRoot">新的安装根绝对路径。</param>
+        /// <remarks>
+        /// <para><b>为什么日志器要重建：</b>每个安装各自一份 <c>.raiddemo/launcher.log</c>，
+        /// 日志跟着安装目录走，删除某份安装时不会在别处留下"孤儿日志"，
+        /// 排查时也总能找到"当时那份安装"的记录。</para>
+        ///
+        /// <para><b>校验与落盘已在 <see cref="InstallRootRow"/> 里完成：</b>
+        /// 这里只做"界面与运行时状态"的收尾——换日志器、刷新版本显示。
+        /// 分工清楚的好处是：路径规则只有一处实现，不会出现"两个地方各校验一遍、规则还不一样"。</para>
+        /// </remarks>
+        private void OnInstallRootChanged(string installRoot)
+        {
+            m_InstallRoot = installRoot;
+            m_Log = new LauncherLog(Path.Combine(
+                UpdateApplier.GetMetadataDirectory(m_InstallRoot),
+                UpdateApplier.LogFileName));
+
+            AppendLog("当前安装目录：" + m_InstallRoot);
+            RefreshLocalVersion();
         }
 
         /// <summary>刷新"本地版本"显示。</summary>
@@ -318,6 +352,7 @@ namespace RaidDemo.Launcher
             m_CheckButton.Enabled = !busy;
             m_UpdateButton.Enabled = !busy;
             m_SourceCombo.Enabled = !busy;
+            m_InstallRow.SetBusy(busy);
 
             if (!busy)
             {

@@ -47,7 +47,7 @@ dotnet publish Tools/Launcher/RaidDemo.Launcher.csproj -c Release -o Builds/Tool
 
 | 字段 | 含义 |
 | --- | --- |
-| `installRoot` | 游戏安装根（相对启动器目录），本体文件直接放在这里 |
+| `installRoot` | 游戏安装根。默认 `Game`（相对启动器目录）；在界面上选过目录后写成绝对路径（只落在被忽略的 `launcher.config.local.json` 里） |
 | `gameExecutable` | 游戏可执行文件名（相对安装根） |
 | `selectedSource` | 默认选中的更新源名称 |
 | `sources[].manifestSource` | 更新源地址：`http(s)://…` 或本地目录（本机演示可不起服务） |
@@ -71,8 +71,16 @@ dotnet publish Tools/Launcher/RaidDemo.Launcher.csproj -c Release -o Builds/Tool
 
 ### 5.1 图形界面（玩家）
 
-直接双击 `RaidDemo.Launcher.exe`：选更新源 → 看本地版本 → `检查更新` / `更新并启动`。
-更新期间界面保持可响应，日志实时显示。
+直接双击 `RaidDemo.Launcher.exe`：选更新源 → 选安装目录 → 看本地版本 →
+`检查更新` / `更新并启动`。更新期间界面保持可响应，日志实时显示。
+
+**安装目录（2026-09-16 新增）**：
+
+- 界面上有"安装目录"一行：文本框显示当前生效的**绝对路径**，`浏览...` 弹出文件夹选择框；
+- 文本框也可以直接粘贴路径（相对路径按"启动器所在目录"解析），在失去焦点时校验；
+- 校验失败（空、非法字符、选到了文件）会弹出原因并把文本框退回旧值——避免"界面显示 A、实际更新到 B"；
+- 切换时会立即尝试创建目录，把"没有写权限"这类问题提前暴露，而不是等下载几十兆后才失败；
+- 选择结果写入 `launcher.config.local.json`；`检查更新` / `更新并启动` 与命令行 `--root` 共用同一套解析逻辑。
 
 ### 5.2 命令行（验收脚本 / CI）
 
