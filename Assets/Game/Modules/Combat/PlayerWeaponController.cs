@@ -44,6 +44,21 @@ namespace RaidDemo.Combat
         /// 因为玩家 1 与敌人 0 的战斗单位编号恰好都是 1。</para>
         /// </remarks>
         private int m_ShooterId;
+
+        /// <summary>
+        /// 伤害规则里代表"射手"的战斗单位编号（免伤判定与自伤拦截用）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么和 <see cref="m_ShooterId"/> 分开（2026-09-16 修自伤缺陷）：</b>
+        /// 单机里"玩家编号"是 0，而战斗单位编号从 1 开始（<c>CombatWorld</c> 的编号起点）。
+        /// 伤害规则要拿射手去查单位表，用玩家编号永远查不到——于是"玩家之间免伤"与
+        /// "不能打自己"这两条在单机 / 安全屋全部失效。</para>
+        ///
+        /// <para>但事件里的编号不能一起改：客户端的表现层（枪声是否算自己的）是按
+        /// <b>玩家编号</b>过滤的。所以两份编号各司其职：事件用
+        /// <see cref="m_ShooterId"/>，伤害规则用本字段。服务器那边两者相同。</para>
+        /// </remarks>
+        private int m_RuleCombatantId;
         private uint m_Sequence;
 
         /// <summary>
@@ -109,7 +124,34 @@ namespace RaidDemo.Combat
             if (combatantId > 0)
             {
                 m_ShooterId = combatantId;
+                m_RuleCombatantId = combatantId;
             }
+        }
+
+        /// <summary>
+        /// 只绑定"伤害规则用的射手编号"，不改事件里的编号。
+        /// </summary>
+        /// <param name="combatantId">射手在本机战斗世界里的单位编号；传 0 或负数时保持当前值。</param>
+        /// <remarks>
+        /// <para>单机与安全屋用这一条：事件继续带玩家编号（表现层按它过滤"是不是我的枪声"），
+        /// 而免伤与自伤拦截用战斗单位编号。</para>
+        ///
+        /// <para><b>不调用它的后果</b>（<c>2026-09-16</c> 的真机缺陷）：单机里
+        /// <c>TryGet(0)</c> 查不到射手 → "玩家免伤"不生效 → 枪口落在自己胶囊体里的那一帧
+        /// 会真的打中自己，AK 两发（77×2）就把玩家判死，表现是"刚进安全屋就躺在地上还能走"。</para>
+        /// </remarks>
+        public void BindCombatantForRules(int combatantId)
+        {
+            if (combatantId > 0)
+            {
+                m_RuleCombatantId = combatantId;
+            }
+        }
+
+        /// <summary>伤害规则使用的射手编号（未绑定时等于事件编号）。</summary>
+        public int RuleCombatantId
+        {
+            get { return m_RuleCombatantId > 0 ? m_RuleCombatantId : m_ShooterId; }
         }
 
         /// <summary>事件里使用的射手编号（战斗单位编号）。</summary>

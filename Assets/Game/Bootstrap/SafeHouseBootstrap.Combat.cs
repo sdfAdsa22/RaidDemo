@@ -82,6 +82,11 @@ namespace RaidDemo.Bootstrap
                 targetView.Initialize(m_PlayerCombatantId, colorFeedback: false);
             }
 
+            // 把"伤害规则用的射手编号"绑上（2026-09-16 修自伤缺陷）：
+            // 单机里事件编号是玩家编号 0，而战斗单位编号从 1 开始——不绑的话
+            // "玩家免伤"与"不能打自己"两条规则都查不到射手，靶场里第一枪就能把自己打死。
+            m_WeaponController.BindCombatantForRules(m_PlayerCombatantId);
+
             // 弹道、音效与特效：与战局一样挂在同一个「战斗效果」节点上。
             // 它们都只订阅开火事件，因此拿到事件总线就能工作。
             var effectsHost = new GameObject("CombatEffects");
@@ -135,7 +140,55 @@ namespace RaidDemo.Bootstrap
                 catalog != null ? catalog.CrosshairSprite : null,
                 catalog != null ? catalog.CrosshairReloadSprite : null);
 
+            // 靶场不可能伤到玩家：真被判定为伤害/死亡说明别处有缺陷（例如自伤）。
+            // 留一条显式报错，别让"角色躺在地上还能走"这种症状再默默出现。
+            m_EventBus.Subscribe<DamageAppliedEvent>(OnPlayerDamagedInSafeHouse);
+
             RegisterTargets();
+
+            // 立刻同步一次武器表现：否则第一帧里武器视图还没装备，
+            // 枪口会走兜底分支，而玩家点"继续游戏"的鼠标键此刻可能仍按着。
+            UpdateWeaponPresentation();
+        }
+
+        /// <summary>
+        /// 安全屋里的玩家受伤回调：靶场不该能伤到玩家，因此这里只报警并把血补回去。
+        /// </summary>
+        /// <param name="evt">伤害事件。</param>
+        private void OnPlayerDamagedInSafeHouse(DamageAppliedEvent evt)
+        {
+            if (evt.TargetId != m_PlayerCombatantId)
+            {
+                return;
+            }
+
+            Debug.LogError(
+                $"[RaidDemo] 安全屋靶场里玩家受到了 {evt.Damage:F0} 点伤害（致命={evt.WasKilled}）——"
+                + "靶场不应该能伤到玩家，请检查射手的规则编号与自伤拦截。");
+
+            if (m_CombatWorld != null && m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
+            {
+                state.SetHealth(PlayerMaxHealth);
+            }
+        }
+
+        /// <summary>
+        /// 武器视图尚未装备时的兜底枪口：推到"体前"，绝不落在角色自己的胶囊体里。
+        /// </summary>
+        /// <returns>枪口世界坐标。</returns>
+        /// <remarks>
+        /// <para><b>为什么不能停在角色中轴（2026-09-16 修自伤缺陷）：</b>射线从枪口出发，
+        /// 起点若在角色自己的胶囊体内部，第一个命中的一定是射手本人——
+        /// 于是"进入场景的第一帧"与"刚换枪那一帧"这两处极短窗口里，
+        /// 开枪就等于朝自己开枪（AK 两发 154 点，足够把 100 血的玩家判死）。</para>
+        ///
+        /// <para>偏移量取 0.6 米，与 <c>PlayerWeaponView</c> 的举枪前移量一致；
+        /// 角色胶囊半径约 0.35 米，因此这个点稳定落在体外。</para>
+        /// </remarks>
+        private Vector3 ResolveFallbackMuzzlePosition()
+        {
+            var motor = m_PlayerMotor.transform;
+            return motor.position + (Vector3.up * 1.2f) + (motor.forward * 0.6f);
         }
 
         /// <summary>
@@ -157,7 +210,7 @@ namespace RaidDemo.Bootstrap
                 m_WeaponController.SetMuzzlePosition(
                     m_WeaponView != null && m_WeaponView.IsEquipped
                         ? m_WeaponView.MuzzleWorldPosition
-                        : m_PlayerMotor.transform.position + (Vector3.up * 1.2f));
+                        : ResolveFallbackMuzzlePosition());
             }
 
             // 必须把「手上是什么武器」同步给控制器：弹匣容量、装弹、射速全部由它管理。

@@ -203,6 +203,11 @@ namespace RaidDemo.Bootstrap
             // 只登记标识、不接管颜色：玩家的配色与受击反馈由角色本身和界面负责。
             m_PlayerTargetView = m_PlayerMotor.gameObject.AddComponent<CombatTargetView>();
             m_PlayerTargetView.Initialize(m_PlayerCombatantId, colorFeedback: false);
+
+            // 把"伤害规则用的射手编号"告诉武器控制器（2026-09-16 修自伤缺陷）：
+            // 事件里继续用玩家编号（表现层按它过滤自己的枪声），而免伤与自伤拦截
+            // 必须用战斗单位编号——两者在单机里不是同一个数（0 与 1）。
+            m_WeaponController?.BindCombatantForRules(m_PlayerCombatantId);
         }
 
         /// <summary>按共享布局生成敌人。</summary>

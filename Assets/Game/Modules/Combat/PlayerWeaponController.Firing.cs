@@ -131,10 +131,22 @@ namespace RaidDemo.Combat
                 return;
             }
 
+            // 射手用"规则编号"（战斗单位编号），而不是事件里的编号：
+            // 单机里事件编号是玩家编号 0，拿它去查单位表永远查不到（编号从 1 开始），
+            // 下面两条规则就会一起失效（2026-09-16 修自伤缺陷时定位）。
+            var shooterId = RuleCombatantId;
+
+            // 自伤在物理上就不该成立：枪口在"武器视图尚未装备"的极早期会回退到角色体内，
+            // 那一帧的射线第一个命中的就是射手自己。这里直接丢弃，既不给伤害也不给命中反馈。
+            if (shooterId > 0 && targetId == shooterId)
+            {
+                return;
+            }
+
             // PVE 合作：玩家之间不造成伤害（2026-09-15 定稿，见 CombatRules 的说明）。
             // 拦在这里而不是"扣完血再回滚"：不扣血、不发命中事件，客户端不会画出
             // 与目标血量对不上的命中反馈。
-            if (m_World.TryGet(m_ShooterId, out var shooter)
+            if (m_World.TryGet(shooterId, out var shooter)
                 && CombatRules.BlocksFriendlyDamage(shooter, combatant))
             {
                 return;
@@ -149,7 +161,10 @@ namespace RaidDemo.Combat
 
             var wasKilled = !combatant.IsAlive;
             m_EventBus.Publish(new DamageAppliedEvent(
-                m_ShooterId,
+                // 伤害事件带"规则编号"（战斗单位编号）：击杀归属与 AI 记仇都按它查单位表。
+                // 单机里它从 0 变成玩家的战斗单位编号，于是"击杀数一直不涨"的问题一并修掉；
+                // 开火事件仍带玩家编号，因为表现层是按玩家编号过滤"是不是我的枪声"的。
+                shooterId,
                 targetId,
                 outcome.Damage,
                 outcome.ArmorDamage,
@@ -162,7 +177,7 @@ namespace RaidDemo.Combat
 
             if (wasKilled)
             {
-                m_EventBus.Publish(new TargetDestroyedEvent(targetId, m_ShooterId));
+                m_EventBus.Publish(new TargetDestroyedEvent(targetId, shooterId));
             }
         }
     }

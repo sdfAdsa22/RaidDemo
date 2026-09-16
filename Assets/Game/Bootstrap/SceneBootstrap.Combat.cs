@@ -110,7 +110,10 @@ namespace RaidDemo.Bootstrap
                 return transform.position + (Vector3.up * MuzzleHeight);
             }
 
-            return m_PlayerMotor.transform.position + (Vector3.up * MuzzleHeight);
+            // 兜底枪口推到体前：起点落在自己的胶囊体里时，射线的第一个命中就是射手本人
+            // （2026-09-16 修自伤缺陷；偏移量与 PlayerWeaponView 的举枪前移量一致）。
+            var motor = m_PlayerMotor.transform;
+            return motor.position + (Vector3.up * MuzzleHeight) + (motor.forward * 0.6f);
         }
 
         /// <summary>
