@@ -240,6 +240,13 @@ namespace RaidDemo.Launcher
             PerformLayout();
             m_HeadlineLabel.Location = new Point(PanelLeft - 3, statusTop - m_HeadlineLabel.Height - 6);
             m_BrandLabel.Location = new Point(PanelLeft, m_HeadlineLabel.Top - m_BrandLabel.Height - 2);
+
+            // 文字区域也要能拖动窗口：无边框窗口里，玩家的第一反应是"抓住画面上任意空白拖"
+            // （标题往往正是他按下的地方）。只让窗体本体可拖会让人觉得"拖不动"。
+            foreach (var label in new[] { m_BrandLabel, m_HeadlineLabel, m_StatusLabel, m_SpeedLabel, m_VersionLabel })
+            {
+                WindowChrome.EnableDrag(label);
+            }
         }
 
         /// <summary>建一个叠在主视觉上的浅色文字标签。</summary>
