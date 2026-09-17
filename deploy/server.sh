@@ -15,6 +15,7 @@
 #   RAIDDEMO_DASHBOARD_PORT  状态页端口（TCP，默认 8080；0 = 关闭）
 #   RAIDDEMO_GRACE           掉线宽限秒数（默认 60）
 #   RAIDDEMO_WATCHDOG        自愈看门狗秒数（默认 2.5；0 = 关闭）
+#   RAIDDEMO_ADMIN_TOKEN     状态页管理口令（默认空 = 写操作仅限服务器本机）
 #   RAIDDEMO_EXTRA_ARGS      追加的启动参数（原样传递）
 #   RAIDDEMO_CHROOT          glibc 兼容模式：指向 Ubuntu rootfs（见 setup_chroot.sh）。
 #                            设置后服务器在 chroot 里运行——用于"系统 glibc 低于 Unity 6
@@ -47,6 +48,7 @@ SAVE_DIR="${RAIDDEMO_SAVE_DIR:-server_saves}"
 DASHBOARD_PORT="${RAIDDEMO_DASHBOARD_PORT:-8080}"
 GRACE="${RAIDDEMO_GRACE:-60}"
 WATCHDOG="${RAIDDEMO_WATCHDOG:-2.5}"
+ADMIN_TOKEN="${RAIDDEMO_ADMIN_TOKEN:-}"
 EXTRA_ARGS="${RAIDDEMO_EXTRA_ARGS:-}"
 CHROOT_DIR="${RAIDDEMO_CHROOT:-}"
 
@@ -148,6 +150,11 @@ start() {
             -grace "$GRACE"
             -watchdog "$WATCHDOG"
         )
+
+        # 管理口令只在显式提供时追加：缺省不传 = 写操作仅限服务器本机（与旧行为一致）。
+        if [ -n "$ADMIN_TOKEN" ]; then
+            app_args+=(-adminToken "$ADMIN_TOKEN")
+        fi
     fi
 
     app_args+=(-batchmode -nographics -logFile "$log_path")

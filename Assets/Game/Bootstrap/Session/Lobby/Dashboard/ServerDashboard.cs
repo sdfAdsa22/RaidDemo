@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -54,6 +55,9 @@ namespace RaidDemo.Bootstrap
             /// <summary>主线程写回的响应。</summary>
             public DashboardResponse Response;
 
+            /// <summary>请求头字段（管理口令从这里读）。</summary>
+            public Dictionary<string, string> Headers;
+
             /// <summary>主线程处理完毕的信号。</summary>
             public readonly ManualResetEventSlim Completed = new ManualResetEventSlim(false);
         }
@@ -63,7 +67,8 @@ namespace RaidDemo.Bootstrap
         private TcpListener m_Listener;
         private Thread m_AcceptThread;
         private Func<ServerStatusSnapshot> m_SnapshotProvider;
-        private Func<string, string> m_ActionHandler;
+        private Func<string, string, string> m_ActionHandler;
+        private string m_AdminToken = string.Empty;
         private volatile bool m_StopRequested;
 
         /// <summary>状态页是否正在监听。</summary>
@@ -83,8 +88,15 @@ namespace RaidDemo.Bootstrap
         /// </summary>
         /// <param name="port">监听端口；0 表示关闭状态页。</param>
         /// <param name="snapshotProvider">取当前状态快照（在主线程执行）。</param>
-        /// <param name="actionHandler">执行运维动作；返回 null 或空串表示成功。</param>
-        public void Initialize(int port, Func<ServerStatusSnapshot> snapshotProvider, Func<string, string> actionHandler)
+        /// <param name="actionHandler">执行运维动作（动作名、参数）；返回 null 或空串表示成功。</param>
+        /// <param name="adminToken">
+        /// 远程写操作所需的管理口令；空表示写操作仅限服务器本机。
+        /// </param>
+        public void Initialize(
+            int port,
+            Func<ServerStatusSnapshot> snapshotProvider,
+            Func<string, string, string> actionHandler,
+            string adminToken = null)
         {
             if (IsRunning)
             {
@@ -95,6 +107,7 @@ namespace RaidDemo.Bootstrap
             m_StopRequested = false;
             m_SnapshotProvider = snapshotProvider;
             m_ActionHandler = actionHandler;
+            m_AdminToken = adminToken ?? string.Empty;
 
             if (port <= 0)
             {
@@ -128,7 +141,9 @@ namespace RaidDemo.Bootstrap
             };
             m_AcceptThread.Start();
 
-            Debug.Log($"[服务器] 状态页已就绪：http://127.0.0.1:{port}/ （写操作仅限本机）");
+            Debug.Log(string.IsNullOrEmpty(m_AdminToken)
+                ? $"[服务器] 状态页已就绪：http://127.0.0.1:{port}/ （写操作仅限本机；配置 adminToken 后可远程管理）"
+                : $"[服务器] 状态页已就绪：http://127.0.0.1:{port}/ （写操作需管理口令，可远程管理）");
         }
 
         /// <summary>停止监听并等待后台线程退出。可重复调用。</summary>
@@ -189,9 +204,11 @@ namespace RaidDemo.Bootstrap
             {
                 pending.Response = DashboardRouter.Handle(
                     pending.RequestLine,
+                    pending.Headers,
                     pending.RemoteAddress,
                     m_SnapshotProvider,
-                    m_ActionHandler);
+                    m_ActionHandler,
+                    m_AdminToken);
                 RequestsHandled++;
 
                 if (!string.IsNullOrEmpty(pending.Response.ActionTaken))

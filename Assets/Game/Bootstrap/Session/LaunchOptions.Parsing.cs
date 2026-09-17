@@ -318,6 +318,16 @@ namespace RaidDemo.Bootstrap
                         result.DashboardPort = dashboardPort;
                         break;
 
+                    case "-adminToken":
+                        if (!TryReadValue(list, ref i, arg, out var adminTokenText, out error))
+                        {
+                            return false;
+                        }
+
+                        // 口令不做格式校验：它只在状态页里被逐字符比较，怎么写的就怎么用。
+                        result.AdminToken = adminTokenText.Trim();
+                        break;
+
                     case "-discoveryPort":
                         if (!TryReadValue(list, ref i, arg, out var discoveryText, out error))
                         {
@@ -334,48 +344,19 @@ namespace RaidDemo.Bootstrap
                         break;
 
                     case "-grace":
-                        if (!TryReadValue(list, ref i, arg, out var graceText, out error))
+                        if (!TryApplyReconnectGrace(list, ref i, arg, result, out error))
                         {
                             return false;
                         }
 
-                        if (!float.TryParse(
-                                graceText,
-                                System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture,
-                                out var graceSeconds)
-                            || graceSeconds < LaunchOptions.MinReconnectGraceSeconds
-                            || graceSeconds > LaunchOptions.MaxReconnectGraceSeconds)
-                        {
-                            error = $"参数 {arg} 需要 {LaunchOptions.MinReconnectGraceSeconds:F0}~"
-                                    + $"{LaunchOptions.MaxReconnectGraceSeconds:F0} 秒之间的时长，实际收到「{graceText}」。";
-                            return false;
-                        }
-
-                        result.ReconnectGraceSeconds = graceSeconds;
                         break;
 
                     case "-watchdog":
-                        if (!TryReadValue(list, ref i, arg, out var watchdogText, out error))
+                        if (!TryApplyTransportWatchdog(list, ref i, arg, result, out error))
                         {
                             return false;
                         }
 
-                        if (!float.TryParse(
-                                watchdogText,
-                                System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture,
-                                out var watchdogSeconds)
-                            || (watchdogSeconds != 0f
-                                && (watchdogSeconds < LaunchOptions.MinTransportWatchdogSeconds
-                                    || watchdogSeconds > LaunchOptions.MaxTransportWatchdogSeconds)))
-                        {
-                            error = $"参数 {arg} 需要 0（关闭）或 {LaunchOptions.MinTransportWatchdogSeconds:F0}~"
-                                    + $"{LaunchOptions.MaxTransportWatchdogSeconds:F0} 秒之间的时长，实际收到「{watchdogText}」。";
-                            return false;
-                        }
-
-                        result.TransportWatchdogSeconds = watchdogSeconds;
                         break;
 
                     case "-autoroom":

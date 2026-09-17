@@ -137,6 +137,15 @@ namespace RaidDemo.Bootstrap
         /// 玩家据此知道"该更新哪一端"。
         /// </summary>
         VersionMismatch = 18,
+
+        /// <summary>
+        /// 被服务器管理员强制移出房间（管理面板的"踢出玩家 / 解散房间"）。
+        /// </summary>
+        /// <remarks>
+        /// 与 <see cref="NotInRoom"/> 分开：后者是"你本来就不在房间里"（重复提交退房），
+        /// 前者是"你被移出来了"——客户端据此显示不同的提示，将来也可以据此做禁入名单。
+        /// </remarks>
+        KickedOut = 19,
     }
 
     /// <summary>

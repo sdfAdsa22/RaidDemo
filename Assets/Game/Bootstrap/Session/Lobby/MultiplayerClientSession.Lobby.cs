@@ -36,6 +36,15 @@ namespace RaidDemo.Bootstrap
         /// <remarks>物品那一半不需要事件：它们走容器批次，界面本来就会跟着容器内容刷新。</remarks>
         public event System.Action<int> MoneyChanged;
 
+        /// <summary>
+        /// 服务器把本机玩家强制移出房间（管理面板踢人 / 解散房间）；参数是给玩家看的提示文案。
+        /// </summary>
+        /// <remarks>
+        /// 与"主动退房"区分：主动退房由玩家自己驱动界面，而这里要额外处理
+        /// "人正在战局里被移出"的情形——那条路径会把玩家送回主菜单，见 <c>RaidFlowController</c>。
+        /// </remarks>
+        public event System.Action<string> ForcedOut;
+
         /// <summary>注册大厅下行消息处理器。</summary>
         private void RegisterHandlers()
         {
@@ -171,7 +180,16 @@ namespace RaidDemo.Bootstrap
 
             if (!message.Success)
             {
-                SetError(string.IsNullOrEmpty(detail) ? $"操作失败（{error}）。" : detail);
+                var reason = string.IsNullOrEmpty(detail) ? $"操作失败（{error}）。" : detail;
+
+                // 管理员把我们移出了房间：走统一收尾（清房间状态 + 通知流程层）。
+                if (kind == LobbyRequestKind.LeaveRoom && error == LobbyError.KickedOut)
+                {
+                    HandleForcedOut(reason);
+                    return;
+                }
+
+                SetError(reason);
                 return;
             }
 
@@ -186,6 +204,9 @@ namespace RaidDemo.Bootstrap
                     {
                         ClientAccountStore.Save(Nickname, token, Address);
                     }
+
+                    // 重新登录成功 = 又回到了可被管理的状态，允许下一次"被移出"再次触发。
+                    m_ForcedOutRaised = false;
 
                     // 重连接管（P-51）时，服务器的房间状态可能**先于**登录结果到达：
                     // ApplyRoomState 已经写好了成员列表，但那时 Phase 还是"登录中"，
@@ -207,6 +228,7 @@ namespace RaidDemo.Bootstrap
 
                 case LobbyRequestKind.CreateRoom:
                 case LobbyRequestKind.JoinRoom:
+                    m_ForcedOutRaised = false;
                     SetPhase(MultiplayerClientPhase.InRoom);
                     StatusText = string.IsNullOrEmpty(detail) ? "已在房间" : detail;
                     RaiseChanged();
@@ -319,6 +341,14 @@ namespace RaidDemo.Bootstrap
                      && (Phase == MultiplayerClientPhase.InRoom || Phase == MultiplayerClientPhase.InLobby))
             {
                 Phase = MultiplayerClientPhase.InLobby;
+            }
+
+            // ④ 自己在战局里、房间却没了（管理员解散了战局中的房间）→ 强制收尾。
+            // 战局里没有"退房"入口，不处理会让客户端永远停在战局场景里。
+            if (MultiplayerKickRules.ShouldForceOutFromRaid(SelfInRoom, RoomPhase, Phase))
+            {
+                HandleForcedOut("房间已被管理员解散，已返回主菜单。");
+                return;
             }
 
             RaiseChanged();

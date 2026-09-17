@@ -173,6 +173,16 @@ namespace RaidDemo.Bootstrap
         /// <summary>本会话是否已主动断开（供界面与测试读取）。</summary>
         public bool IsDisconnected => m_Disconnected;
 
+        /// <summary>
+        /// 本次会话是否已经触发过"被移出房间"。
+        /// </summary>
+        /// <remarks>
+        /// 服务器的一次踢人 / 解散会同时产生两种信号：结果消息与房间状态广播，到达顺序不定。
+        /// 没有这个标记，同一次移出会触发两次界面处理（第二次可能刚好在场景切换中，造成重复加载）。
+        /// 进入房间或重新登录时复位——那说明玩家已经回到可被管理的状态。
+        /// </remarks>
+        private bool m_ForcedOutRaised;
+
         /// <summary>取得（必要时创建）唯一的联机会话。</summary>
         /// <remarks>宿主对象跨场景存活：大厅在安全屋、战局在地图场景，连接必须活过这次切换。</remarks>
         public static MultiplayerClientSession Ensure()

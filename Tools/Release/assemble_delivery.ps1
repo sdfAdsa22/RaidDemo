@@ -190,7 +190,15 @@ function Publish-Launcher {
     $directory = Join-Path $Target "启动器"
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
     Copy-Item (Join-Path $launcherPublish "RaidDemo.Launcher.exe") -Destination $directory -Force
-    Copy-Item (Join-Path $launcherPublish "launcher.config.json") -Destination $directory -Force
+
+    # 配置模板优先取发布目录；增量发布偶尔不会重新复制内容文件（发布目录被清理过的情形），
+    # 这时回退到源目录——交付目录缺这份模板，启动器只剩占位地址，等于分发了一份坏包。
+    $configTemplate = Join-Path $launcherPublish "launcher.config.json"
+    if (-not (Test-Path $configTemplate)) {
+        $configTemplate = Join-Path (Split-Path $launcherProject) "launcher.config.json"
+    }
+
+    Copy-Item $configTemplate -Destination $directory -Force
 
     $localConfig = Join-Path $launcherPublish "launcher.config.local.json"
     if (Test-Path $localConfig) {

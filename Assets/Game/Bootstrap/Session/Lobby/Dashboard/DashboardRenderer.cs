@@ -15,7 +15,7 @@ namespace RaidDemo.Bootstrap
     /// 页面本身要能在没有网络、没有 CDN 的机器上打开。一行内联 CSS 就够，
     /// 多余的依赖只会让"运维在云主机上看一眼"这件事变复杂。</para>
     /// </remarks>
-    public static class DashboardRenderer
+    public static partial class DashboardRenderer
     {
         /// <summary>JSON 路由的 Content-Type。</summary>
         public const string JsonContentType = "application/json; charset=utf-8";
@@ -31,25 +31,21 @@ namespace RaidDemo.Bootstrap
         /// </summary>
         /// <param name="snapshot">状态快照。</param>
         /// <param name="canControl">
-        /// 当前请求是否来自本机。只有本机访问时才画出"停止房间 / 停止服务器"两个按钮：
-        /// 页面在公网上是只读的，按钮画出来也点不动，反而像是坏了。
+        /// 当前请求是否来自本机（本机访问免口令）。
         /// </param>
+        /// <param name="adminEnabled">服务器是否配置了管理口令（决定远程访问能不能操作）。</param>
         /// <param name="notice">一键操作执行后的提示文本；没有时为 null。</param>
         /// <param name="refreshSeconds">自动刷新间隔（秒）；0 表示不自动刷新。</param>
         public static string BuildHtml(
             ServerStatusSnapshot snapshot,
             bool canControl,
+            bool adminEnabled = false,
             string notice = null,
             float refreshSeconds = 2f)
         {
             var html = new StringBuilder(4096);
             html.Append("<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">");
             html.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-
-            if (refreshSeconds > 0f)
-            {
-                html.Append($"<meta http-equiv=\"refresh\" content=\"{refreshSeconds:F0}\">");
-            }
 
             html.Append("<title>RaidDemo 服务器状态</title>");
             html.Append("<style>");
@@ -61,7 +57,9 @@ namespace RaidDemo.Bootstrap
             html.Append(".card{background:#183028;border:1px solid #24382f;border-radius:10px;padding:16px;margin-bottom:16px}");
             html.Append(".badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px}");
             html.Append(".empty{color:#7d8f85}.warn{color:#ffb347}.err{color:#ff7b72}");
-            html.Append(".btn{display:inline-block;margin-right:10px;padding:8px 14px;border-radius:8px;background:#2c4a3c;color:#e8e4d5;text-decoration:none}");
+            html.Append(".btn{display:inline-block;margin:0 10px 6px 0;padding:8px 14px;border-radius:8px;background:#2c4a3c;color:#e8e4d5;text-decoration:none;border:0;cursor:pointer;font-size:14px;font-family:inherit}");
+            html.Append(".btn:hover{background:#39604d}");
+            html.Append("input{padding:8px 10px;border-radius:8px;border:1px solid #2c4a3c;background:#12211c;color:#e8e4d5;font-size:14px;min-width:220px;font-family:inherit}");
             html.Append("code{color:#b8d8c4}");
             html.Append("</style></head><body>");
 
@@ -76,13 +74,13 @@ namespace RaidDemo.Bootstrap
             }
 
             AppendRoomCard(html, snapshot);
-            AppendPlayersCard(html, snapshot);
+            AppendPlayersCard(html, snapshot, canControl || adminEnabled);
             AppendLogsCard(html, snapshot);
             AppendAddressesCard(html, snapshot);
-            AppendActionsCard(html, canControl);
+            AppendActionsCard(html, canControl, adminEnabled);
 
-            html.Append("<p class=\"empty\">停止类操作只接受来自本机（127.0.0.1）的请求：");
-            html.Append("云主机上请先建 SSH 隧道再打开本页。JSON 版本：<code>/status.json</code></p>");
+            html.Append("<p class=\"empty\">管理操作需要来自本机的请求，或在页面口令框输入服务器配置的管理口令（adminToken）。JSON 版本：<code>/status.json</code></p>");
+            AppendAdminScript(html, refreshSeconds);
             html.Append("</body></html>");
             return html.ToString();
         }
@@ -162,7 +160,10 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>在线玩家卡片。</summary>
-        private static void AppendPlayersCard(StringBuilder html, ServerStatusSnapshot snapshot)
+        /// <param name="html">输出目标。</param>
+        /// <param name="snapshot">状态快照。</param>
+        /// <param name="operable">是否画出"踢出"按钮（本机访问或配置了口令）。</param>
+        private static void AppendPlayersCard(StringBuilder html, ServerStatusSnapshot snapshot, bool operable)
         {
             html.Append("<div class=\"card\"><h2>在线玩家</h2>");
 
@@ -172,7 +173,13 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            html.Append("<table><thead><tr><th>连接</th><th>昵称</th><th>状态</th></tr></thead><tbody>");
+            html.Append("<table><thead><tr><th>连接</th><th>昵称</th><th>状态</th><th>在线</th>");
+            if (operable)
+            {
+                html.Append("<th>操作</th>");
+            }
+
+            html.Append("</tr></thead><tbody>");
             for (var i = 0; i < snapshot.Members.Count; i++)
             {
                 var member = snapshot.Members[i];
@@ -180,10 +187,36 @@ namespace RaidDemo.Bootstrap
                 html.Append($"<td>{member.ClientId}</td>");
                 html.Append($"<td>{Escape(member.Nickname)}{(member.IsHost ? " ★" : string.Empty)}</td>");
                 html.Append($"<td>{Escape(member.StateText)}</td>");
+                html.Append($"<td class=\"empty\">{Escape(FormatDuration(member.OnlineSeconds))}</td>");
+                if (operable)
+                {
+                    AppendKickCell(html, member);
+                }
+
                 html.Append("</tr>");
             }
 
             html.Append("</tbody></table></div>");
+        }
+
+        /// <summary>玩家行里的操作单元格。</summary>
+        /// <param name="html">输出目标。</param>
+        /// <param name="member">目标玩家。</param>
+        /// <remarks>
+        /// 只有房间成员能踢：不在房间里的连接没有"房间席位"可移除，
+        /// 而断线重连机制会让直接断开看起来"踢不掉"，所以那个入口干脆不提供。
+        /// 昵称通过 data 属性传给脚本、不进 JS 字面量：它是玩家输入，转义规则只需要管一处。
+        /// </remarks>
+        private static void AppendKickCell(StringBuilder html, ServerStatusMember member)
+        {
+            if (!member.InRoom)
+            {
+                html.Append("<td class=\"empty\">—</td>");
+                return;
+            }
+
+            html.Append($"<td><button class=\"btn\" data-nick=\"{Escape(member.Nickname)}\"");
+            html.Append($" onclick=\"act('/?action=kick-player&amp;client={member.ClientId}', this)\">踢出</button></td>");
         }
 
         /// <summary>最近日志卡片。</summary>
@@ -227,21 +260,6 @@ namespace RaidDemo.Bootstrap
                 html.Append($"<div><code>{Escape(snapshot.Addresses[i])}</code></div>");
             }
 
-            html.Append("</div>");
-        }
-
-        /// <summary>一键操作卡片（只有本机访问才画）。</summary>
-        private static void AppendActionsCard(StringBuilder html, bool canControl)
-        {
-            if (!canControl)
-            {
-                return;
-            }
-
-            html.Append("<div class=\"card\"><h2>运维操作（仅本机可用）</h2>");
-            html.Append("<a class=\"btn\" href=\"/?action=stop-room\">停止房间（回空闲）</a>");
-            html.Append("<a class=\"btn\" href=\"/?action=stop-server\">停止服务器</a>");
-            html.Append("<div class=\"empty\">停止房间不影响服务器进程；停止服务器会写完日志后退出。</div>");
             html.Append("</div>");
         }
 

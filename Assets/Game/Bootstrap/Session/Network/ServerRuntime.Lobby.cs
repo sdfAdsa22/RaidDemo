@@ -34,6 +34,12 @@ namespace RaidDemo.Bootstrap
             public bool LoggedIn;
 
             /// <summary>
+            /// 本次登录成功的时刻（<c>Time.realtimeSinceStartup</c>）；0 表示还没登录成功。
+            /// </summary>
+            /// <remarks>状态页用它显示"这个人进服多久了"，排查挂机 / 重连时会很有用。</remarks>
+            public float LoginAt;
+
+            /// <summary>
             /// 掉线宽限的截止时刻（<c>Time.realtimeSinceStartup</c>）；&lt;= 0 表示连接正常。
             /// </summary>
             /// <remarks>

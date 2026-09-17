@@ -43,6 +43,7 @@ namespace RaidDemo.Tests.EditMode
                 Nickname = "小明",
                 IsHost = true,
                 InRoom = true,
+                OnlineSeconds = 125f,
                 StateText = "在房间（房主）",
             });
             snapshot.Members.Add(new ServerStatusMember
@@ -57,19 +58,39 @@ namespace RaidDemo.Tests.EditMode
             return snapshot;
         }
 
-        private static DashboardResponse Handle(string requestLine, string remote, out string actionTaken, string actionResult = null)
+        /// <summary>最近一次动作处理器收到的参数（踢人编号等）。每次请求前重置。</summary>
+        private static string s_LastActionArgument;
+
+        private static DashboardResponse Handle(
+            string requestLine,
+            string remote,
+            out string actionTaken,
+            string actionResult = null,
+            string adminToken = null,
+            string requestToken = null)
         {
             // 局部变量中转：out 参数不能直接在 lambda 里赋值（CS1628）。
             string taken = null;
+            s_LastActionArgument = null;
+
+            var headers = new Dictionary<string, string>();
+            if (requestToken != null)
+            {
+                headers[DashboardRouter.AdminTokenHeader] = requestToken;
+            }
+
             var response = DashboardRouter.Handle(
                 requestLine,
+                headers,
                 remote,
                 BuildSnapshot,
-                action =>
+                (action, argument) =>
                 {
                     taken = action;
+                    s_LastActionArgument = argument;
                     return actionResult;
-                });
+                },
+                adminToken);
 
             actionTaken = taken;
             return response;
@@ -94,16 +115,28 @@ namespace RaidDemo.Tests.EditMode
         {
             var response = Handle("GET / HTTP/1.1", Local, out _);
 
-            StringAssert.DoesNotContain("<script>", response.Body);
+            // 页面自身的内联脚本是允许的（自动刷新与口令框）；要断言的是昵称里的标签没有原样落进 HTML。
+            StringAssert.DoesNotContain("<script>坏名字</script>", response.Body);
             StringAssert.Contains("&lt;script&gt;", response.Body);
         }
 
-        /// <summary>本机访问才画运维按钮；外网访问只有只读信息。</summary>
+        /// <summary>外网 + 未配置口令时页面只有只读信息（按钮画出来也点不动）。</summary>
         [Test]
         public void 运维按钮只对本机显示()
         {
             StringAssert.Contains("stop-room", Handle("GET / HTTP/1.1", Local, out _).Body);
             StringAssert.DoesNotContain("action=stop-room", Handle("GET / HTTP/1.1", Remote, out _).Body);
+            StringAssert.Contains("未配置管理口令", Handle("GET / HTTP/1.1", Remote, out _).Body);
+        }
+
+        /// <summary>配置了口令后，外网页面也画出操作区（真正的拦截在路由层）。</summary>
+        [Test]
+        public void 配置口令后外网页面显示操作区()
+        {
+            var response = Handle("GET / HTTP/1.1", Remote, out _, adminToken: "s3cret");
+
+            StringAssert.Contains("action=stop-room", response.Body);
+            StringAssert.Contains("adminToken", response.Body);
         }
 
         /// <summary>JSON 路由：与页面同源的机器可读版本。</summary>
@@ -162,10 +195,10 @@ namespace RaidDemo.Tests.EditMode
             Assert.AreEqual(200, response.StatusCode);
             Assert.AreEqual(DashboardRouter.StopRoomAction, actionTaken);
             Assert.AreEqual(DashboardRouter.StopRoomAction, response.ActionTaken);
-            StringAssert.Contains("房间已停止", response.Body);
+            StringAssert.Contains("房间已解散", response.Body);
         }
 
-        /// <summary>外网来源的写操作被拒绝，并且不会调用处理器（默认攻击面为零）。</summary>
+        /// <summary>外网来源且在没配置口令时，写操作被拒绝且不会调用处理器（默认攻击面为零）。</summary>
         [Test]
         public void 外网不能执行写操作()
         {
@@ -173,7 +206,87 @@ namespace RaidDemo.Tests.EditMode
 
             Assert.AreEqual(403, response.StatusCode);
             Assert.IsNull(actionTaken, "被拒绝的请求不能被执行。");
-            StringAssert.Contains("SSH", response.Body);
+            StringAssert.Contains("本机", response.Body);
+        }
+
+        /// <summary>带对管理口令的远程请求可以执行；口令写在请求头里。</summary>
+        [Test]
+        public void 远程请求带对口令可以执行()
+        {
+            var response = Handle(
+                "GET /?action=stop-room HTTP/1.1",
+                Remote,
+                out var actionTaken,
+                adminToken: "s3cret",
+                requestToken: "s3cret");
+
+            Assert.AreEqual(200, response.StatusCode);
+            Assert.AreEqual(DashboardRouter.StopRoomAction, actionTaken);
+        }
+
+        /// <summary>口令错误与"未带口令"一样被拒绝，且不给任何执行机会。</summary>
+        [Test]
+        public void 远程请求口令错误被拒()
+        {
+            var wrong = Handle(
+                "GET /?action=stop-room HTTP/1.1",
+                Remote,
+                out var actionTaken,
+                adminToken: "s3cret",
+                requestToken: "guess");
+            Assert.AreEqual(403, wrong.StatusCode);
+            Assert.IsNull(actionTaken);
+            StringAssert.Contains("管理口令", wrong.Body);
+
+            var missing = Handle("GET /?action=stop-room HTTP/1.1", Remote, out var missingTaken, adminToken: "s3cret");
+            Assert.AreEqual(403, missing.StatusCode);
+            Assert.IsNull(missingTaken);
+        }
+
+        /// <summary>命令行排查用：口令也能从查询串传（页面自身走请求头）。</summary>
+        [Test]
+        public void 口令可从查询串传入()
+        {
+            var response = Handle(
+                "GET /?action=stop-room&token=s3cret HTTP/1.1",
+                Remote,
+                out var actionTaken,
+                adminToken: "s3cret");
+
+            Assert.AreEqual(200, response.StatusCode);
+            Assert.AreEqual(DashboardRouter.StopRoomAction, actionTaken);
+        }
+
+        /// <summary>踢人动作与参数解析：client 参数必须原样交给处理器。</summary>
+        [Test]
+        public void 踢人动作解析参数()
+        {
+            var response = Handle("GET /?action=kick-player&client=3 HTTP/1.1", Local, out var actionTaken);
+
+            Assert.AreEqual(200, response.StatusCode);
+            Assert.AreEqual(DashboardRouter.KickPlayerAction, actionTaken);
+            Assert.AreEqual("3", s_LastActionArgument);
+            StringAssert.Contains("已踢出玩家", response.Body);
+        }
+
+        /// <summary>本机页面渲染出踢人按钮：只对房间成员画，昵称进 data 属性而不是脚本字面量。</summary>
+        [Test]
+        public void 页面渲染踢人按钮()
+        {
+            var response = Handle("GET / HTTP/1.1", Local, out _);
+
+            StringAssert.Contains("kick-player", response.Body);
+            StringAssert.Contains("data-nick=\"小明\"", response.Body);
+            // 不在房间里的连接没有可踢的席位：不该出现指向它的按钮。
+            StringAssert.DoesNotContain("client=1", response.Body);
+        }
+
+        /// <summary>在线时长列渲染成可读文本。</summary>
+        [Test]
+        public void 页面渲染在线时长()
+        {
+            var response = Handle("GET / HTTP/1.1", Local, out _);
+            StringAssert.Contains("2 分 5 秒", response.Body);
         }
 
         /// <summary>动作名未登记时回 400，而不是"看起来成功了"。</summary>
@@ -209,7 +322,7 @@ namespace RaidDemo.Tests.EditMode
         [Test]
         public void 没有快照时页面不崩()
         {
-            var response = DashboardRouter.Handle("GET / HTTP/1.1", Local, null, null);
+            var response = DashboardRouter.Handle("GET / HTTP/1.1", null, Local, null, null);
 
             Assert.AreEqual(200, response.StatusCode);
             StringAssert.Contains("RaidDemo", response.Body);

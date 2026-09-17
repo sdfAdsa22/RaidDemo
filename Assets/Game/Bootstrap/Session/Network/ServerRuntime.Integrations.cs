@@ -20,7 +20,11 @@ namespace RaidDemo.Bootstrap
         private void InitializeServerIntegrations()
         {
             m_Dashboard = gameObject.AddComponent<ServerDashboard>();
-            m_Dashboard.Initialize(m_Options.DashboardPort, BuildStatusSnapshot, HandleDashboardAction);
+            m_Dashboard.Initialize(
+                m_Options.DashboardPort,
+                BuildStatusSnapshot,
+                HandleDashboardAction,
+                m_Options.AdminToken);
 
             if (m_Options.DiscoveryPort > 0)
             {
@@ -61,17 +65,23 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>状态页请求的运维动作；返回 null 表示成功。</summary>
         /// <param name="action">动作名（见 <see cref="DashboardRouter"/> 的常量）。</param>
+        /// <param name="argument">动作参数（踢人时是目标玩家编号；其它动作忽略）。</param>
         /// <remarks>
-        /// 权限判断在路由层（只允许回环来源），这里只负责执行：
+        /// 权限判断在路由层（本机来源或口令正确），这里只负责执行：
         /// 把"能不能做"和"做什么"分开，安全边界就只有一处需要审查。
         /// </remarks>
-        private string HandleDashboardAction(string action)
+        private string HandleDashboardAction(string action, string argument)
         {
             switch (action)
             {
                 case DashboardRouter.StopRoomAction:
                     StopRoomFromDashboard();
                     return null;
+
+                case DashboardRouter.KickPlayerAction:
+                    return int.TryParse(argument, out var clientId)
+                        ? KickPlayerFromDashboard(clientId)
+                        : "缺少或非法的玩家编号。";
 
                 case DashboardRouter.StopServerAction:
                     StopServerFromDashboard();

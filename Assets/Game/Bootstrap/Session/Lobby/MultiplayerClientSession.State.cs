@@ -49,6 +49,34 @@ namespace RaidDemo.Bootstrap
             RaiseChanged();
         }
 
+        /// <summary>
+        /// 服务器把本机玩家强制移出房间（管理员踢出 / 解散房间）时的统一收尾。
+        /// </summary>
+        /// <param name="reason">给玩家看的提示文案。</param>
+        /// <remarks>
+        /// <para><b>为什么集中在一个方法里：</b>触发入口有两个——服务器直接发来的
+        /// <see cref="LobbyError.KickedOut"/> 结果，以及房间广播显示"房间没了、自己也不在名单里"。
+        /// 两个入口必须做同一套收尾（清房间状态、通知界面、留一条错误文案），
+        /// 分开写迟早会漂移成两种体验。</para>
+        ///
+        /// <para><b>顺序有讲究：</b>先清房间状态再发事件——事件处理方（流程控制器）可能会立刻退出联机流程，
+        /// 那时任何"还在房间里"的残留状态都会被界面读到。</para>
+        /// </remarks>
+        internal void HandleForcedOut(string reason)
+        {
+            if (m_ForcedOutRaised)
+            {
+                return;
+            }
+
+            m_ForcedOutRaised = true;
+            ResetRoomState();
+
+            var text = string.IsNullOrEmpty(reason) ? "你已被移出房间。" : reason;
+            ForcedOut?.Invoke(text);
+            SetError(text);
+        }
+
         /// <summary>清空错误（发起新操作时调用）。</summary>
         private void ClearError()
         {

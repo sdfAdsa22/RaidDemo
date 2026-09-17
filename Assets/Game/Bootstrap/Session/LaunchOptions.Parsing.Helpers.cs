@@ -35,6 +35,76 @@ namespace RaidDemo.Bootstrap
             return true;
         }
 
+        /// <summary>解析 <c>-grace</c>：掉线宽限时长。</summary>
+        /// <param name="args">参数数组。</param>
+        /// <param name="index">当前下标（会前进到取值）。</param>
+        /// <param name="switchName">开关名（用于报错）。</param>
+        /// <param name="target">解析结果。</param>
+        /// <param name="error">失败原因。</param>
+        /// <remarks>从解析主体里抽出来（文件 400 行上限）：这类"取值 → 校验 → 落字段"的参数块
+        /// 放进辅助文件后，主 switch 里新增参数只剩三行。</remarks>
+        private static bool TryApplyReconnectGrace(
+            string[] args,
+            ref int index,
+            string switchName,
+            LaunchOptions target,
+            out string error)
+        {
+            error = null;
+            if (!TryReadValue(args, ref index, switchName, out var text, out error))
+            {
+                return false;
+            }
+
+            if (!float.TryParse(
+                    text,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var seconds)
+                || seconds < MinReconnectGraceSeconds
+                || seconds > MaxReconnectGraceSeconds)
+            {
+                error = $"参数 {switchName} 需要 {MinReconnectGraceSeconds:F0}~"
+                        + $"{MaxReconnectGraceSeconds:F0} 秒之间的时长，实际收到「{text}」。";
+                return false;
+            }
+
+            target.ReconnectGraceSeconds = seconds;
+            return true;
+        }
+
+        /// <summary>解析 <c>-watchdog</c>：传输层自愈判定时长（0 表示关闭）。</summary>
+        private static bool TryApplyTransportWatchdog(
+            string[] args,
+            ref int index,
+            string switchName,
+            LaunchOptions target,
+            out string error)
+        {
+            error = null;
+            if (!TryReadValue(args, ref index, switchName, out var text, out error))
+            {
+                return false;
+            }
+
+            if (!float.TryParse(
+                    text,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var seconds)
+                || (seconds != 0f
+                    && (seconds < MinTransportWatchdogSeconds
+                        || seconds > MaxTransportWatchdogSeconds)))
+            {
+                error = $"参数 {switchName} 需要 0（关闭）或 {MinTransportWatchdogSeconds:F0}~"
+                        + $"{MaxTransportWatchdogSeconds:F0} 秒之间的时长，实际收到「{text}」。";
+                return false;
+            }
+
+            target.TransportWatchdogSeconds = seconds;
+            return true;
+        }
+
         /// <summary>读取一个"不能为空"的字符串参数；空白串按缺值处理。</summary>
         /// <param name="args">参数数组。</param>
         /// <param name="index">当前下标（会前进到取值）。</param>

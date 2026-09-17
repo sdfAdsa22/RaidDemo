@@ -243,6 +243,16 @@ namespace RaidDemo.Bootstrap
         /// <summary>服务器状态页端口（<c>-dashboardPort</c>）；0 表示关闭状态页。</summary>
         public int DashboardPort { get; private set; } = DefaultDashboardPort;
 
+        /// <summary>
+        /// 状态页写操作的管理口令（<c>-adminToken</c>）；空表示写操作仅限服务器本机。
+        /// </summary>
+        /// <remarks>
+        /// 它的存在是为了让云主机上的管理操作不再依赖 SSH 隧道：在服务器配置里放一串口令，
+        /// 从任意电脑打开状态页、输入口令即可踢人 / 解散房间。不配置时行为与旧版本一致
+        /// （只有服务器本机发起的写操作会被接受）。
+        /// </remarks>
+        public string AdminToken { get; private set; } = string.Empty;
+
         /// <summary>局域网发现端口（<c>-discoveryPort</c>）；0 表示关闭自动发现。</summary>
         public int DiscoveryPort { get; private set; } = DefaultDiscoveryPort;
 
@@ -336,7 +346,12 @@ namespace RaidDemo.Bootstrap
                 description += RaidTimeLimitSeconds > 0f
                     ? $" ｜ 战局时长上限 {RaidTimeLimitSeconds:F0} 秒"
                     : " ｜ 战局时长上限 关闭";
-                description += $" ｜ 状态页 {(DashboardPort == 0 ? "关闭" : DashboardPort.ToString())}";
+                var dashboardText = DashboardPort == 0
+                    ? "关闭"
+                    : string.IsNullOrEmpty(AdminToken)
+                        ? $"{DashboardPort}（写操作仅本机）"
+                        : $"{DashboardPort}（可远程管理）";
+                description += $" ｜ 状态页 {dashboardText}";
                 description += $" ｜ 发现 {(DiscoveryPort == 0 ? "关闭" : DiscoveryPort.ToString())}";
                 description += $" ｜ 掉线宽限 {ReconnectGraceSeconds:F0} 秒";
                 description += $" ｜ 自愈看门狗 {(TransportWatchdogSeconds <= 0f ? "关闭" : $"{TransportWatchdogSeconds:F1} 秒")}";

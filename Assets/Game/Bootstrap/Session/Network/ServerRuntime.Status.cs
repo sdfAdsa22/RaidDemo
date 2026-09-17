@@ -62,6 +62,7 @@ namespace RaidDemo.Bootstrap
                     Nickname = string.IsNullOrEmpty(client.Nickname) ? "（未登录）" : client.Nickname,
                     IsHost = member != null && member.IsHost,
                     InRoom = member != null,
+                    OnlineSeconds = client.LoginAt > 0f ? Mathf.Max(0f, now - client.LoginAt) : 0f,
                     StateText = DescribeClientState(client, member),
                 });
             }

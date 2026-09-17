@@ -132,7 +132,9 @@ namespace RaidDemo.Bootstrap
             Time.timeScale = 0f;
             m_ResultScreen.SetVisible(false);
             m_MenuScreen.SetHasSave(HasSave);
-            m_MenuScreen.SetNotice(StartupNotice);
+            // 一次性会话提示优先：它承载"被管理员移出房间"这类刚刚发生、必须让玩家看到的原因，
+            // 而 StartupNotice 是启动时就已记录的历史（强退惩罚），晚一点显示不迟。
+            m_MenuScreen.SetNotice(SessionNotice.Consume() ?? StartupNotice);
             m_MenuScreen.SetVisible(true);
             UnlockCursor();
         }

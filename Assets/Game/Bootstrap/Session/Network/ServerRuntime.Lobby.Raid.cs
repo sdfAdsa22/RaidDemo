@@ -250,13 +250,57 @@ namespace RaidDemo.Bootstrap
                 m_Room.TryLeave(id, out _);
 
                 SendLobbyResult(id, LobbyRequestKind.LeaveRoom, false,
-                    LobbyError.NotInRoom, "房间已被服务器停止。");
+                    LobbyError.KickedOut, "房间已被管理员解散。");
             }
 
             BroadcastRoomState();
             m_RaidStartedAt = -1f;
 
-            m_Session?.Log.Info("[服务器] 状态页请求：已停止房间（成员全部退出）。");
+            m_Session?.Log.Info("[服务器] 状态页请求：已解散房间（成员全部退出）。");
+        }
+
+        /// <summary>
+        /// 状态页的"踢出玩家"：把一名成员请出房间（服务器进程与其它玩家不受影响）。
+        /// </summary>
+        /// <param name="clientId">目标玩家的连接编号（状态页"编号"列）。</param>
+        /// <returns>成功时为 null；失败时是给管理员看的原因。</returns>
+        /// <remarks>
+        /// <para><b>为什么战局中的成员不允许踢：</b>踢出意味着"房间席位没了、世界里的身体也要移除"，
+        /// 而战局中的客户端没有一条"被移出房间后从哪里继续"的既定路径（撤离 / 阵亡 / 解散各有自己的对接口）。
+        /// 与其造一条半成品路径，这里的口径是：战局中请用「解散房间」——它把所有人一起收摊，
+        /// 客户端侧走的是已验收的完整流程。</para>
+        ///
+        /// <para>被踢的客户端会收到 <see cref="LobbyError.KickedOut"/> 结果（界面显示原因）与新的房间状态广播，
+        /// 状态回到"已登录"，可以立刻重新加入房间（不封禁——这是 Demo 的管理工具，不是处罚系统）。</para>
+        /// </remarks>
+        internal string KickPlayerFromDashboard(int clientId)
+        {
+            if (!m_Room.Exists)
+            {
+                return "当前没有房间。";
+            }
+
+            var member = m_Room.Find(clientId);
+            if (member == null)
+            {
+                return $"玩家 {clientId} 不在房间里。";
+            }
+
+            if (m_Room.Phase != LobbyPhase.Waiting)
+            {
+                return "该玩家正在战局中：请改用「解散房间」。";
+            }
+
+            RemovePlayerFromWorld(clientId);
+            m_RaidProgress.Remove(clientId);
+            m_Room.TryLeave(clientId, out _);
+
+            SendLobbyResult(clientId, LobbyRequestKind.LeaveRoom, false,
+                LobbyError.KickedOut, "你已被管理员移出房间。");
+
+            BroadcastRoomState();
+            m_Session?.Log.Info($"[服务器] 状态页请求：已踢出玩家 {clientId}（{member.Nickname}）。");
+            return null;
         }
 
         /// <summary>状态页的"停止服务器"：先收摊再退出进程。</summary>

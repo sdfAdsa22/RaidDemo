@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -49,7 +50,7 @@ namespace RaidDemo.Bootstrap
                 client.SendTimeout = SocketTimeoutMilliseconds;
 
                 var remote = client.Client.RemoteEndPoint as IPEndPoint;
-                var requestLine = ReadRequestLine(client);
+                var requestLine = ReadRequestHead(client, out var headers);
                 if (string.IsNullOrEmpty(requestLine))
                 {
                     WriteResponse(client, new DashboardResponse(400, DashboardRenderer.TextContentType, "请求为空。"), isHead: false);
@@ -60,6 +61,7 @@ namespace RaidDemo.Bootstrap
                 {
                     RequestLine = requestLine,
                     RemoteAddress = remote != null ? remote.Address.ToString() : string.Empty,
+                    Headers = headers,
                 };
 
                 m_Inbox.Enqueue(pending);
@@ -88,14 +90,24 @@ namespace RaidDemo.Bootstrap
             }
         }
 
-        /// <summary>读第一行（到 CRLF 为止）。</summary>
-        private static string ReadRequestLine(TcpClient client)
+        /// <summary>读请求头：首行加所有头部字段。</summary>
+        /// <param name="client">客户端连接。</param>
+        /// <param name="headers">解析出的头部字段（大小写不敏感；重名取第一个）。</param>
+        /// <remarks>
+        /// 头部字段是为管理口令（<c>X-Admin-Token</c>）读的：口令走头部而不是查询串，
+        /// 就不会出现在浏览器历史、代理日志与地址栏截图里。解析仍然只做到"读得懂"为止——
+        /// 不支持同名多次、不做百分号解码，因为这台服务器上只有我们自己发的请求。
+        /// </remarks>
+        private static string ReadRequestHead(TcpClient client, out Dictionary<string, string> headers)
         {
+            headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
             // 注意不要在这里释放 NetworkStream：它由 TcpClient 持有，后面还要用同一条流写响应。
             var stream = client.GetStream();
             var buffer = new byte[MaxRequestBytes];
             var total = 0;
             var headerEnd = -1;
+            var firstLineEnd = -1;
             string requestLine = null;
 
             while (total < buffer.Length)
@@ -108,25 +120,24 @@ namespace RaidDemo.Bootstrap
 
                 total++;
 
-                if (requestLine == null && total >= 1 && buffer[total - 1] == (byte)'\n')
+                if (requestLine == null && buffer[total - 1] == (byte)'\n')
                 {
                     var length = total > 1 && buffer[total - 2] == (byte)'\r' ? total - 2 : total - 1;
                     requestLine = Encoding.UTF8.GetString(buffer, 0, length);
+                    firstLineEnd = total;
+
+                    // 单行容忍：首行之后暂时没有数据时，等一小会儿再决定这是"只发一行的极简客户端"
+                    // 还是"头字段还在路上"的正常请求（两者在首行读完后无法立刻区分）。
+                    if (!stream.DataAvailable && !WaitForMoreBytes(stream))
+                    {
+                        headerEnd = total;
+                        break;
+                    }
+
+                    continue;
                 }
 
-                // 继续读到请求头结束（空行 CRLFCRLF）。
-                if (total >= 4
-                    && buffer[total - 4] == (byte)'\r' && buffer[total - 3] == (byte)'\n'
-                    && buffer[total - 2] == (byte)'\r' && buffer[total - 1] == (byte)'\n')
-                {
-                    headerEnd = total;
-                    break;
-                }
-
-                // 容许只发一行就结束的极简客户端（例如 telnet 手工测试）。
-                if (requestLine != null && total >= 2
-                    && buffer[total - 2] == (byte)'\r' && buffer[total - 1] == (byte)'\n'
-                    && headerEnd < 0)
+                if (DashboardHttpRules.IsRequestHeadTerminated(buffer, total))
                 {
                     headerEnd = total;
                     break;
@@ -138,6 +149,8 @@ namespace RaidDemo.Bootstrap
                 headerEnd = total;
             }
 
+            DashboardHttpRules.ParseHeaderFields(buffer, firstLineEnd, headerEnd, headers);
+
             // 把本次请求剩下的字节读完再交给上层：
             // 只读第一行就关闭连接时，客户端缓冲区里还留着未读的请求头，
             // Windows 会用 RST 而不是 FIN 收尾，客户端（curl / 浏览器 / Invoke-WebRequest）
@@ -145,6 +158,28 @@ namespace RaidDemo.Bootstrap
             DrainRemainingHeaders(stream);
 
             return requestLine;
+        }
+
+        /// <summary>短暂等待后续字节；等到返回 true，超时返回 false。</summary>
+        /// <param name="stream">客户端流。</param>
+        /// <remarks>
+        /// 100 毫秒是本机与公网实测都远够用的量级：正常请求的头字段与首行几乎同时到达，
+        /// 而 telnet 手工敲的一行不会等这么久。等待发生在后台收包线程上，不阻塞主线程。
+        /// </remarks>
+        private static bool WaitForMoreBytes(NetworkStream stream)
+        {
+            var deadline = DateTime.UtcNow.AddMilliseconds(100);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (stream.DataAvailable)
+                {
+                    return true;
+                }
+
+                Thread.Sleep(2);
+            }
+
+            return stream.DataAvailable;
         }
 
         /// <summary>把请求头剩余部分读干净（最多等到短暂的空闲），避免关闭连接时发出 RST。</summary>

@@ -108,6 +108,19 @@ vi server.config.json                          # 改 port / room / dashboardPort
 > **命令行 > 配置文件 > 内置默认**，脚本一传参数就会把配置文件压掉——
 > 那正是"改了文件却不生效"的经典坑。
 
+**远程管理状态页（可选）**
+
+状态页（默认 `http://<服务器>:8080/`）可以查看房间、玩家与日志，也能踢人 / 解散房间 / 停止服务器。
+写操作默认只接受来自服务器本机的请求；要让自己的电脑在公网上也能管理，
+在 `server.config.json` 里加一行管理口令：
+
+```json
+"adminToken": "换成一串只有你知道的文本"
+```
+
+重启服务器后，打开状态页在口令框输入这串文本即可执行操作。口令只是"管理开关"，
+不会下发给游戏客户端；删除该字段或留空即回到"仅本机可操作"。
+
 **配置方式二：环境变量**（没有 `server.config.json` 时生效，均有默认值）
 
 ```bash
@@ -122,6 +135,7 @@ RAIDDEMO_PORT=7777 RAIDDEMO_ROOM=周末车队 RAIDDEMO_GRACE=60 ./server.sh star
 | `RAIDDEMO_DASHBOARD_PORT` | 8080 | 状态页端口；0 = 关闭 |
 | `RAIDDEMO_GRACE` | 60 | 掉线宽限秒数 |
 | `RAIDDEMO_WATCHDOG` | 2.5 | 自愈看门狗秒数；0 = 关闭 |
+| `RAIDDEMO_ADMIN_TOKEN` | 空 | 状态页管理口令；空 = 写操作仅限服务器本机 |
 | `RAIDDEMO_EXTRA_ARGS` | 空 | 追加参数（原样传递） |
 
 ### 用 systemd 常驻（可选）

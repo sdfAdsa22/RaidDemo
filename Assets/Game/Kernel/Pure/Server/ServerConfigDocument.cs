@@ -110,5 +110,17 @@ namespace RaidDemo.Kernel.Server
 
         /// <summary>传输层自愈判定时长（秒）；0 表示关闭。未设置时为 <see cref="UnsetFloat"/>。</summary>
         public float watchdog = UnsetFloat;
+
+        /// <summary>
+        /// 状态页写操作（踢人 / 解散房间 / 停止服务器）所需的管理口令。
+        /// </summary>
+        /// <remarks>
+        /// <para>为空表示"不对外开写权限"：写操作仍然只接受来自服务器本机的请求，
+        /// 与配置此字段之前的行为完全一致——这样旧部署不改配置也不会凭空多出一个攻击面。</para>
+        ///
+        /// <para>填写之后，任何来源只要带上这串口令就能在状态页上执行写操作。
+        /// 云主机的常规用法：在配置文件里放一串随机口令，人从自己电脑打开状态页输入一次即可管理房间。</para>
+        /// </remarks>
+        public string adminToken = string.Empty;
     }
 }

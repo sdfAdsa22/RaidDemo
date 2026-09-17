@@ -80,7 +80,7 @@ namespace RaidDemo.Bootstrap
                 Scan = OnMultiplayerScan,
                 JoinFound = OnMultiplayerJoinFound,
                 SelectCloudServer = OnMultiplayerSelectCloudServer,
-                Back = ReturnToMainMenuFromMultiplayer,
+                Back = () => ReturnToMainMenuFromMultiplayer(),
             });
 
             m_LobbyScreen = gameObject.AddComponent<LobbyScreen>();
@@ -138,6 +138,7 @@ namespace RaidDemo.Bootstrap
                 m_Session.RaidEnding -= OnRaidEnding;
                 m_Session.MoneyChanged -= OnMoneyChanged;
                 m_Session.ResumedFromReconnect -= OnResumedFromReconnect;
+                m_Session.ForcedOut -= OnSessionForcedOut;
             }
 
             m_Session = session;
@@ -146,6 +147,7 @@ namespace RaidDemo.Bootstrap
             m_Session.RaidEnding += OnRaidEnding;
             m_Session.MoneyChanged += OnMoneyChanged;
             m_Session.ResumedFromReconnect += OnResumedFromReconnect;
+            m_Session.ForcedOut += OnSessionForcedOut;
 
             // 会话可能在我们订阅之前就已经走到了某个阶段（例如命令行直接连接），
             // 因此订阅之后立刻按当前状态刷一次界面。
@@ -268,7 +270,11 @@ namespace RaidDemo.Bootstrap
         /// 最终退出的统一入口：防止重复触发，并先把"离开房间"发出去再执行后续动作。
         /// </summary>
         /// <param name="continuation">离开确认（或超时）之后要执行的退出动作。</param>
-        private void BeginExitTransition(System.Action continuation)
+        /// <param name="skipLeaveRoom">
+        /// 跳过"离开房间"握手。被管理员移出房间时用 true——服务器已经把我们移出去了，
+        /// 再发一次 LeaveRoom 只会换回一条失败回包，等待它的确认更是白等。
+        /// </param>
+        private void BeginExitTransition(System.Action continuation, bool skipLeaveRoom = false)
         {
             if (m_ExitTransitionActive)
             {
@@ -279,6 +285,14 @@ namespace RaidDemo.Bootstrap
             // 跨场景标记：告诉"被动路径"（服务器的回屋广播等）在退出窗口里让路，
             // 否则它们加载场景会销毁下面这个等待协程，退出动作永远走不完。
             ClientMode.BeginExitTransition();
+
+            if (skipLeaveRoom)
+            {
+                m_ExitTransitionActive = false;
+                continuation();
+                return;
+            }
+
             LeaveRoomThen(() =>
             {
                 // 闸门只覆盖"退出进行中"的窗口：退出动作一开始执行就放行。
@@ -327,53 +341,6 @@ namespace RaidDemo.Bootstrap
             }
 
             continuation();
-        }
-
-        /// <summary>
-        /// 房间界面点「返回」：断开会话并回到联机界面（服务器列表）。
-        /// </summary>
-        /// <remarks>
-        /// 断开而不是"保留连接回到列表"：联机界面上的「连接」是唯一的入口，
-        /// 保留一条已建立的连接会让那个按钮处于"已经连上了"的哑火状态，玩家只能靠猜。
-        /// 离开房间走显式的 LeaveRoom（而不是靠断线被当作退出）——
-        /// 后者会进 60 秒宽限，玩家重新连接时被接管回旧房间。
-        /// </remarks>
-        private void OnMultiplayerBackToServers()
-        {
-            LeaveRoomThen(() =>
-            {
-                m_Session?.Disconnect();
-                ShowServersScreen(null, "已返回服务器列表。");
-            });
-        }
-
-        /// <summary>联机界面点「返回主菜单」：断开连接并回到主菜单。</summary>
-        private void ReturnToMainMenuFromMultiplayer()
-        {
-            m_LeavingMultiplayer = true;
-            m_MultiplayerUiActive = false;
-            m_MultiplayerScreen?.SetVisible(false);
-            m_LobbyScreen?.SetVisible(false);
-
-            // 先"离开房间"再断开：直接断开会进 60 秒宽限，宽限期内重进会被接管回旧房间
-            // （负责人反馈的"战局进行中，进不去"）。
-            BeginExitTransition(() =>
-            {
-                m_Session?.Disconnect();
-
-                // 与"暂停菜单 → 返回主菜单"走同一条路：改进程身份 + 重载安全屋。
-                // 只切状态的话，安全屋身上还挂着已经断开的移动/容器链路，
-                // 命令处理器也停在"只上行"的版本上——玩家会看到主菜单回来了，
-                // 但人物不动、仓库点不动（同一类缺陷的另一个入口）。
-                ClientMode.Deactivate();
-
-                m_LeavingMultiplayer = false;
-
-                HidePauseMenu();
-                State = FlowState.MainMenu;
-                Time.timeScale = 1f;
-                SceneManager.LoadScene(GameScenes.SafeHouse);
-            });
         }
 
         /// <summary>拆分"主机[:端口]"（用于把上次地址回填到界面）。</summary>

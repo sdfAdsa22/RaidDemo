@@ -250,6 +250,7 @@ namespace RaidDemo.Bootstrap
             AddNumber(target, "-raidDuration", document.raidDuration);
             AddNumber(target, "-autostart", document.autoStart);
             AddInteger(target, "-dashboardPort", document.dashboardPort);
+            AddText(target, "-adminToken", document.adminToken);
             AddInteger(target, "-discoveryPort", document.discoveryPort);
             AddNumber(target, "-grace", document.grace);
             AddNumber(target, "-watchdog", document.watchdog);

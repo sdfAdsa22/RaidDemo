@@ -101,6 +101,9 @@ namespace RaidDemo.Bootstrap
         /// <summary>是否已加入房间。</summary>
         public bool InRoom;
 
+        /// <summary>本次登录以来的在线秒数；未登录时为 0。</summary>
+        public float OnlineSeconds;
+
         /// <summary>状态的中文描述（已登录 / 未登录 / 战局中 …），直接用于展示。</summary>
         public string StateText = string.Empty;
     }

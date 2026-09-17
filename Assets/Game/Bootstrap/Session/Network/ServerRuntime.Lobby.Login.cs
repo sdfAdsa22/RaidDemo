@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace RaidDemo.Bootstrap
 {
@@ -140,6 +141,9 @@ namespace RaidDemo.Bootstrap
         private void FinishLobbyLogin(LobbyClient client, string nickname, string detail, string token, bool created)
         {
             var displayName = (nickname ?? string.Empty).Trim();
+
+            // 在线时长从这条收尾路径开始计：无论是普通登录还是重连接管，玩家都是"这一刻回来的"。
+            client.LoginAt = Time.realtimeSinceStartup;
 
             // 重连接管（P5）：如果这个昵称正处在掉线宽限里，本次登录就是"回来接管自己"，
             // 而不是一次新的登录。必须排在"昵称是否在线"之前判断——宽限中的那条记录
