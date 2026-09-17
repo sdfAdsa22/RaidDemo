@@ -211,6 +211,13 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public static class ServerEntryPoint
     {
+        /// <summary>专用服务器的帧率上限（Hz）。</summary>
+        /// <remarks>
+        /// 战局逻辑是 60Hz 固定步、20Hz 快照，60 帧足以覆盖全部节拍；
+        /// 详见 <see cref="DetectServerMode"/> 里的限帧说明。
+        /// </remarks>
+        private const int ServerFrameRate = 60;
+
         /// <summary>
         /// 场景加载前：解析命令行，决定本进程的角色。
         /// </summary>
@@ -255,6 +262,13 @@ namespace RaidDemo.Bootstrap
 
             // 无头服务器没有窗口，失去焦点是常态：停掉帧循环等于让整个服务器停摆。
             Application.runInBackground = true;
+
+            // 帧率上限（U-98）：专用服务器没有渲染帧要画，而 -batchmode -nographics
+            // 既没有垂直同步、也没有别的节流——不设上限时 Unity 主循环会以机器极限速度空转。
+            // 云主机实测（0 人在线）：主线程常驻 95%+ 单核、Job worker 再吃 ~20%，
+            // 2 核整机监控长期贴近 100%。把帧率钉在 60 之后，空转的那部分开销直接消失，
+            // 而 60Hz 仿真、20Hz 快照、心跳与看门狗都不受任何影响。
+            Application.targetFrameRate = ServerFrameRate;
 
             // 先切控制台编码再打第一行中文日志：晚一行就会先甩出一串乱码（负责人反馈过）。
             ServerMode.UseUtf8Console();

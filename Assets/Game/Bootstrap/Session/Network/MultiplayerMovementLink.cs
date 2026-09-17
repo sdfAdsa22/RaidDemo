@@ -77,7 +77,6 @@ namespace RaidDemo.Bootstrap
         private NetworkManager m_Network;
         private MovementPredictionBuffer m_Prediction;
         private float m_StepAccumulator;
-        private uint m_Sequence;
         private bool m_HandlerRegistered;
 
         /// <summary>
@@ -275,7 +274,10 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            m_Sequence++;
+            // 序号取自进程级发号器（见 PlayerInputSequence 的说明）：
+            // 换场景后新链路必须接着旧链路的号继续数，否则服务器会把新链路的前几百条输入
+            // 当"重复包"整片丢弃，表现为进图几秒后闪回出生点（U-98）。
+            var sequence = PlayerInputSequence.Next();
 
             // 时间被冻结（结算 / 暂停 / 角色选择把 timeScale 压成 0）或本机不可操控（倒地）时发零输入：
             // 此时发包的唯一目的是保活，界面上残留的按键状态绝不能变成服务器上的移动或开火。
@@ -287,7 +289,7 @@ namespace RaidDemo.Bootstrap
                 noControl ? Vector2F.Zero : intent.Move,
                 intent.Look,
                 noControl ? false : intent.Sprint,
-                m_Sequence,
+                sequence,
                 Time.timeAsDouble);
 
             m_MoveHandler.Tick(FixedStep);
