@@ -126,6 +126,12 @@ namespace RaidDemo.Bootstrap
         /// <summary>开始新游戏：清空存档并重新进入安全屋。</summary>
         public void StartNewGame()
         {
+            // 与"继续游戏"同一条闸门：联机客户端进程里不允许走单机入口（见方法说明）。
+            if (BlockSinglePlayerEntryInMultiplayerProcess())
+            {
+                return;
+            }
+
             m_SaveStore?.Delete(out _);
             Progress = new MetaProgress();
             HookProgress(Progress);

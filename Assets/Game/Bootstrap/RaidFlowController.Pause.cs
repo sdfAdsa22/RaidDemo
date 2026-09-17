@@ -85,28 +85,41 @@ namespace RaidDemo.Bootstrap
                 Progress.ClearLoadout();
             }
 
-            // 联机：从战局退回主菜单等于退出联机（连接与房间都不会跨进程保留），
-            // 主动断开并让服务器把这一局按退赛处理；不清掉会话的话，
-            // 回到安全屋后大厅界面会立刻又冒出来。
-            if (MultiplayerClientSession.IsActive)
+            // 联机退出先"离开房间"再断开：直接断开会进 60 秒宽限，宽限期内重进
+            // 会被接管回旧战局（"战局进行中，进不去"）。单机时这句是空操作。
+            BeginExitTransition(() =>
             {
-                MultiplayerClientSession.Current.Disconnect();
-            }
+                // 联机：从战局退回主菜单等于退出联机（连接与房间都不会跨进程保留），
+                // 主动断开并让服务器把这一局按退赛处理；不清掉会话的话，
+                // 回到安全屋后大厅界面会立刻又冒出来。
+                if (MultiplayerClientSession.IsActive)
+                {
+                    MultiplayerClientSession.Current.Disconnect();
+                }
 
-            // 退出联机必须连"进程身份"一起改：否则重载后的安全屋仍按联机进程装配，
-            // 不显示主菜单、也不会创建本地玩家（负责人反馈的问题 9）。
-            ClientMode.Deactivate();
+                // 退出联机必须连"进程身份"一起改：否则重载后的安全屋仍按联机进程装配，
+                // 不显示主菜单、也不会创建本地玩家（负责人反馈的问题 9）。
+                ClientMode.Deactivate();
 
-            m_RaidInProgress = false;
-            SaveNow();
-            HidePauseMenu();
-            State = FlowState.MainMenu;
-            Time.timeScale = 1f;
-            SceneManager.LoadScene(SafeHouseSceneName);
+                m_RaidInProgress = false;
+                SaveNow();
+                HidePauseMenu();
+                State = FlowState.MainMenu;
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(SafeHouseSceneName);
+            });
         }
 
         /// <summary>返回桌面。</summary>
         private void QuitApplication()
+        {
+            // 与"返回主菜单"同一条纪律：先把"离开房间"发出去再退进程，
+            // 否则服务器会把他当掉线者保留 60 秒（房间卡在"战局进行中"）。
+            BeginExitTransition(QuitApplicationNow);
+        }
+
+        /// <summary>真正退出进程（编辑器里停止播放模式）。</summary>
+        private void QuitApplicationNow()
         {
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;

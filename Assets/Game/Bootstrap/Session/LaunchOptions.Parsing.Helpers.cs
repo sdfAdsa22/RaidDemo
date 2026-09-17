@@ -35,6 +35,38 @@ namespace RaidDemo.Bootstrap
             return true;
         }
 
+        /// <summary>读取一个"不能为空"的字符串参数；空白串按缺值处理。</summary>
+        /// <param name="args">参数数组。</param>
+        /// <param name="index">当前下标（会前进到取值）。</param>
+        /// <param name="switchName">开关名（用于报错）。</param>
+        /// <param name="value">去掉首尾空白后的取值；失败时为 null。</param>
+        /// <param name="error">失败原因。</param>
+        /// <remarks>连接地址与预填地址都要求"非空"：空串会让界面显示一个没法用的输入框，
+        /// 或让 <c>-connect</c> 静默退化成"不连接却以为连上了"，都在这里一次拦掉。</remarks>
+        private static bool TryReadNonEmptyValue(
+            string[] args,
+            ref int index,
+            string switchName,
+            out string value,
+            out string error)
+        {
+            value = null;
+            if (!TryReadValue(args, ref index, switchName, out var raw, out error))
+            {
+                return false;
+            }
+
+            var trimmed = raw.Trim();
+            if (trimmed.Length == 0)
+            {
+                error = $"参数 {switchName} 不能为空。";
+                return false;
+            }
+
+            value = trimmed;
+            return true;
+        }
+
         /// <summary>
         /// 判断是否是不含盘符与上跳的相对目录。
         /// </summary>

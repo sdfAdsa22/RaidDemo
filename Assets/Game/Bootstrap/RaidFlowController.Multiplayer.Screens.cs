@@ -88,12 +88,34 @@ namespace RaidDemo.Bootstrap
                 }
             }
 
+            // 启动器预填的地址优先于"上次用过的地址"：它代表玩家这次选的游戏服务器，
+            // 而 LastAddress 只是历史记录。启动器因此不再需要 -connect 直接拉进联机流程
+            // （那样会跳过主菜单——负责人反馈的云服务器问题），只做预填。
+            m_ServerAddressHidden = false;
+            m_HintedServerAddress = null;
+            var hint = LaunchOptions.Current != null ? LaunchOptions.Current.ServerHostHint : null;
+            if (!string.IsNullOrEmpty(hint))
+            {
+                ParseAddress(hint, out var hintedAddress, out var hintedPort);
+                m_HintedServerAddress = hintedAddress;
+                m_HintedServerPort = hintedPort;
+                address = hintedAddress;
+                port = hintedPort;
+
+                // 隐藏源（云主机）：地址不上屏，连接时仍用上面记下的真实值。
+                m_ServerAddressHidden = LaunchOptions.Current.HideServerAddress;
+            }
+
             if (string.IsNullOrEmpty(nickname))
             {
                 nickname = LobbyText.SuggestNickname();
             }
 
-            m_MultiplayerScreen.SetDefaults(nickname, DefaultPassphrase, address, port);
+            m_MultiplayerScreen.SetDefaults(
+                nickname,
+                DefaultPassphrase,
+                m_ServerAddressHidden ? HiddenAddressPlaceholder : address,
+                port);
             m_MultiplayerScreen.SetBusy(false);
             m_MultiplayerScreen.SetScanning(false);
             m_MultiplayerScreen.SetStatus(
@@ -106,6 +128,29 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>默认口令：与命令行验收用的默认值一致，方便第一次联机的人直接连上。</summary>
         private const string DefaultPassphrase = "123456";
+
+        /// <summary>
+        /// 联机客户端进程里拦下"继续游戏 / 新游戏"这两个单机入口。
+        /// </summary>
+        /// <returns>被拦下时返回 true（调用方直接返回）。</returns>
+        /// <remarks>
+        /// <para>联机客户端进程由服务器裁定一切：进"没有服务器世界"的安全屋之后，
+        /// 移动与转向会被上行链路接管又无人应答——表现是完全不能动
+        /// （负责人反馈的"继续游戏后进图不能移动"）。</para>
+        ///
+        /// <para>启动器改传 <c>-serverhost</c>（预填、不自动联机）之后，正常路径不再进入这里；
+        /// 这个闸门留给"手动带 -connect 启动"的旁路与自动化场景。</para>
+        /// </remarks>
+        private bool BlockSinglePlayerEntryInMultiplayerProcess()
+        {
+            if (!ClientMode.IsActive)
+            {
+                return false;
+            }
+
+            m_MenuScreen?.SetNotice("当前是联机客户端：请从「联机」进入服务器，单机入口暂不可用。");
+            return true;
+        }
 
         /// <summary>显示房间界面（创建 / 加入 / 成员列表）。</summary>
         private void ApplyLobbyScreen()

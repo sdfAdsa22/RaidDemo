@@ -158,6 +158,13 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         public void EnterSafeHouse()
         {
+            // 联机客户端进程里，"继续游戏"是单机入口：会被上行链路接管又无人应答，
+            // 表现是完全不能动（负责人反馈的"继续游戏后进图不能移动"）。直接拦下并指路。
+            if (BlockSinglePlayerEntryInMultiplayerProcess())
+            {
+                return;
+            }
+
             m_RaidInProgress = false;
             SaveNow();
             State = FlowState.SafeHouse;

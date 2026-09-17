@@ -130,7 +130,15 @@ namespace RaidDemo.Launcher
             var profile = GetSelectedProfile();
             if (profile != null && !string.IsNullOrWhiteSpace(profile.GameServer))
             {
-                arguments += $" -connect \"{profile.GameServer}\"";
+                // 只预填服务器地址、不自动连接：游戏仍然先显示主菜单，玩家点「联机」时
+                // 地址已经填好。以前传 -connect 会自动登录并跳过主菜单（负责人反馈的
+                // "启动器启动后进的不是主菜单"），改成 -serverhost 之后启动路径与直接双击一致。
+                arguments += $" -serverhost \"{profile.GameServer}\"";
+                if (profile.HideAddress)
+                {
+                    // 隐藏源（云主机）：游戏侧把预填地址显示成"已隐藏"，连接时仍用真实地址。
+                    arguments += " -hideserver";
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(m_Config.ExtraGameArguments))

@@ -158,6 +158,24 @@ namespace RaidDemo.Bootstrap
         public string ConnectAddress { get; private set; }
 
         /// <summary>
+        /// 启动器预填的服务器地址（<c>-serverhost 主机[:端口]</c>）；为 null 表示没有预填。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>它与 <c>-connect</c> 的区别：</b><c>-connect</c> 是"自动登录并直接进联机流程"
+        /// （自动化/调试用）；本参数只把地址填进联机界面的输入框，游戏仍然先进主菜单，
+        /// 由玩家自己点「联机」——启动器启动的游戏因此不会再"跳过主菜单"
+        /// （负责人反馈的云服务器问题）。</para>
+        /// </remarks>
+        public string ServerHostHint { get; private set; }
+
+        /// <summary>
+        /// 是否隐藏预填的服务器地址（<c>-hideserver</c>）。
+        /// </summary>
+        /// <remarks>启动器对"需要隐藏地址"的更新源（例如云主机）设置；游戏侧把预填地址
+        /// 显示成占位符，连接时仍使用真实地址。</remarks>
+        public bool HideServerAddress { get; private set; }
+
+        /// <summary>
         /// 更新源地址（<c>-updatesource</c>）；为 null 表示使用默认值。
         /// </summary>
         /// <remarks>

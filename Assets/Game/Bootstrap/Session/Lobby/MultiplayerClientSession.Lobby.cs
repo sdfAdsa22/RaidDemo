@@ -187,7 +187,15 @@ namespace RaidDemo.Bootstrap
                         ClientAccountStore.Save(Nickname, token, Address);
                     }
 
-                    SetPhase(MultiplayerClientPhase.InLobby);
+                    // 重连接管（P-51）时，服务器的房间状态可能**先于**登录结果到达：
+                    // ApplyRoomState 已经写好了成员列表，但那时 Phase 还是"登录中"，
+                    // 它不会推进阶段。若这里无条件回到"已登录"，界面就会显示房间内容、
+                    // 阶段却是"已登录"——点「开始战局」直接报"当前状态（已登录）不能执行这个操作"
+                    // （负责人反馈的图 2）。因此登录成功时按"自己是否已在等待中的房间"对齐阶段。
+                    var resumedIntoWaitingRoom = SelfInRoom && RoomPhase == LobbyPhase.Waiting;
+                    SetPhase(resumedIntoWaitingRoom
+                        ? MultiplayerClientPhase.InRoom
+                        : MultiplayerClientPhase.InLobby);
                     StatusText = string.IsNullOrEmpty(detail) ? "已登录" : detail;
                     RaiseChanged();
 

@@ -197,6 +197,11 @@ namespace RaidDemo.Bootstrap
                     if (message.SourceId == LocalNetworkPlayerId)
                     {
                         ApplyLocalMagazineAmmo(message.MagazineAmmo);
+
+                        // 换弹进度条：联机时本地不跑换弹（服务器权威），由这条状态事件驱动。
+                        // 之前只有开火事件里驱动过——纯按 R 换弹（不开枪）时进度条不出现
+                        // （负责人反馈的"联机状态左下角无换弹进度条"）。
+                        m_CombatHud?.NotifyReloadStateFromServer(message.IsReloading);
                     }
 
                     break;

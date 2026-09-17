@@ -135,8 +135,20 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void CheckRaidCompletion()
         {
-            if (m_Room.Phase != LobbyPhase.InRaid || m_World == null)
+            // 收尾的判据是"服务器是否托管着战局世界"，而不是"房间是否还处于战局中"：
+            // 最后一人离开会把房间直接解散（相位回到 Empty）；若这里继续按房间相位提前返回，
+            // 世界就永远留在战局——下一批玩家建新房时会踩到残留状态
+            //（负责人反馈的"创建相同房间号也能进入但很多 bug"）。
+            if (m_WorldKind != ServerWorldKind.Raid || m_World == null)
             {
+                return;
+            }
+
+            if (m_Room.Phase != LobbyPhase.InRaid)
+            {
+                // 房间已解散或已回到等待：没有人需要这场战局了，直接收尾回安全屋。
+                // EndRaidToLobby 内部对"房间已解散"是安全的（不会把房间复活成等待中）。
+                EndRaidToLobby();
                 return;
             }
 

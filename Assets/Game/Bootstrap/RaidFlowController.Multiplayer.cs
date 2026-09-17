@@ -36,6 +36,18 @@ namespace RaidDemo.Bootstrap
         /// <summary>联机相关的界面当前是否处于显示状态（用于判断"断开后要不要回到联机界面"）。</summary>
         private bool m_MultiplayerUiActive;
 
+        /// <summary>地址被隐藏时，地址输入框里显示的占位文本。</summary>
+        private const string HiddenAddressPlaceholder = "已隐藏";
+
+        /// <summary>启动器预填的服务器地址（真实值）；地址被隐藏时界面只显示占位符。</summary>
+        private string m_HintedServerAddress;
+        private int m_HintedServerPort;
+
+        /// <summary>联机界面的地址框当前是否显示"已隐藏"占位符。</summary>
+        /// <remarks>启动器对需要隐藏地址的更新源（云主机）传 <c>-hideserver</c>：
+        /// 地址不上屏，但连接时仍使用它——玩家没有改过这一格，不该因为"看不见"而连不上。</remarks>
+        private bool m_ServerAddressHidden;
+
         /// <summary>正在主动退出联机（点「返回主菜单」或暂停菜单退出）时为 true。</summary>
         /// <remarks>
         /// 断开连接会同步触发 <see cref="OnSessionChanged"/>，而那段逻辑看到"联机界面开着"
@@ -161,6 +173,17 @@ namespace RaidDemo.Bootstrap
         /// <summary>点「连接」：建立会话并登录。</summary>
         private void OnMultiplayerConnect(string address, int port, string nickname, string passphrase)
         {
+            // 地址框显示"已隐藏"占位符时，用启动器预填的真实地址连接——
+            // 玩家没有改过这一格，他不该因为"看不见地址"而连不上。
+            // 他一旦手动改写这一格（内容不再是占位符），就按他输入的内容走。
+            if (m_ServerAddressHidden
+                && string.Equals(address?.Trim(), HiddenAddressPlaceholder, System.StringComparison.Ordinal)
+                && !string.IsNullOrEmpty(m_HintedServerAddress))
+            {
+                address = m_HintedServerAddress;
+                port = m_HintedServerPort;
+            }
+
             var session = MultiplayerClientSession.Ensure();
             EnsureSessionSubscription();
             session.AutoRoom = false;
@@ -226,17 +249,86 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 最终退出流程（返回主菜单 / 退出桌面）是否已经在进行。
+        /// </summary>
+        /// <remarks>等待服务器确认"离开房间"的几百毫秒里，玩家可能再点一次按钮——
+        /// 没有这道闸就会启动第二条退出协程，出现重复断线与重复重载场景。</remarks>
+        private bool m_ExitTransitionActive;
+
+        /// <summary>等待"离开房间"确认的最长时间（秒）。</summary>
+        private const float LeaveRoomWaitSeconds = 0.6f;
+
+        /// <summary>
+        /// 最终退出的统一入口：防止重复触发，并先把"离开房间"发出去再执行后续动作。
+        /// </summary>
+        /// <param name="continuation">离开确认（或超时）之后要执行的退出动作。</param>
+        private void BeginExitTransition(System.Action continuation)
+        {
+            if (m_ExitTransitionActive)
+            {
+                return;
+            }
+
+            m_ExitTransitionActive = true;
+            LeaveRoomThen(continuation);
+        }
+
+        /// <summary>
+        /// 先向服务器发"离开房间"（可靠消息）并等确认或短超时，再执行后续动作。
+        /// </summary>
+        /// <param name="continuation">离开确认（或超时）之后要执行的动作。</param>
+        /// <remarks>
+        /// <para><b>为什么不能直接断开：</b>直接 Shutdown 会被服务器当作"意外掉线"，
+        /// 进入 60 秒宽限——房间成员、战局进度和玩家的身体都留在服务器上；
+        /// 他在宽限期内重进就会被"重连接管"回旧房间，表现为"战局进行中，进不去"
+        /// （负责人反馈的云服务器问题）。主动退出必须先明确地说一句"我离开"。</para>
+        ///
+        /// <para><b>为什么要等：</b>LeaveRoom 走可靠通道，发送到送达需要一点时间；
+        /// 发完立刻 Shutdown 有概率让它出不了网。超时后照常执行后续动作——
+        /// 即使这一次没送到，服务器还有宽限逻辑兜底，不会卡住玩家。</para>
+        /// </remarks>
+        private void LeaveRoomThen(System.Action continuation)
+        {
+            if (m_Session != null && MultiplayerClientSession.IsActive && m_Session.SelfInRoom)
+            {
+                m_Session.LeaveRoom();
+                StartCoroutine(LeaveRoomRoutine(continuation));
+                return;
+            }
+
+            continuation();
+        }
+
+        /// <summary>等"离开房间"被服务器确认（阶段回到"已登录"）或超时。</summary>
+        private System.Collections.IEnumerator LeaveRoomRoutine(System.Action continuation)
+        {
+            var deadline = Time.realtimeSinceStartup + LeaveRoomWaitSeconds;
+            while (Time.realtimeSinceStartup < deadline
+                   && m_Session != null
+                   && m_Session.Phase != MultiplayerClientPhase.InLobby)
+            {
+                yield return null;
+            }
+
+            continuation();
+        }
+
+        /// <summary>
         /// 房间界面点「返回」：断开会话并回到联机界面（服务器列表）。
         /// </summary>
         /// <remarks>
         /// 断开而不是"保留连接回到列表"：联机界面上的「连接」是唯一的入口，
         /// 保留一条已建立的连接会让那个按钮处于"已经连上了"的哑火状态，玩家只能靠猜。
-        /// 服务器侧会把这次断开当作退出房间处理。
+        /// 离开房间走显式的 LeaveRoom（而不是靠断线被当作退出）——
+        /// 后者会进 60 秒宽限，玩家重新连接时被接管回旧房间。
         /// </remarks>
         private void OnMultiplayerBackToServers()
         {
-            m_Session?.Disconnect();
-            ShowServersScreen(null, "已返回服务器列表。");
+            LeaveRoomThen(() =>
+            {
+                m_Session?.Disconnect();
+                ShowServersScreen(null, "已返回服务器列表。");
+            });
         }
 
         /// <summary>联机界面点「返回主菜单」：断开连接并回到主菜单。</summary>
@@ -247,20 +339,25 @@ namespace RaidDemo.Bootstrap
             m_MultiplayerScreen?.SetVisible(false);
             m_LobbyScreen?.SetVisible(false);
 
-            m_Session?.Disconnect();
+            // 先"离开房间"再断开：直接断开会进 60 秒宽限，宽限期内重进会被接管回旧房间
+            // （负责人反馈的"战局进行中，进不去"）。
+            BeginExitTransition(() =>
+            {
+                m_Session?.Disconnect();
 
-            // 与"暂停菜单 → 返回主菜单"走同一条路：改进程身份 + 重载安全屋。
-            // 只切状态的话，安全屋身上还挂着已经断开的移动/容器链路，
-            // 命令处理器也停在"只上行"的版本上——玩家会看到主菜单回来了，
-            // 但人物不动、仓库点不动（同一类缺陷的另一个入口）。
-            ClientMode.Deactivate();
+                // 与"暂停菜单 → 返回主菜单"走同一条路：改进程身份 + 重载安全屋。
+                // 只切状态的话，安全屋身上还挂着已经断开的移动/容器链路，
+                // 命令处理器也停在"只上行"的版本上——玩家会看到主菜单回来了，
+                // 但人物不动、仓库点不动（同一类缺陷的另一个入口）。
+                ClientMode.Deactivate();
 
-            m_LeavingMultiplayer = false;
+                m_LeavingMultiplayer = false;
 
-            HidePauseMenu();
-            State = FlowState.MainMenu;
-            Time.timeScale = 1f;
-            SceneManager.LoadScene(GameScenes.SafeHouse);
+                HidePauseMenu();
+                State = FlowState.MainMenu;
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(GameScenes.SafeHouse);
+            });
         }
 
         /// <summary>拆分"主机[:端口]"（用于把上次地址回填到界面）。</summary>

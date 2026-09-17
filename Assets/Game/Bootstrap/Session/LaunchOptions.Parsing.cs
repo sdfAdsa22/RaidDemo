@@ -18,9 +18,8 @@ namespace RaidDemo.Bootstrap
         /// <para>只有「本类认识的参数取值非法」才算失败：端口不是数字、存档目录是绝对路径等。
         /// 完全不认识的参数一律忽略——引擎会往命令行里塞大量自有参数。</para>
         ///
-        /// <para>需要连服务器配置文件一起读的调用方（真实的玩家进程入口）用
-        /// <see cref="TryParseWithServerConfig"/>；本方法保持"只认命令行"的历史语义，
-        /// 供客户端路径与既有测试使用。</para>
+        /// <para>需要连服务器配置文件一起读的调用方用 <see cref="TryParseWithServerConfig"/>；
+        /// 本方法保持"只认命令行"的历史语义，供客户端路径与既有测试使用。</para>
         /// </remarks>
         public static bool TryParse(string[] args, out LaunchOptions options, out string error)
         {
@@ -133,19 +132,25 @@ namespace RaidDemo.Bootstrap
                         break;
 
                     case "-connect":
-                        if (!TryReadValue(list, ref i, arg, out var connectAddress, out error))
+                        if (!TryReadNonEmptyValue(list, ref i, arg, out var connectAddress, out error))
                         {
                             return false;
                         }
 
-                        var address = connectAddress.Trim();
-                        if (address.Length == 0)
+                        result.ConnectAddress = connectAddress;
+                        break;
+
+                    case "-serverhost":
+                        if (!TryReadNonEmptyValue(list, ref i, arg, out var serverHost, out error))
                         {
-                            error = $"参数 {arg} 不能为空。";
                             return false;
                         }
 
-                        result.ConnectAddress = address;
+                        result.ServerHostHint = serverHost;
+                        break;
+
+                    case "-hideserver":
+                        result.HideServerAddress = true;
                         break;
 
                     case "-updatesource":

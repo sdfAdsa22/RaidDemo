@@ -156,7 +156,13 @@ namespace RaidDemo.Launcher
             var profile = config.GetSelectedProfile();
             if (profile != null && !string.IsNullOrWhiteSpace(profile.GameServer))
             {
-                arguments.Add($"-connect \"{profile.GameServer}\"");
+                // 只预填、不自动连接（与图形界面同一条规则）：游戏先显示主菜单，
+                // 玩家点「联机」时地址已经填好。
+                arguments.Add($"-serverhost \"{profile.GameServer}\"");
+                if (profile.HideAddress)
+                {
+                    arguments.Add("-hideserver");
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(config.ExtraGameArguments))

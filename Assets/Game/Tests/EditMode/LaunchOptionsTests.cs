@@ -90,6 +90,36 @@ namespace RaidDemo.Tests.EditMode
         }
 
         /// <summary>引擎自己的参数必须被忽略，不能因为不认识就报错。</summary>
+        /// <summary>
+        /// 启动器预填参数：-serverhost 只填地址、-hideserver 只标记隐藏，都不激活联机模式。
+        /// </summary>
+        /// <remarks>这条边界很关键：若预填被当成 -connect，游戏会跳过主菜单直接进联机流程
+        /// （负责人反馈的"启动器启动后进的不是主菜单"）。</remarks>
+        [Test]
+        public void 服务器预填参数生效且不激活联机模式()
+        {
+            var ok = LaunchOptions.TryParse(
+                new[] { "-serverhost", "47.104.210.207:7777", "-hideserver" },
+                out var options,
+                out var error);
+
+            Assert.IsTrue(ok, error);
+            Assert.AreEqual("47.104.210.207:7777", options.ServerHostHint);
+            Assert.IsTrue(options.HideServerAddress);
+            Assert.IsFalse(options.IsServerRequested, "预填不是服务器模式。");
+            Assert.IsNull(options.ConnectAddress, "预填不应激活自动连接——-connect 才有那个语义。");
+        }
+
+        /// <summary>-serverhost 缺少取值时按解析失败处理（与其它带值参数一致）。</summary>
+        [Test]
+        public void 服务器预填缺少取值时解析失败()
+        {
+            var ok = LaunchOptions.TryParse(new[] { "-serverhost" }, out _, out var error);
+
+            Assert.IsFalse(ok);
+            StringAssert.Contains("-serverhost", error);
+        }
+
         [Test]
         public void 不认识的参数被忽略()
         {
