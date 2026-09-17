@@ -93,6 +93,21 @@ namespace RaidDemo.UI
         /// <summary>HUD 元素压在场景上时的底色（半透明深色，保证白字可读）。</summary>
         public static readonly Color HudPlate = new Color(0.10f, 0.12f, 0.13f, 0.82f);
 
+        // ---- 主菜单专用（方案 B：左品牌、右菜单） ----
+
+        /// <summary>
+        /// 主菜单背景里"山峦剪影"的颜色。
+        /// </summary>
+        /// <remarks>比 <see cref="MenuBackdrop"/> 亮一档：它压在底色上但仍属背景，
+        /// 再亮会抢按钮的视线，再暗就看不到山脊的轮廓。</remarks>
+        public static readonly Color MenuBackdropHill = FromHex("#245048");
+
+        /// <summary>主菜单深色右栏上的次级文字（操作提示行、脚注）。</summary>
+        public static readonly Color OnDarkSoft = FromHex("#8FB0A9");
+
+        /// <summary>主菜单背景装饰"准星"的浅青色。</summary>
+        public static readonly Color MenuCrosshair = FromHex("#BFE6E0");
+
         // ---- 背包专用 ----
 
         /// <summary>空装备槽底色。</summary>
@@ -139,6 +154,9 @@ namespace RaidDemo.UI
 
         /// <summary>标题字号。</summary>
         public const float TitleSize = 46f;
+
+        /// <summary>主菜单品牌区的大标题字号（比普通标题大一档）。</summary>
+        public const float HeroSize = 76f;
 
         /// <summary>小标题字号。</summary>
         public const float SubtitleSize = 20f;

@@ -109,7 +109,7 @@ namespace RaidDemo.Bootstrap
             }
 
             m_MenuScreen = gameObject.AddComponent<MainMenuScreen>();
-            m_MenuScreen.Initialize(EnterSafeHouse, StartNewGame, ShowMultiplayerMenu);
+            m_MenuScreen.Initialize(EnterSafeHouse, StartNewGame, ShowMultiplayerMenu, QuitApplication);
 
             m_ResultScreen = gameObject.AddComponent<RaidResultScreen>();
             m_ResultScreen.Initialize(GoToSafeHouse);

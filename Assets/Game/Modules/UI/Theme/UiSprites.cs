@@ -50,6 +50,8 @@ namespace RaidDemo.UI
         private static Sprite s_Ring;
         private static Sprite s_RingWhite;
         private static Sprite s_Block;
+        private static Sprite s_Disc;
+        private static Sprite s_StripeTile;
 
         /// <summary>奶油色面板（不透明）。</summary>
         public static Sprite Card => s_Card ??= Build("Ui_Card", UiPalette.Paper, UiPalette.Outline, 3f, 0f);
@@ -97,6 +99,20 @@ namespace RaidDemo.UI
         public static Sprite Block => s_Block ??= Build("Ui_Block", Color.white, Color.white, 0f, 0f);
 
         /// <summary>
+        /// 实心圆：主菜单背景装饰的大圆与小圆点。
+        /// </summary>
+        /// <remarks>圆不能走九宫格（切边后拉伸会变成"圆角方块"），因此这张图不使用边界，
+        /// 按整图拉伸使用。贴图取 256 像素，放大到 600+ 像素时边缘仍然平滑。</remarks>
+        public static Sprite Disc => s_Disc ??= BuildDisc();
+
+        /// <summary>
+        /// 45° 斜纹平铺单元：配合 <c>Image.type = Tiled</c> 铺出斜纹装饰块。
+        /// </summary>
+        /// <remarks>平铺单元 64 贴图像素 ＝ 32 参考像素；条纹相位按 (x + y) 取模，
+        /// 在相邻 tile 的接缝处正好连续，铺开后看不到格子痕迹。</remarks>
+        public static Sprite StripeTile => s_StripeTile ??= BuildStripeTile();
+
+        /// <summary>
         /// 画一张圆角矩形贴图并切成九宫格。
         /// </summary>
         /// <param name="name">贴图名（便于在 Profiler 里辨认）。</param>
@@ -106,13 +122,7 @@ namespace RaidDemo.UI
         /// <param name="shadow">底部硬阴影高度（参考像素），0 表示不画。</param>
         private static Sprite Build(string name, Color face, Color outline, float outlineWidth, float shadow)
         {
-            var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
-            {
-                name = name,
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp,
-                hideFlags = HideFlags.HideAndDontSave
-            };
+            var texture = NewTexture(name, Size, TextureWrapMode.Clamp);
 
             var radius = UiPalette.CornerRadius * Supersample;
             var half = (Size * 0.5f) - 1f;
@@ -163,6 +173,79 @@ namespace RaidDemo.UI
                 SpriteMeshType.FullRect,
                 border);
             sprite.name = name;
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
+        }
+
+        /// <summary>创建一张运行时贴图（不序列化、不保存，随资源生命周期常驻）。</summary>
+        private static Texture2D NewTexture(string name, int size, TextureWrapMode wrapMode)
+        {
+            return new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = name,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = wrapMode,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+        }
+
+        /// <summary>生成 <see cref="Disc"/> 的实心圆贴图。</summary>
+        private static Sprite BuildDisc()
+        {
+            const int size = 256;
+            var texture = NewTexture("Ui_Disc", size, TextureWrapMode.Clamp);
+            var center = new Vector2(size * 0.5f, size * 0.5f);
+            var radius = (size * 0.5f) - 2f;
+            var pixels = new Color32[size * size];
+            for (var y = 0; y < size; y++)
+            {
+                for (var x = 0; x < size; x++)
+                {
+                    var distance = (new Vector2(x + 0.5f, y + 0.5f) - center).magnitude - radius;
+                    pixels[(y * size) + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(Coverage(distance) * 255f));
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
+
+            var sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, size, size),
+                new Vector2(0.5f, 0.5f),
+                PixelsPerUnit);
+            sprite.name = "Ui_Disc";
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
+        }
+
+        /// <summary>生成 <see cref="StripeTile"/> 的斜纹平铺单元。</summary>
+        private static Sprite BuildStripeTile()
+        {
+            const int size = 64;
+            var texture = NewTexture("Ui_StripeTile", size, TextureWrapMode.Repeat);
+            var pixels = new Color32[size * size];
+            for (var y = 0; y < size; y++)
+            {
+                for (var x = 0; x < size; x++)
+                {
+                    // 半周期（32 像素）实心，随后 2 像素线性过渡：平铺后是均匀的 45° 斜纹，
+                    // 条纹边缘也不会出现硬锯齿。
+                    var diagonal = (x + y) % size;
+                    var alpha = Mathf.Clamp01(((size * 0.5f) - diagonal) / 2f);
+                    pixels[(y * size) + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
+
+            var sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, size, size),
+                new Vector2(0.5f, 0.5f),
+                PixelsPerUnit);
+            sprite.name = "Ui_StripeTile";
             sprite.hideFlags = HideFlags.HideAndDontSave;
             return sprite;
         }
