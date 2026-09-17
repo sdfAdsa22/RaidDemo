@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -74,6 +75,50 @@ namespace RaidDemo.Bootstrap
             IsActive = true;
             Options = options;
         }
+
+        /// <summary>
+        /// 专用服务器在有控制台的 Windows 上把控制台切到 UTF-8。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么必须做：</b>Unity 把日志按 UTF-8 写到 stdout，而 Windows 控制台默认代码页
+        /// 是 GBK（936）——中文日志会全变成 `锛?` 这样的乱码（负责人反馈的"服务端启动后中文乱码"）。
+        /// 把控制台输出代码页切到 65001 之后，同一份字节就能正确显示，日志文件不受影响。</para>
+        ///
+        /// <para><b>为什么包一层 try：</b>没有附加控制台时（双击启动、<c>-batchmode</c> 且输出被重定向到文件）
+        /// 设置编码会抛异常；这不是错误，游戏照常运行。日志文件本身一直是 UTF-8。</para>
+        /// </remarks>
+        public static void UseUtf8Console()
+        {
+            try
+            {
+                // 必须直接调 Win32：只设 Console.OutputEncoding 在 Unity 播放器里不生效
+                // （日志由播放器的原生写出口输出，实测仍然是乱码；而控制台里手动
+                // 执行 `chcp 65001` 之后立刻正常——两相对照确定问题就在控制台代码页）。
+                if (GetConsoleWindow() != IntPtr.Zero)
+                {
+                    SetConsoleOutputCP(Utf8CodePage);
+                }
+
+                Console.OutputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            }
+            catch (Exception exception)
+            {
+                Debug.Log($"[启动] 控制台编码切换跳过（没有可用控制台）：{exception.GetType().Name}");
+            }
+        }
+
+        /// <summary>控制台 UTF-8 代码页（65001）。</summary>
+        private const uint Utf8CodePage = 65001;
+
+        /// <summary>取当前进程挂着的控制台窗口；没有控制台时为 0。</summary>
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        /// <summary>设置控制台输出代码页。</summary>
+        /// <param name="codePage">目标代码页。</param>
+        /// <returns>成功返回 true。</returns>
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetConsoleOutputCP(uint codePage);
     }
 
     /// <summary>
@@ -189,6 +234,9 @@ namespace RaidDemo.Bootstrap
 
             // 无头服务器没有窗口，失去焦点是常态：停掉帧循环等于让整个服务器停摆。
             Application.runInBackground = true;
+
+            // 先切控制台编码再打第一行中文日志：晚一行就会先甩出一串乱码（负责人反馈过）。
+            ServerMode.UseUtf8Console();
 
             Debug.Log($"[启动] 以服务器模式运行 ｜ {options.Describe()}");
         }

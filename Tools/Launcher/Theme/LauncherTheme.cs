@@ -136,7 +136,12 @@ namespace RaidDemo.Launcher.Theme
         /// <summary>建字体；字体缺失时 GDI+ 会自动回退到系统默认族。</summary>
         private static Font CreateFont(float size, FontStyle style)
         {
-            return new Font("Microsoft YaHei UI", size, style, GraphicsUnit.Point);
+            // 字号一律用**像素**而不是磅：本工程的界面会按显示器 DPI 等比缩放一次
+            // （见 LauncherForm.ApplyDpiScale），而磅值本身就会随 DPI 放大——
+            // 两者叠加会让文字被放大两次，长标签直接被顶出面板（负责人反馈的
+            // "右侧字体显示不全"就是这么来的）。像素单位下"缩放一次"就是唯一的一次。
+            // 磅 → 像素按 96 DPI 换算（1pt = 96/72 px），因此这里的取值与原来的视觉一致。
+            return new Font("Microsoft YaHei UI", size * (96f / 72f), style, GraphicsUnit.Pixel);
         }
     }
 }

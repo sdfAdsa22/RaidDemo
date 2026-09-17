@@ -123,7 +123,10 @@ namespace RaidDemo.Launcher.Theme
                 LineJoin = LineJoin.Round,
             };
 
-            DrawContainer(graphics, outline, new RectangleF(width * 0.09f, horizon - unit * 0.85f, unit * 3.0f, unit), 0);
+            // 高度必须是 unit×0.85：顶边写在 horizon - 0.85u 上，高度再写满一个 unit 的话，
+            // 这个柜子会比地平线矮下去 0.15u——同一排里只有它"沉"下去（负责人反馈的
+            // "最左边的橙色方块比其他方块偏下"）。同一排的其它柜子都是"顶边 + 高度 = 地平线"。
+            DrawContainer(graphics, outline, new RectangleF(width * 0.09f, horizon - unit * 0.85f, unit * 3.0f, unit * 0.85f), 0);
             DrawContainer(graphics, outline, new RectangleF(width * 0.31f, horizon - unit * 1.55f, unit * 2.6f, unit * 1.55f), 1);
             DrawContainer(graphics, outline, new RectangleF(width * 0.50f, horizon - unit * 0.70f, unit * 2.4f, unit * 0.70f), 2);
             DrawContainer(graphics, outline, new RectangleF(width * 0.66f, horizon - unit * 1.25f, unit * 1.9f, unit * 1.25f), 3);

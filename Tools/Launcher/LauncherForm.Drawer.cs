@@ -91,7 +91,10 @@ namespace RaidDemo.Launcher
                 BackColor = Color.Transparent,
             };
 
-            var serverLabel = CreateFieldLabel("游戏服务器（启动游戏时自动填入）", 274);
+            // 安装目录那一行的宿主面板占 230~288（高度 DrawerFieldHeight = 58）。
+            // 服务器标签原来放在 274，正好落在面板的下半部分里，被面板盖掉上沿，
+            // 只剩下半截字（负责人反馈的"右侧字体显示不全"）。挪到面板下方即可。
+            var serverLabel = CreateFieldLabel("游戏服务器（启动游戏时自动填入）", 298);
             m_ServerValueLabel = new Label
             {
                 Text = "(未设置)",
@@ -99,12 +102,13 @@ namespace RaidDemo.Launcher
                 ForeColor = LauncherTheme.Ink,
                 AutoSize = false,
                 Size = new Size(DrawerWidth - DrawerPadding * 2, 24),
-                Location = new Point(DrawerPadding, 298),
+                Location = new Point(DrawerPadding, 322),
             };
 
             var restore = CreateSecondaryButton("恢复默认", new Size(110, 36));
             restore.Location = new Point(DrawerPadding, ClientSize.Height - 58);
             restore.Click += (_, __) => OnRestoreDefaults();
+            m_RestoreButton = restore;
 
             var save = new FlatButton(FlatButtonStyle.Primary)
             {
@@ -114,6 +118,7 @@ namespace RaidDemo.Launcher
                 Location = new Point(DrawerWidth - DrawerPadding - 126, ClientSize.Height - 58),
             };
             save.Click += (_, __) => OnSaveSettings();
+            m_SaveButton = save;
 
             m_Drawer.Controls.AddRange(new Control[]
             {
@@ -179,17 +184,22 @@ namespace RaidDemo.Launcher
         /// <summary>推进一步抽屉动画；到位后停表。</summary>
         private void StepDrawer()
         {
-            var target = m_DrawerOpen ? ClientSize.Width - DrawerWidth : ClientSize.Width;
+            // 落点用**面板当前宽度**而不是设计常量：高 DPI 下整套界面被等比放大，
+            // 面板宽度已不是 DrawerWidth（404）而是 1.5 倍的 606。仍按常量算落点，
+            // 会让面板右侧约 200 像素留在窗口外——抽屉底部的"保存设置"被窗口边缘切掉
+            // （负责人反馈的"启动器字体显示不全"里最靠右的那个按钮）。
+            var target = m_DrawerOpen ? ClientSize.Width - m_Drawer.Width : ClientSize.Width;
             var delta = target - m_Drawer.Left;
+            var step = Math.Max(1, (int)Math.Round(DrawerSlideStep * (DeviceDpi / 96f)));
 
-            if (Math.Abs(delta) <= DrawerSlideStep)
+            if (Math.Abs(delta) <= step)
             {
                 m_Drawer.Left = target;
                 m_DrawerTimer.Stop();
                 return;
             }
 
-            m_Drawer.Left += Math.Sign(delta) * DrawerSlideStep;
+            m_Drawer.Left += Math.Sign(delta) * step;
         }
 
         /// <summary>保存抽屉里的设置。</summary>
@@ -237,7 +247,9 @@ namespace RaidDemo.Launcher
             var index = m_SourceCombo.Items.IndexOf(defaults.SelectedSource);
             m_SourceCombo.SelectedIndex = index >= 0 ? index : 0;
             m_InstallRow?.ShowCurrent(m_Config.GetInstallRootPath(AppContext.BaseDirectory));
-            m_StatusLabel.Text = "已恢复默认值（点「保存设置」生效）";
+            // 文案要短到放得下：状态行可视宽度 312 像素、13pt 正文约每字 17 像素，
+            // 原来那句 18 个字（≈310px）必然被裁到最后一个字。
+            m_StatusLabel.Text = "已恢复默认值（点「保存设置」）";
         }
     }
 }

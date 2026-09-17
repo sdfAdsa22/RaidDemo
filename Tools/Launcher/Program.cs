@@ -64,6 +64,11 @@ namespace RaidDemo.Launcher
         /// <summary>启动图形界面。</summary>
         private static int RunUserInterface()
         {
+            // 高 DPI 显示器上必须显式声明感知模式：不声明时 Windows 会把整个窗口
+            // 当位图拉伸（150% 缩放下 1000×620 的客户区被拉成 1500×930），
+            // 中文与描边全部发糊——负责人反馈的"启动器不清晰"就是这个原因。
+            // 声明之后由 WinForms 按 DPI 缩放控件坐标，绘制仍是逐像素的。
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new LauncherForm());

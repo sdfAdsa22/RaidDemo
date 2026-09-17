@@ -59,9 +59,12 @@ namespace RaidDemo.Launcher
             Text = "RaidDemo 启动器";
             FormBorderStyle = FormBorderStyle.None;      // 自绘标题栏（主视觉铺满）
             StartPosition = FormStartPosition.CenterScreen;
+
+            // 缩放自己算（见 ApplyDpiScale）：WinForms 的 AutoScaleMode.Dpi 在本工程
+            // 这套"全代码摆控件 + 自绘"的结构里会把窗口反向缩到 0.67 倍（实测），
+            // 与其和框架的自动缩放拉扯，不如在缩放基准上只做一次显式的等比缩放。
+            AutoScaleMode = AutoScaleMode.None;
             ClientSize = new Size(WindowWidth, WindowHeight);
-            MinimumSize = Size;
-            MaximumSize = Size;
             BackColor = LauncherTheme.Pine;               // 主视觉绘好之前的兜底色
             DoubleBuffered = true;
             KeyPreview = true;
@@ -74,8 +77,32 @@ namespace RaidDemo.Launcher
         /// </remarks>
         private void OnShownLayout()
         {
-            WindowChrome.ApplyRoundedCorners(this, WindowCornerRadius);
+            ApplyDpiScale();
+
+            // 缩放完成之后再锁定窗口尺寸：Min/Max 若在 BuildLayout 里写死设计尺寸，
+            // 会把按 DPI 放大后的窗口夹回去，等于把自动缩放抵消掉。
+            MinimumSize = Size;
+            MaximumSize = Size;
+
+            WindowChrome.ApplyRoundedCorners(this, ScaledRadius(WindowCornerRadius));
             RebuildKeyArt();
+        }
+
+        /// <summary>
+        /// 句柄创建后立刻按 DPI 缩放一次。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么放在这里而不是构造函数里：</b>窗口的显示器 DPI 要等句柄创建之后才确定；
+        /// 构造函数阶段 <c>DeviceDpi</c> 还是 96，据此算出来的缩放系数是 1（等于没缩放）。</para>
+        ///
+        /// <para><b>为什么还要在 Shown 里再来一次：</b>跨显示器拖动或系统缩放变化时，
+        /// 句柄创建阶段拿到的可能仍是上一块屏的 DPI；<see cref="ApplyDpiScale"/> 自己带幂等判断，
+        /// 重复调用不会把界面越缩越小。</para>
+        /// </remarks>
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyDpiScale();
         }
 
         /// <summary>主视觉背景：预渲染到一张位图上，绘制时直接贴。</summary>
@@ -97,8 +124,79 @@ namespace RaidDemo.Launcher
         {
             base.OnResize(e);
             RebuildKeyArt();
-            WindowChrome.ApplyRoundedCorners(this, WindowCornerRadius);
+            WindowChrome.ApplyRoundedCorners(this, ScaledRadius(WindowCornerRadius));
         }
+
+        /// <summary>把设计像素换算成当前 DPI 下的物理像素。</summary>
+        /// <param name="designPixels">按 96 DPI 写的设计值。</param>
+        /// <remarks>只用于"交给系统 API 的数值"（圆角半径等）；控件坐标由 WinForms 自动缩放。</remarks>
+        private int ScaledRadius(int designPixels)
+        {
+            return (int)Math.Round(designPixels * (DeviceDpi / 96f));
+        }
+
+        /// <summary>
+        /// 按显示器 DPI 把整套界面等比放大一次。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么需要：</b>窗口在 150% 缩放的屏幕上如果不对 DPI 作声明，
+        /// Windows 会把整幅画面当位图拉伸——中文与描边全部发糊（负责人反馈的"启动器不清晰"）。</para>
+        ///
+        /// <para><b>为什么要自己缩放：</b>本工程的布局是"全代码写的固定设计尺寸 + 自绘主视觉"，
+        /// 交给 <c>AutoScaleMode.Dpi</c> 时实测得到的是 0.67 倍（方向相反）。
+        /// 显式调用 <c>Scale()</c> 走的是设计器同一条缩放路径：子控件位置、尺寸与字体一起放大，
+        /// 主视觉本来就按 <c>ClientSize</c> 重画，因此自动跟随。</para>
+        /// </remarks>
+        private void ApplyDpiScale()
+        {
+            var scale = DeviceDpi / 96f;
+            if (Math.Abs(scale - 1f) < 0.01f || m_DpiScaled)
+            {
+                return;
+            }
+
+            m_DpiScaled = true;
+            // 子控件交给 Scale 放大，窗口本身要显式改成放大后的客户区——
+            // Control.Scale 只按比例调整子控件，不会改宿主窗口的大小（实测：只 Scale 会让内容溢出）。
+            Scale(new SizeF(scale, scale));
+            ClientSize = new Size(
+                (int)Math.Round(WindowWidth * scale),
+                (int)Math.Round(WindowHeight * scale));
+
+            // 立刻把窗口尺寸锁死：抽屉里的控件在 LoadConfiguration 之后会按自己的内容
+            // 把窗口顶高（实测 930 → 986，正好是安装目录行的高度），而这块界面本来就是
+            // 按固定尺寸设计的，多出来的高度只会让主视觉下沿露出底色。
+            MinimumSize = Size;
+            MaximumSize = Size;
+
+            // 抽屉底部的两个按钮按"缩放后的抽屉尺寸"重新贴一次右下角：
+            // 它们原本是按设计高度算的固定坐标，缩放后容易落到面板外（实测被窗口右缘切掉半截）。
+            RepositionDrawerButtons(scale);
+        }
+
+        /// <summary>把抽屉底部的两个按钮重新贴到缩放后的面板底部。</summary>
+        private void RepositionDrawerButtons(float scale)
+        {
+            if (m_Drawer == null || m_RestoreButton == null || m_SaveButton == null)
+            {
+                return;
+            }
+
+            var padding = (int)Math.Round(DrawerPadding * scale);
+            var bottom = m_Drawer.ClientSize.Height - (int)Math.Round(22 * scale) - m_RestoreButton.Height;
+            m_RestoreButton.Location = new Point(padding, bottom);
+            m_SaveButton.Location = new Point(
+                m_Drawer.ClientSize.Width - padding - m_SaveButton.Width, bottom);
+        }
+
+        /// <summary>抽屉底部的"恢复默认"按钮（缩放后需要重新定位）。</summary>
+        private FlatButton m_RestoreButton;
+
+        /// <summary>抽屉底部的"保存设置"按钮（缩放后需要重新定位）。</summary>
+        private FlatButton m_SaveButton;
+
+        /// <summary>本次运行是否已经按 DPI 缩放过（幂等保护）。</summary>
+        private bool m_DpiScaled;
 
         /// <summary>按当前客户区尺寸重画主视觉。</summary>
         private void RebuildKeyArt()
@@ -213,7 +311,8 @@ namespace RaidDemo.Launcher
             // 状态与体积说明并排、**互不重叠**：WinForms 的透明控件不参与兄弟控件的合成，
             // 后画的透明标签会把先画的文字擦掉（实测踩过：状态行只剩半截影子）。
             m_StatusLabel.AutoSize = false;
-            m_StatusLabel.Size = new Size(300, 20);
+            // 宽度取到"下载速度标签"的左缘为止（PanelLeft + 312）：再宽就会盖住右边那列。
+            m_StatusLabel.Size = new Size(312, 20);
             m_StatusLabel.TextAlign = ContentAlignment.MiddleLeft;
 
             m_SpeedLabel = CreateArtLabel(string.Empty, LauncherTheme.BodyFont, Point.Empty);
