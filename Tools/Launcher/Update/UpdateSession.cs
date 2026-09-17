@@ -171,6 +171,17 @@ namespace RaidDemo.Launcher.Update
 
                     if (changes.Count == 0)
                     {
+                        // 本体没变化不等于资源层就位：第一次安装或上次资源层装失败时，
+                        // 这里补装一次，玩家点"开始游戏"就直接能进图。
+                        if (applyChanges && !ContentCacheInstaller.TryInstall(client, m_Source, remote, Log, out var contentFailure))
+                        {
+                            result.Success = false;
+                            result.FailureReason = contentFailure;
+                            result.Summary = "资源层安装失败：" + contentFailure;
+                            Report(UpdatePhase.Failed, result.Summary);
+                            return result;
+                        }
+
                         result.Summary = $"已是最新版本（{DescribeVersion(remote)}）。";
                         Report(UpdatePhase.Completed, result.Summary);
                         return result;
@@ -196,6 +207,17 @@ namespace RaidDemo.Launcher.Update
                     }
 
                     ApplyLayer(changes, remote);
+
+                    // 资源层不落在安装目录里，而是装进游戏的内容缓存（见安装器的类型注释）。
+                    if (!ContentCacheInstaller.TryInstall(client, m_Source, remote, Log, out var contentFailureReason))
+                    {
+                        result.Success = false;
+                        result.FailureReason = contentFailureReason;
+                        result.Summary = "资源层安装失败：" + contentFailureReason;
+                        Report(UpdatePhase.Failed, result.Summary);
+                        return result;
+                    }
+
                     result.Summary = $"更新完成：{changes.Count} 个文件（{DescribeVersion(remote)}）。";
                     Report(UpdatePhase.Completed, result.Summary);
                     return result;
