@@ -108,14 +108,19 @@ namespace RaidDemo.Combat
         private Vector3 ResolveShotDirection(float spreadOffsetDegrees)
         {
             var groundMuzzle = new Vector3(m_MuzzlePosition.x, 0f, m_MuzzlePosition.z);
+            var facing = Vector2F.FromDegrees(m_AimDegrees);
             var toAim = m_AimWorldPoint.IsNearlyZero
-                ? Vector2F.FromDegrees(m_AimDegrees)
+                ? facing
                 : new Vector2F(m_AimWorldPoint.X - groundMuzzle.x, m_AimWorldPoint.Y - groundMuzzle.z);
 
-            if (toAim.IsNearlyZero)
+            // 准星压在角色身上（瞄准解算的死区内）时，瞄准点就在角色旁边——它落在**枪口后方**，
+            // "枪口 → 瞄准点"会退化成指向自己的身体，弹道于是朝反方向飞（负责人反馈的
+            // "准星在玩家上时弹道反方向射击"）。此时退回当前朝向，与死区里"保持上一次朝向"
+            // 的语义保持一致：准星贴脸时，朝哪打由角色朝向回答。
+            var aimIsBehindMuzzle = ((toAim.X * facing.X) + (toAim.Y * facing.Y)) < 0f;
+            if (toAim.IsNearlyZero || aimIsBehindMuzzle)
             {
-                // 瞄准点与角色重合时没有方向可言，退回当前朝向。
-                toAim = Vector2F.FromDegrees(m_AimDegrees);
+                toAim = facing;
             }
 
             // 散布绕竖直轴旋转瞄准点，因此弹着点的距离不变、只改变方位。

@@ -130,8 +130,13 @@ namespace RaidDemo.Presentation
             //
             // 同时保留高度差：起点与终点各自向下探测，所以站在装卸平台上的敌人开枪时，
             // 弹道仍然画在平台面上，不会像"统一压到固定高度"那样被画到平台下面。
-            line.SetPosition(0, ProjectToGround(evt.Origin));
-            line.SetPosition(1, ProjectToGround(evt.EndPoint));
+            //
+            // 画成三点折线：枪口（真实位置）→ 枪口正下方的地面 → 终点地面。
+            // "从枪口出来"与"与准星共线"在地面平面上无法用两点同时满足（枪口在半空），
+            // 折线让起点贴住枪口、主体线段贴地穿过准星，两个诉求都保住。
+            line.SetPosition(0, evt.Origin);
+            line.SetPosition(1, ProjectToGround(evt.Origin));
+            line.SetPosition(2, ProjectToGround(evt.EndPoint));
             m_Active.Add(new TracerInstance { Line = line, Remaining = TracerLifetime });
         }
 
@@ -180,7 +185,7 @@ namespace RaidDemo.Presentation
             var host = new GameObject("Tracer");
             host.transform.SetParent(transform, worldPositionStays: false);
             var line = host.AddComponent<LineRenderer>();
-            line.positionCount = 2;
+            line.positionCount = 3;
             line.startWidth = TracerWidth;
             line.endWidth = TracerWidth;
             line.useWorldSpace = true;

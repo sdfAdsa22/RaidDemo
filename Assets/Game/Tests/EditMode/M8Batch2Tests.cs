@@ -104,6 +104,30 @@ namespace RaidDemo.Tests.EditMode
                 pelletSpreadDegrees: 7f);
         }
 
+        /// <summary>
+        /// 准星压在角色身上时，弹道沿当前朝向飞，而不是掉头朝自己的身体。
+        /// </summary>
+        /// <remarks>负责人反馈："准星在玩家上时弹道反方向射击"。根因是方向由
+        /// "枪口 → 瞄准点"反推，而贴脸的瞄准点落在枪口后方。</remarks>
+        [Test]
+        public void 准星贴在角色身上时_弹道沿当前朝向而不是反向()
+        {
+            m_Controller.SyncEquippedWeapon(BuildShotgun());
+            m_AmmoPouch.AutoPlace(m_Factory.Create(m_ShotgunAmmo, 6));
+
+            // 枪口在角色"前方"1 米（沿 +x），朝向 +x；瞄准点落在角色旁边（枪口后方）。
+            m_Controller.SetMuzzlePosition(new Vector3(1f, 1.05f, 0f));
+            m_Controller.SetAimDirection(Vector2F.Right);
+            m_Controller.SetAimWorldPoint(new Vector2F(0.2f, 0f));
+
+            m_Controller.SetTriggerHeld(true);
+            m_Controller.Tick(0.016f);
+
+            Assert.IsTrue(m_Probe.Directions.Count > 0, "应当至少打出一颗弹丸。");
+            Assert.Greater(m_Probe.Directions[0].x, 0.9f,
+                "弹道应当沿当前朝向（+x）飞，而不是掉头朝自己的身体。");
+        }
+
         [Test]
         public void 霰弹枪一发打出六颗弹丸且只消耗一发弹药()
         {
