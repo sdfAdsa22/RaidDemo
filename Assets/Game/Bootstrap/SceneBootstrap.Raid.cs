@@ -317,7 +317,7 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            m_RaidSession?.NotifyKill(evt.AttackerId);
+            m_RaidSession?.NotifyKill();
             NotifyQuestKill();
         }
 

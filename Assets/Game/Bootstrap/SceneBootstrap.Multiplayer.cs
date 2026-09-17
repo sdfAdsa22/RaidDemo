@@ -107,9 +107,12 @@ namespace RaidDemo.Bootstrap
         private void InitializeMultiplayerClientIfNeeded()
         {
             var session = MultiplayerClientSession.Current;
-            if (session == null || session.Network == null)
+            // 会话必须"还活着"：主动断开过的会话对象仍会被 Current 引用（Disconnect 只置终态、
+            // 不释放引用），因此只查 null 会把"单机加载战局地图"也判成联机——本地玩家被交给
+            // 永远不会 attach 的移动链路，表现就是"继续游戏进图不能动"（U-100）。
+            if (session == null || session.IsDisconnected || session.Network == null)
             {
-                // 既不是联机客户端，也没有会话：单机路径，什么都不用接。
+                // 既不是联机客户端，也没有活动会话：单机路径，什么都不用接。
                 return;
             }
 

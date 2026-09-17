@@ -79,24 +79,28 @@ namespace RaidDemo.Bootstrap
         /// 取玩家在背包命令通道里使用的随身装备。
         /// </summary>
         /// <remarks>
-        /// <para><b>战局里</b>用参战时交给 CombatWorld 的那一份；<b>安全屋里</b>玩家没有参战
-        /// （<c>AddPlayerToCombat</c> 在安全屋世界传 null），直接回退到账号档案里的那一份——
-        /// 两者本来就是同一个对象（战局参战传入的就是 <c>profile.Loadout</c>）。</para>
+        /// <para><b>战局里</b>用参战时交给 CombatWorld 的那一份（传入的就是账号档案的 loadout，
+        /// 因此命令、镜像与结算始终是同一个对象）。</para>
         ///
-        /// <para><b>为什么必须回退（负责人反馈的"第二把空手"）：</b>命令通道原先只在战局里建立，
-        /// 安全屋里的装备 / 整理命令被服务器丢弃——客户端"本地先执行"让界面看起来换好了，
-        /// 但服务器档案里还是"上一把撤离后清空"的装备，于是下一局进图空手。</para>
+        /// <para><b>安全屋必须用账号档案那一份（U-100 的"第二把空手"）：</b>安全屋里玩家的战斗
+        /// 单位是 <c>AddPlayerToCombat(null)</c> 临时配发的默认套（靶场用），改它不会进档案、
+        /// 也不会带进战局；而进图配发读的是档案。两处不是同一个对象时，表现就是
+        /// "安全屋界面里装备得好好的，一进图空手"。</para>
+        ///
+        /// <para>落点规则本身抽在 <see cref="ServerLoadoutRouting"/>：纯函数、可被 EditMode 用例直接钉住。</para>
         /// </remarks>
         private RaidDemo.Inventory.PlayerLoadout ResolveCommandLoadout(int playerId)
         {
-            if (m_Combat != null
-                && m_Combat.TryGetLoadout(playerId, out var combatLoadout)
-                && combatLoadout != null)
+            RaidDemo.Inventory.PlayerLoadout combatLoadout = null;
+            if (m_Combat != null && m_Combat.TryGetLoadout(playerId, out var found))
             {
-                return combatLoadout;
+                combatLoadout = found;
             }
 
-            return ResolveProfileForPlayer(playerId)?.Loadout;
+            return ServerLoadoutRouting.ResolveCommandLoadout(
+                m_WorldKind,
+                ResolveProfileForPlayer(playerId)?.Loadout,
+                combatLoadout);
         }
 
         /// <summary>玩家断开时撤掉他的命令路由与随身容器。</summary>

@@ -118,13 +118,17 @@ namespace RaidDemo.Raid
         }
 
         /// <summary>登记一次击杀。</summary>
-        /// <param name="attackerCombatantId">攻击方标识。</param>
         /// <remarks>
-        /// 只统计玩家造成的击杀。让 AI 之间的误伤也计入，结算上的击杀数就不再可信。
+        /// <para><b>归属判定在调用方，本方法不再比较编号（U-100）：</b>
+        /// <c>SceneBootstrap.OnKillCounted</c> 已经按运行形态判定过"这一枪是不是本机玩家打的"——
+        /// 联机用客户端编号、单机用战斗单位编号。这里再拿它和 <c>m_PlayerCombatantId</c> 比一次，
+        /// 会让联机下的击杀全部记不上（右上角击杀数恒为 0，而服务器结算一直是对的）。</para>
+        ///
+        /// <para>只统计玩家造成的击杀：让 AI 之间的误伤也计入，结算上的击杀数就不再可信。</para>
         /// </remarks>
-        public void NotifyKill(int attackerCombatantId)
+        public void NotifyKill()
         {
-            if (!IsActive || attackerCombatantId != m_PlayerCombatantId)
+            if (!IsActive)
             {
                 return;
             }
