@@ -51,7 +51,7 @@ dotnet publish Tools/Launcher/RaidDemo.Launcher.csproj -c Release -o Builds/Tool
 | `gameExecutable` | 游戏可执行文件名（相对安装根） |
 | `selectedSource` | 默认选中的更新源名称 |
 | `sources[].manifestSource` | 更新源地址：`http(s)://…` 或本地目录（本机演示可不起服务） |
-| `sources[].gameServer` | 该源对应的默认游戏服务器地址（启动游戏时作为 `-connect` 传入） |
+| `sources[].gameServer` | 该源对应的默认游戏服务器地址（启动游戏时作为 `-serverhost` 传入：只预填联机界面，不自动连接；隐藏源额外带 `-hideserver`） |
 | `sources[].editable` | 是否允许在界面上直接编辑地址（自定义源） |
 | `sources[].hideAddress` | 是否在界面上隐藏该源的地址（默认 `false`；模板里的 `云主机` 为 `true`，避免演示时拍到公网 IP） |
 | `extraGameArguments` | 追加给游戏的额外参数（空格分隔，可留空） |
