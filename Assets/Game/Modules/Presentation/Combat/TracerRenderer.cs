@@ -34,15 +34,6 @@ namespace RaidDemo.Presentation
         /// <summary>弹道线条的宽度（米）。</summary>
         private const float TracerWidth = 0.03f;
 
-        /// <summary>弹道离地高度（米）。略高于地面，避免与地板重叠产生闪烁。</summary>
-        private const float GroundOffset = 0.05f;
-
-        /// <summary>地面探测的起点抬高量（米）。</summary>
-        private const float GroundProbeLift = 2f;
-
-        /// <summary>地面探测向下的最大距离（米）。</summary>
-        private const float GroundProbeDepth = 6f;
-
         /// <summary>弹道颜色。</summary>
         private static readonly Color TracerColor = new Color(1f, 0.9f, 0.5f, 0.9f);
 
@@ -123,44 +114,16 @@ namespace RaidDemo.Presentation
         {
             var line = Rent();
 
-            // 弹道画在"各自下方的地面"上，而不是枪口高度。
-            // 原因：准星落在地面，而弹道从枪口水平打出，两者在斜俯视下不在同一条视线上；
-            // 把首尾都落到地面之后，这条线必然穿过准星——
-            // 玩家看到的才是"子弹从我这打到准星指的地方"。
+            // 弹道就是"枪口 → 终点"的两点直线，不做任何投影。
             //
-            // 同时保留高度差：起点与终点各自向下探测，所以站在装卸平台上的敌人开枪时，
-            // 弹道仍然画在平台面上，不会像"统一压到固定高度"那样被画到平台下面。
-            //
-            // 画成三点折线：枪口（真实位置）→ 枪口正下方的地面 → 终点地面。
-            // "从枪口出来"与"与准星共线"在地面平面上无法用两点同时满足（枪口在半空），
-            // 折线让起点贴住枪口、主体线段贴地穿过准星，两个诉求都保住。
+            // 为什么现在可以直接画在真实高度：瞄准解算的平面抬到了枪口高度
+            // （装配层传"脚底 + MuzzleHeight"，见 U-95 方案 A），准星、弹道与枪口
+            // 处在同一个水平面——这条真实弹道在屏幕上自然穿过准星，起点也贴着枪口。
+            // 之前的"贴地 / 三点折线"是为了补偿"准星在地面、弹道在半空"两个平面的错位；
+            // 统一平面之后，那些补偿画法全部删除。
             line.SetPosition(0, evt.Origin);
-            line.SetPosition(1, ProjectToGround(evt.Origin));
-            line.SetPosition(2, ProjectToGround(evt.EndPoint));
+            line.SetPosition(1, evt.EndPoint);
             m_Active.Add(new TracerInstance { Line = line, Remaining = TracerLifetime });
-        }
-
-        /// <summary>
-        /// 把弹道点投影到它正下方的地面 / 平台面。
-        /// </summary>
-        /// <remarks>
-        /// <para><b>为什么是 public static：</b>它与 <c>AimResolver</c> 一样是"决定弹道画在哪"的
-        /// 纯查询——公开之后测试可以在真实物理场景里断言"弹道穿过准星所依赖的落点"，
-        /// 不需要启动整个游戏。</para>
-        /// <para>探测遮罩排除单位层（<see cref="PhysicsLayers.GroundProbeMask"/>）：
-        /// 弹道的地面高度应由地形与建筑决定，命中一个站在原地的角色时不该把线抬到它头顶。</para>
-        /// <para>探测不到地面时（悬空、场景外）退回原点高度加偏移，保证弹道总是可见。</para>
-        /// </remarks>
-        public static Vector3 ProjectToGround(Vector3 point)
-        {
-            var probeStart = point + (Vector3.up * GroundProbeLift);
-            var probeDistance = GroundProbeLift + GroundProbeDepth;
-            if (Physics.Raycast(probeStart, Vector3.down, out var hit, probeDistance, PhysicsLayers.GroundProbeMask))
-            {
-                return new Vector3(point.x, hit.point.y + GroundOffset, point.z);
-            }
-
-            return new Vector3(point.x, point.y + GroundOffset, point.z);
         }
 
         /// <summary>取一条可用的线段渲染器，池空时创建新的。</summary>
@@ -185,7 +148,7 @@ namespace RaidDemo.Presentation
             var host = new GameObject("Tracer");
             host.transform.SetParent(transform, worldPositionStays: false);
             var line = host.AddComponent<LineRenderer>();
-            line.positionCount = 3;
+            line.positionCount = 2;
             line.startWidth = TracerWidth;
             line.endWidth = TracerWidth;
             line.useWorldSpace = true;

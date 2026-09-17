@@ -32,6 +32,14 @@ namespace RaidDemo.Bootstrap
         /// <summary>靶子的「生命」：只用于让伤害事件成立，打到 0 也不会消失。</summary>
         private const float TargetMaxHealth = 100000f;
 
+        /// <summary>
+        /// 瞄准平面高度（米）：准星、弹道与枪口处在同一个水平面。
+        /// </summary>
+        /// <remarks>与战局的 <c>SceneBootstrap.MuzzleHeight</c>、服务器的
+        /// <c>ServerRuntime.Combat.MuzzleHeight</c> 取同一个值——三处不一致时，
+        /// 弹道会在屏幕上与准星错开（U-95 方案 A 的约束）。</remarks>
+        private const float AimPlaneHeight = 1.05f;
+
         private CombatTuning m_CombatTuning;
         private CombatWorld m_CombatWorld;
         private PlayerWeapon m_PlayerWeapon;
@@ -284,9 +292,11 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
+            // 瞄准点位于瞄准平面（脚底 + 枪口高度）：与战局同一条规则——
+            // 准星与弹道共面之后，弹道在屏幕上才会穿过准星（U-95 方案 A）。
             var screen = camera.WorldToScreenPoint(new Vector3(
                 worldAim.X,
-                m_PlayerMotor.transform.position.y,
+                m_PlayerMotor.transform.position.y + AimPlaneHeight,
                 worldAim.Y));
 
             if (screen.z < 0f)

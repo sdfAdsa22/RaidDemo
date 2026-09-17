@@ -121,8 +121,12 @@ namespace RaidDemo.Bootstrap
                 return;
             }
 
-            // 瞄准点位于角色所在高度，反投影时使用相同高度，避免透视造成的偏移。
-            var world = new Vector3(worldAim.X, m_PlayerMotor.transform.position.y, worldAim.Y);
+            // 瞄准点位于**瞄准平面**（脚底 + 枪口高度，见 Tick 里的回写）：
+            // 准星与弹道处在同一个水平面，弹道在屏幕上才会穿过准星（U-95 方案 A）。
+            var world = new Vector3(
+                worldAim.X,
+                m_PlayerMotor.transform.position.y + MuzzleHeight,
+                worldAim.Y);
             var screen = cam.WorldToScreenPoint(world);
 
             if (screen.z < 0f)
