@@ -42,6 +42,17 @@ namespace RaidDemo.Tests.EditMode
             return ReturnsHit;
         }
 
+        /// <inheritdoc />
+        public bool TryRaycastIgnoringTarget(
+            Vector3 origin,
+            Vector3 direction,
+            float maxDistance,
+            int ignoredTargetId,
+            out HitInfo hit)
+        {
+            return TryRaycast(origin, direction, maxDistance, out hit);
+        }
+
         /// <summary>只让射线命中指定单位，便于表达"看见了谁"。</summary>
         public void HitTarget(int targetId, float distance = 5f)
         {

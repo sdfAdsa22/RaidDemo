@@ -18,6 +18,13 @@ namespace RaidDemo.Presentation
         private readonly int m_LayerMask;
         private readonly bool m_LiftOriginToGround;
 
+        /// <summary>
+        /// 候选命中的共享缓冲：跳过射手自己的那条路径要收集全部命中再挑最近的有效项。
+        /// </summary>
+        /// <remarks>与相机遮挡探测同一套做法（复用静态数组，避免每次开火产生托管分配）。
+        /// 16 个候选足够覆盖"身体 + 掩体 + 目标"这类最坏情形。</remarks>
+        private static readonly RaycastHit[] s_Candidates = new RaycastHit[16];
+
         /// <summary>创建射线检测实现。</summary>
         /// <param name="layerMask">层遮罩，默认检测所有层。</param>
         public PhysicsHitProbe(int layerMask = Physics.DefaultRaycastLayers)
@@ -47,23 +54,100 @@ namespace RaidDemo.Presentation
                 return false;
             }
 
-            if (m_LiftOriginToGround
-                && NavMesh.SamplePosition(origin, out var navHit, 4f, NavMesh.AllAreas))
-            {
-                origin.y += navHit.position.y;
-            }
+            origin = LiftOriginIfNeeded(origin);
 
             if (!Physics.Raycast(origin, direction, out var raycastHit, maxDistance, m_LayerMask))
             {
                 return false;
             }
 
+            hit = ResolveHit(raycastHit);
+            return true;
+        }
+
+        /// <inheritdoc />
+        public bool TryRaycastIgnoringTarget(
+            Vector3 origin,
+            Vector3 direction,
+            float maxDistance,
+            int ignoredTargetId,
+            out HitInfo hit)
+        {
+            hit = default;
+            if (maxDistance <= 0f)
+            {
+                return false;
+            }
+
+            if (ignoredTargetId == 0)
+            {
+                // 没有要跳过的目标时走单发路径：结果相同，也省一次全量收集。
+                return TryRaycast(origin, direction, maxDistance, out hit);
+            }
+
+            origin = LiftOriginIfNeeded(origin);
+            var count = Physics.RaycastNonAlloc(origin, direction, s_Candidates, maxDistance, m_LayerMask);
+
+            var found = false;
+            var bestDistance = float.MaxValue;
+            var best = default(RaycastHit);
+            for (var i = 0; i < count; i++)
+            {
+                var candidate = s_Candidates[i];
+
+                // 距离为零的命中表示探测起点已经在碰撞体内部（相机遮挡排查时同一类过滤）：
+                // 它不是一条真实的弹道阻挡，跳过。
+                if (candidate.distance <= 0f || candidate.distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                if (ResolveTargetId(candidate.collider) == ignoredTargetId)
+                {
+                    continue;   // 射手自己：透明，继续往后找
+                }
+
+                best = candidate;
+                bestDistance = candidate.distance;
+                found = true;
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+
+            hit = ResolveHit(best);
+            return true;
+        }
+
+        /// <summary>按配置把起点抬到射手脚下的地面高度（见构造函数的说明）。</summary>
+        private Vector3 LiftOriginIfNeeded(Vector3 origin)
+        {
+            if (m_LiftOriginToGround
+                && NavMesh.SamplePosition(origin, out var navHit, 4f, NavMesh.AllAreas))
+            {
+                origin.y += navHit.position.y;
+            }
+
+            return origin;
+        }
+
+        /// <summary>把物理命中转换为战斗层的命中结果。</summary>
+        private static HitInfo ResolveHit(in RaycastHit raycastHit)
+        {
             var target = raycastHit.collider.GetComponentInParent<CombatTargetView>();
             var targetId = target != null ? target.TargetId : 0;
             var center = target != null ? target.CenterWorldPosition : Vector3.zero;
 
-            hit = new HitInfo(targetId, raycastHit.point, center, raycastHit.distance);
-            return true;
+            return new HitInfo(targetId, raycastHit.point, center, raycastHit.distance);
+        }
+
+        /// <summary>取碰撞体所属的受击目标标识；没有登记目标时返回 0（环境）。</summary>
+        private static int ResolveTargetId(Collider collider)
+        {
+            var target = collider != null ? collider.GetComponentInParent<CombatTargetView>() : null;
+            return target != null ? target.TargetId : 0;
         }
     }
 }

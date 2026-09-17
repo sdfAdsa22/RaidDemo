@@ -284,6 +284,14 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.SetCursorLock(true);
             }
 
+            // 与战局同一条规则：先把上一帧推进后的最新位置回写给输入层，再做本帧输入采集。
+            // 顺序反了的话瞄准点基于旧位置计算，开局第一帧甚至会用到默认的 (0,0)。
+            if (m_InputCollector != null && m_PlayerMotor != null)
+            {
+                m_InputCollector.SetOriginPosition(m_PlayerMotor.SimulatedPosition);
+                m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
+            }
+
             if (uiBlocking)
             {
                 // 界面挡住操作时必须连"待上行意图"一起清掉：
@@ -307,12 +315,6 @@ namespace RaidDemo.Bootstrap
             else
             {
                 m_MoveHandler.Tick(Time.deltaTime);
-            }
-
-            if (m_InputCollector != null && m_PlayerMotor != null)
-            {
-                m_InputCollector.SetOriginPosition(m_PlayerMotor.SimulatedPosition);
-                m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
             }
 
             UpdateInteraction(uiBlocking);

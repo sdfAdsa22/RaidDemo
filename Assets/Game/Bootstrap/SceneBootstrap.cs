@@ -231,6 +231,13 @@ namespace RaidDemo.Bootstrap
                 m_InputCollector.SetCursorLock(true);
             }
 
+            // 先回写最新位置再采集输入：瞄准点必须基于最新位置（否则开局第一帧会用默认 (0,0)）。
+            if (m_InputCollector != null && m_PlayerMotor != null)
+            {
+                m_InputCollector.SetOriginPosition(m_PlayerMotor.SimulatedPosition);
+                m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
+            }
+
             if (inputBlocked)
             {
                 // 翻背包时角色必须立刻停住。只清意图而不停模拟，角色会按上一次的
@@ -263,13 +270,6 @@ namespace RaidDemo.Bootstrap
             else
             {
                 m_MoveHandler.Tick(Time.deltaTime);
-            }
-
-            // 把最新位置回写给输入层，使下一帧的瞄准方向基于最新位置计算。
-            if (m_InputCollector != null && m_PlayerMotor != null)
-            {
-                m_InputCollector.SetOriginPosition(m_PlayerMotor.SimulatedPosition);
-                m_InputCollector.SetOriginHeight(m_PlayerMotor.transform.position.y);
             }
 
             if (inventoryOpen)

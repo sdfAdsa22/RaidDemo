@@ -64,5 +64,31 @@ namespace RaidDemo.Combat
         /// <param name="hit">命中结果。</param>
         /// <returns>射线打到任何碰撞体时返回 true。</returns>
         bool TryRaycast(Vector3 origin, Vector3 direction, float maxDistance, out HitInfo hit);
+
+        /// <summary>
+        /// 与 <see cref="TryRaycast"/> 相同，但把某个受击目标当作"透明"：命中它时继续往后投射。
+        /// </summary>
+        /// <param name="origin">射线起点（世界坐标）。</param>
+        /// <param name="direction">射线方向，不必归一化。</param>
+        /// <param name="maxDistance">最大距离（米）。</param>
+        /// <param name="ignoredTargetId">
+        /// 要跳过的受击目标标识（通常是射手自己的战斗单位编号）；0 表示不跳过任何目标。
+        /// </param>
+        /// <param name="hit">最近的有效命中结果。</param>
+        /// <returns>跳过被忽略目标后仍打到任何碰撞体时返回 true。</returns>
+        /// <remarks>
+        /// <para><b>为什么需要它：</b>枪口在身体外侧（身前 0.6 米＋枪管长度），当瞄准点落在
+        /// 角色附近、尤其侧后方时，"从枪口指向瞄准点"的射线会**穿过自己的身体**。
+        /// 物理上命中自己是正确的，玩法上却是一个错误：子弹会停在自己身上，打不到身后的目标
+        /// （负责人反馈的"准星靠近玩家时好像打到了自己"）。</para>
+        /// <para>把这条语义放在探针层而不是武器层：探针掌握射线的距离与命中顺序，
+        /// 能"跳过自己继续投"；武器层只该收到一条有效弹道。</para>
+        /// </remarks>
+        bool TryRaycastIgnoringTarget(
+            Vector3 origin,
+            Vector3 direction,
+            float maxDistance,
+            int ignoredTargetId,
+            out HitInfo hit);
     }
 }

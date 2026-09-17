@@ -29,11 +29,28 @@ namespace RaidDemo.Tests.EditMode
             /// <summary>命中结果。</summary>
             public HitInfo Result { get; set; }
 
+            /// <summary>最近一次投射要求跳过的目标编号（0 表示没有要求）。</summary>
+            public int LastIgnoredTargetId { get; private set; }
+
             /// <inheritdoc />
             public bool TryRaycast(Vector3 origin, Vector3 direction, float maxDistance, out HitInfo hit)
             {
                 hit = Result;
                 return true;
+            }
+
+            /// <inheritdoc />
+            /// <remarks>这个桩直接返回"命中了射手自己"：测试要验的正是武器层里
+            /// 自伤防护这道第二防线（物理探针的跳过逻辑另有测试覆盖）。</remarks>
+            public bool TryRaycastIgnoringTarget(
+                Vector3 origin,
+                Vector3 direction,
+                float maxDistance,
+                int ignoredTargetId,
+                out HitInfo hit)
+            {
+                LastIgnoredTargetId = ignoredTargetId;
+                return TryRaycast(origin, direction, maxDistance, out hit);
             }
         }
 
@@ -157,6 +174,26 @@ namespace RaidDemo.Tests.EditMode
                 m_ShooterCombatantId,
                 captured.AttackerId,
                 "击杀归属按战斗单位编号查表；用玩家编号 0 会永远对不上（单机击杀数一直不涨就是这个原因）。");
+        }
+
+        /// <summary>
+        /// 开火时要把射手自己的编号交给探针，让它把"命中自己"当作透明。
+        /// </summary>
+        /// <remarks>物理探针的跳过逻辑由 <c>PhysicsHitProbeTests</c> 用真实碰撞体验证；
+        /// 这个用例管的是"武器层有没有把编号正确传下去"——调用点被改坏时它会立刻失败。</remarks>
+        [Test]
+        public void 开火时把射手编号交给探针用于跳过自己()
+        {
+            var enemyId = m_World.Create(100f, isPlayer: false);
+            ArrangeHitOn(enemyId);
+
+            m_Controller.SetTriggerHeld(true);
+            m_Controller.Tick(1f);
+
+            Assert.AreEqual(
+                m_ShooterCombatantId,
+                m_Probe.LastIgnoredTargetId,
+                "开火必须把射手的战斗单位编号交给探针，否则子弹会停在自己身上。");
         }
     }
 }

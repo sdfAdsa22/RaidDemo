@@ -202,17 +202,6 @@ namespace RaidDemo.Bootstrap
         {
             var weapon = m_Loadout?.Equipment?.Get(EquipmentSlot.PrimaryWeapon);
 
-            // 枪口位置必须每帧写入：命中射线从枪口出发，不设置的话它停在世界原点，
-            // 于是「枪响了、子弹也飞了」，但永远打不到眼前的靶子。
-            if (m_PlayerMotor != null && m_WeaponController != null)
-            {
-                // 有真实武器模型时枪口取枪管末端，模型缺失时退回"角色位置抬高"。
-                m_WeaponController.SetMuzzlePosition(
-                    m_WeaponView != null && m_WeaponView.IsEquipped
-                        ? m_WeaponView.MuzzleWorldPosition
-                        : ResolveFallbackMuzzlePosition());
-            }
-
             // 必须把「手上是什么武器」同步给控制器：弹匣容量、装弹、射速全部由它管理。
             // 漏掉这一步的症状很有迷惑性——界面上武器名是有的（那是这里直接读装备槽显示的），
             // 但弹药数是「-- / --」、按 R 没反应、开枪也打不响。
@@ -249,6 +238,18 @@ namespace RaidDemo.Bootstrap
                     m_WeaponController.Weapon.IsEquipped,
                     m_WeaponLengthCells,
                     m_WeaponItemId);
+            }
+
+            // 枪口位置必须每帧写入：命中射线从枪口出发，不设置的话它停在世界原点，
+            // 于是「枪响了、子弹也飞了」，但永远打不到眼前的靶子。
+            // 放在 UpdateView 之后取：视图刚按本帧的位置与朝向摆完，先取会用到上一帧的枪口。
+            if (m_PlayerMotor != null && m_WeaponController != null)
+            {
+                // 有真实武器模型时枪口取枪管末端，模型缺失时退回"角色位置抬高"。
+                m_WeaponController.SetMuzzlePosition(
+                    m_WeaponView != null && m_WeaponView.IsEquipped
+                        ? m_WeaponView.MuzzleWorldPosition
+                        : ResolveFallbackMuzzlePosition());
             }
 
             UpdateCrosshair();

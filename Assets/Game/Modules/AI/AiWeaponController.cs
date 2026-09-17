@@ -151,8 +151,10 @@ namespace RaidDemo.AI
             // 先声明再传入 out：若写成 `probe != null && probe.TryRaycast(..., out var hit)`，
             // 因为短路求值的存在，编译器无法证明后续读取 hit 时它一定被赋值。
             var hit = default(HitInfo);
+            // 与玩家同一条规则：忽略射手自己，子弹不会停在开枪者身上。
             var didHit = m_Director.Probe != null
-                         && m_Director.Probe.TryRaycast(origin, direction, weapon.RangeMeters, out hit);
+                         && m_Director.Probe.TryRaycastIgnoringTarget(
+                             origin, direction, weapon.RangeMeters, m_CombatantId, out hit);
 
             var endPoint = didHit ? hit.Point : origin + (direction * weapon.RangeMeters);
             var targetId = didHit ? hit.TargetId : 0;

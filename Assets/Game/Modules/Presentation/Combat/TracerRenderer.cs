@@ -37,6 +37,12 @@ namespace RaidDemo.Presentation
         /// <summary>弹道离地高度（米）。略高于地面，避免与地板重叠产生闪烁。</summary>
         private const float GroundOffset = 0.05f;
 
+        /// <summary>地面探测的起点抬高量（米）。</summary>
+        private const float GroundProbeLift = 2f;
+
+        /// <summary>地面探测向下的最大距离（米）。</summary>
+        private const float GroundProbeDepth = 6f;
+
         /// <summary>弹道颜色。</summary>
         private static readonly Color TracerColor = new Color(1f, 0.9f, 0.5f, 0.9f);
 
@@ -117,23 +123,38 @@ namespace RaidDemo.Presentation
         {
             var line = Rent();
 
-            // 弹道画在地面上，而不是枪口高度。
-            // 原因：准星落在地面，而弹道从枪口水平打出，两者在斜俯视下不在同一条视线上。
-            // 把命中点投影到地面之后，这条线必然穿过准星——
+            // 弹道画在"各自下方的地面"上，而不是枪口高度。
+            // 原因：准星落在地面，而弹道从枪口水平打出，两者在斜俯视下不在同一条视线上；
+            // 把首尾都落到地面之后，这条线必然穿过准星——
             // 玩家看到的才是"子弹从我这打到准星指的地方"。
+            //
+            // 同时保留高度差：起点与终点各自向下探测，所以站在装卸平台上的敌人开枪时，
+            // 弹道仍然画在平台面上，不会像"统一压到固定高度"那样被画到平台下面。
             line.SetPosition(0, ProjectToGround(evt.Origin));
             line.SetPosition(1, ProjectToGround(evt.EndPoint));
             m_Active.Add(new TracerInstance { Line = line, Remaining = TracerLifetime });
         }
 
-        /// <summary>把世界坐标压到地面高度，稍微抬高一点避免与地板重叠闪烁。</summary>
-        private static Vector3 ProjectToGround(Vector3 point)
+        /// <summary>
+        /// 把弹道点投影到它正下方的地面 / 平台面。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么是 public static：</b>它与 <c>AimResolver</c> 一样是"决定弹道画在哪"的
+        /// 纯查询——公开之后测试可以在真实物理场景里断言"弹道穿过准星所依赖的落点"，
+        /// 不需要启动整个游戏。</para>
+        /// <para>探测遮罩排除单位层（<see cref="PhysicsLayers.GroundProbeMask"/>）：
+        /// 弹道的地面高度应由地形与建筑决定，命中一个站在原地的角色时不该把线抬到它头顶。</para>
+        /// <para>探测不到地面时（悬空、场景外）退回原点高度加偏移，保证弹道总是可见。</para>
+        /// </remarks>
+        public static Vector3 ProjectToGround(Vector3 point)
         {
-            // 保留弹道点的真实高度，只加一个小偏移避免与地面/平台面 z-fighting。
-            //
-            // 历史：这里曾经把 Y 强制压成 GroundOffset（"贴地画线"），在平地上看不出问题；
-            // 但装卸平台高 1.25 米，站在平台上的敌人开枪时弹道就被画到平台下面去了——
-            // 表现为"敌人开火了但看不见弹道"，实际上子弹是打中的。
+            var probeStart = point + (Vector3.up * GroundProbeLift);
+            var probeDistance = GroundProbeLift + GroundProbeDepth;
+            if (Physics.Raycast(probeStart, Vector3.down, out var hit, probeDistance, PhysicsLayers.GroundProbeMask))
+            {
+                return new Vector3(point.x, hit.point.y + GroundOffset, point.z);
+            }
+
             return new Vector3(point.x, point.y + GroundOffset, point.z);
         }
 

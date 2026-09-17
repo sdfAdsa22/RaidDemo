@@ -149,10 +149,18 @@ namespace RaidDemo.Bootstrap
             var alive = m_PlayerCombatantId == 0 || IsPlayerAlive();
             m_WeaponController.SetAlive(alive);
 
+            // 瞄准统一在这里同步一次：后面的武器模型朝向（UpdateWeaponView）、枪口位置
+            // 与开火方向都基于同一份本帧瞄准数据。它以前藏在"采集开火输入"里，
+            // 导致枪的朝向用的是上一帧的角度（视觉上枪比准星慢一帧）。
+            SyncAimToWeapon();
+
             SyncEquippedWeapon();
-            m_WeaponController.SetMuzzlePosition(ResolveMuzzlePosition());
             UpdateCriticalAxis();
             UpdateWeaponView();
+
+            // 枪口位置必须在武器视图更新之后取：视图按本帧的位置与朝向摆放，
+            // 先取的话每次开火用的是上一帧的枪口（移动中表现为"子弹从身后的位置发出"）。
+            m_WeaponController.SetMuzzlePosition(ResolveMuzzlePosition());
 
             // 滚轮切换武器。界面打开时不响应，避免整理背包时误切。
             var switchDirection = m_InputCollector != null && !inventoryOpen

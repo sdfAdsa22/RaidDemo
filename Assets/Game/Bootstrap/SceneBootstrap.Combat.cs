@@ -155,7 +155,6 @@ namespace RaidDemo.Bootstrap
 
             m_InputCollector.ReadCombatIntent(out var wantsToFire, out var wantsToReload);
 
-            SyncAimToWeapon();
             var aim = m_InputCollector.LookDirection;
 
             if (!wantsToFire)

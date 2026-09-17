@@ -350,6 +350,17 @@ namespace RaidDemo.Tests.EditMode
                 hit = new HitInfo(TargetId, Point, Point + new Vector3(0f, -1f, 0f), Point.magnitude);
                 return true;
             }
+
+            /// <inheritdoc />
+            public bool TryRaycastIgnoringTarget(
+                Vector3 origin,
+                Vector3 direction,
+                float maxDistance,
+                int ignoredTargetId,
+                out HitInfo hit)
+            {
+                return TryRaycast(origin, direction, maxDistance, out hit);
+            }
         }
     }
 }

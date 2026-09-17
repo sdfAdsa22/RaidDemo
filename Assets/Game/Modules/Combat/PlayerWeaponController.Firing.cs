@@ -66,7 +66,10 @@ namespace RaidDemo.Combat
             var range = runtime.Weapon.RangeMeters;
             var direction = ResolveShotDirection(spreadOffsetDegrees);
 
-            var didHit = m_Probe.TryRaycast(origin, direction, range, out var hit);
+            // 跳过射手自己：枪口在身体外侧，当瞄准点落在角色附近（尤其侧后方）时，
+            // "枪口 → 瞄准点"的射线会穿过自己的身体。忽略自己之后子弹继续飞向身后的目标，
+            // 而不是停在自己身上（负责人反馈："准星靠近玩家时好像打到了自己"）。
+            var didHit = m_Probe.TryRaycastIgnoringTarget(origin, direction, range, RuleCombatantId, out var hit);
             var endPoint = didHit ? hit.Point : origin + (direction * range);
             var targetId = didHit ? hit.TargetId : 0;
 

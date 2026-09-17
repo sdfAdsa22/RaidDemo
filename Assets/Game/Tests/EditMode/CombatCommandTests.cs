@@ -39,6 +39,17 @@ namespace RaidDemo.Tests.EditMode
                 hit = Result;
                 return ReturnsHit;
             }
+
+            /// <inheritdoc />
+            public bool TryRaycastIgnoringTarget(
+                Vector3 origin,
+                Vector3 direction,
+                float maxDistance,
+                int ignoredTargetId,
+                out HitInfo hit)
+            {
+                return TryRaycast(origin, direction, maxDistance, out hit);
+            }
         }
 
         private ItemFactory m_Factory;
