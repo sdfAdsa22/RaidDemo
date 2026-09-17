@@ -38,8 +38,12 @@ namespace RaidDemo.UI
                 panel, "服务器地址", new Vector2(Padding, top + 16f), new Vector2(240f, 24f),
                 UiPalette.SmallSize, TextAlignmentOptions.Left, UiPalette.InkSoft);
             m_AddressInput = UiTextInput.Create(
-                panel, "AddressInput", new Vector2(Padding, top + 42f), new Vector2(360f, 46f),
+                panel, "AddressInput", new Vector2(Padding, top + 42f), new Vector2(260f, 46f),
                 "127.0.0.1", false, LobbyText.MaxAddressLength);
+
+            // 一键选云主机（预填了地址才显示）；地址框收窄到 260 仍然放得下「IP:端口」。
+            m_CloudServerButton = UiFactory.CreateButton(panel, "云主机", new Vector2(Padding + 272f, top + 42f), new Vector2(88f, 46f));
+            m_CloudServerButton.Rect.gameObject.SetActive(false);
 
             UiFactory.CreateLabel(
                 panel, "端口", new Vector2(Padding + 376f, top + 16f), new Vector2(120f, 24f),
@@ -145,8 +149,7 @@ namespace RaidDemo.UI
 
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
-                // Esc 的第一层含义是"退出输入框"，第二层才是返回主菜单：
-                // 否则玩家打字打到一半按 Esc 会直接离开这个界面。
+            // Esc 的第一层含义是"退出输入框"，第二层才是返回主菜单——否则打字打到一半按 Esc 会直接离开界面。
                 if (m_FocusedInput != null)
                 {
                     Focus(null);
@@ -199,15 +202,18 @@ namespace RaidDemo.UI
             var overConnect = !m_IsBusy && m_ConnectButton.Contains(pointer);
             var overScan = !m_IsBusy && !m_IsScanning && m_ScanButton.Contains(pointer);
             var overBack = m_BackButton.Contains(pointer);
+            var overCloud = !m_IsBusy && m_CloudServerButton.Rect.gameObject.activeSelf && m_CloudServerButton.Contains(pointer);
 
             m_RandomNicknameButton.SetHovered(overRandom);
             m_ConnectButton.SetHovered(overConnect);
             m_ScanButton.SetHovered(overScan);
             m_BackButton.SetHovered(overBack);
+            m_CloudServerButton.SetHovered(overCloud);
             m_RandomNicknameButton.ApplyVisual(overRandom && isPressed);
             m_ConnectButton.ApplyVisual(overConnect && isPressed);
             m_ScanButton.ApplyVisual(overScan && isPressed);
             m_BackButton.ApplyVisual(overBack && isPressed);
+            m_CloudServerButton.ApplyVisual(overCloud && isPressed);
 
             if (!wasPressed || consumed)
             {
@@ -224,6 +230,12 @@ namespace RaidDemo.UI
             {
                 SetStatus("正在扫描局域网…", false);
                 m_Actions.Scan?.Invoke();
+                return;
+            }
+
+            if (overCloud)
+            {
+                m_Actions.SelectCloudServer?.Invoke();
                 return;
             }
 
@@ -317,6 +329,7 @@ namespace RaidDemo.UI
             m_RandomNicknameButton.Interactable = !m_IsBusy;
             m_ConnectButton.Interactable = !m_IsBusy;
             m_ScanButton.Interactable = !m_IsBusy && !m_IsScanning;
+            m_CloudServerButton.Interactable = !m_IsBusy;
             m_BackButton.Interactable = true;
 
             for (var i = 0; i < m_RoomRows.Length; i++)

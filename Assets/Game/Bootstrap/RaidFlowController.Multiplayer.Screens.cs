@@ -118,6 +118,8 @@ namespace RaidDemo.Bootstrap
                 port);
             m_MultiplayerScreen.SetBusy(false);
             m_MultiplayerScreen.SetScanning(false);
+            // 「云主机」一键填入只在启动器提供了地址预填时出现（见 OnMultiplayerSelectCloudServer）。
+            m_MultiplayerScreen.SetCloudServerAvailable(!string.IsNullOrEmpty(m_HintedServerAddress));
             m_MultiplayerScreen.SetStatus(
                 string.IsNullOrEmpty(error) ? (status ?? string.Empty) : error,
                 !string.IsNullOrEmpty(error));
@@ -128,6 +130,38 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>默认口令：与命令行验收用的默认值一致，方便第一次联机的人直接连上。</summary>
         private const string DefaultPassphrase = "123456";
+
+        /// <summary>
+        /// 点「云主机」：把启动器预填的服务器地址一键填进地址框。
+        /// </summary>
+        /// <remarks>
+        /// <para>地址来源是启动器的 <c>-serverhost</c> 参数（本次启动的那份配置）；
+        /// 隐藏源（云主机）在界面上仍然显示"已隐藏"占位符，连接时用内存里的真实地址——
+        /// 与"预填"同一条规则，见 <see cref="OnMultiplayerConnect"/>。</para>
+        ///
+        /// <para>没有预填地址时按钮根本不显示（见 <c>SetCloudServerAvailable</c>），
+        /// 这个方法只处理"有地址可填"的情形。</para>
+        /// </remarks>
+        private void OnMultiplayerSelectCloudServer()
+        {
+            if (string.IsNullOrEmpty(m_HintedServerAddress))
+            {
+                m_MultiplayerScreen.SetStatus(
+                    "没有可用的云主机地址：请手动输入，或从启动器启动（启动器会带上服务器地址）。",
+                    true);
+                return;
+            }
+
+            m_ServerAddressHidden = LaunchOptions.Current != null && LaunchOptions.Current.HideServerAddress;
+            m_MultiplayerScreen.SetAddress(
+                m_ServerAddressHidden ? HiddenAddressPlaceholder : m_HintedServerAddress,
+                m_HintedServerPort);
+            m_MultiplayerScreen.SetStatus(
+                m_ServerAddressHidden
+                    ? "已选择云主机（地址已隐藏），点「连接并进入大厅」。"
+                    : $"已选择云主机 {m_HintedServerAddress}:{m_HintedServerPort}。",
+                false);
+        }
 
         /// <summary>
         /// 联机客户端进程里拦下"继续游戏 / 新游戏"这两个单机入口。

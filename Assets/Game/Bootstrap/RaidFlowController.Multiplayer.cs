@@ -79,6 +79,7 @@ namespace RaidDemo.Bootstrap
                 Connect = OnMultiplayerConnect,
                 Scan = OnMultiplayerScan,
                 JoinFound = OnMultiplayerJoinFound,
+                SelectCloudServer = OnMultiplayerSelectCloudServer,
                 Back = ReturnToMainMenuFromMultiplayer,
             });
 
@@ -270,6 +271,9 @@ namespace RaidDemo.Bootstrap
             }
 
             m_ExitTransitionActive = true;
+            // 跨场景标记：告诉"被动路径"（服务器的回屋广播等）在退出窗口里让路，
+            // 否则它们加载场景会销毁下面这个等待协程，退出动作永远走不完。
+            ClientMode.BeginExitTransition();
             LeaveRoomThen(continuation);
         }
 

@@ -1,7 +1,7 @@
 {
   "installRoot": "RaidDemo",
   "gameExecutable": "RaidDemo.exe",
-  "selectedSource": "本机",
+  "selectedSource": "云主机",
   "extraGameArguments": "",
   "sources": [
     {

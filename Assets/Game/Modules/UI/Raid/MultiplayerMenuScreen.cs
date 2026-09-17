@@ -45,6 +45,9 @@ namespace RaidDemo.UI
         /// <summary>请求扫描局域网。</summary>
         public Action Scan;
 
+        /// <summary>点击「云主机」：把启动器预填的服务器地址一键填进地址框。</summary>
+        public Action SelectCloudServer;
+
         /// <summary>点击扫描结果：按该地址连接。</summary>
         public Action<string, int> JoinFound;
 
@@ -97,6 +100,9 @@ namespace RaidDemo.UI
         private readonly UiButton[] m_RoomRows = new UiButton[ScanRowCount];
         private UiTextInput[] m_Fields;
         private MultiplayerMenuActions m_Actions;
+
+        /// <summary>「云主机」按钮：启动器提供了预填地址时才显示。</summary>
+        private UiButton m_CloudServerButton;
         private IReadOnlyList<MultiplayerMenuRoom> m_Rooms = Array.Empty<MultiplayerMenuRoom>();
         private Keyboard m_SubscribedKeyboard;
         private bool m_IsVisible;
@@ -228,6 +234,39 @@ namespace RaidDemo.UI
             }
 
             RefreshInteractable();
+        }
+
+        /// <summary>
+        /// 是否显示「云主机」一键填入按钮。
+        /// </summary>
+        /// <param name="available">启动器提供了服务器地址预填时为 true。</param>
+        /// <remarks>没有预填地址时（直接双击启动）按钮隐藏——没有可填的内容，
+        /// 留着只会让玩家点出一个"没有云主机地址"的错误。</remarks>
+        public void SetCloudServerAvailable(bool available)
+        {
+            if (m_CloudServerButton == null)
+            {
+                return;
+            }
+
+            m_CloudServerButton.Rect.gameObject.SetActive(available);
+            RefreshInteractable();
+        }
+
+        /// <summary>把地址与端口填进输入框（一键选云主机 / 启动器预填时调用）。</summary>
+        /// <param name="address">要填入的地址文本（隐藏时传占位符）。</param>
+        /// <param name="port">端口；非正值时不动端口输入框。</param>
+        public void SetAddress(string address, int port)
+        {
+            if (!string.IsNullOrEmpty(address))
+            {
+                m_AddressInput.SetValue(address);
+            }
+
+            if (port > 0)
+            {
+                m_PortInput.SetValue(port.ToString());
+            }
         }
 
     }

@@ -37,12 +37,15 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void RegisterPlayerContainers(int playerId)
         {
-            if (m_Combat == null || m_InventoryRouters.ContainsKey(playerId))
+            // 不再要求 m_Combat 存在：安全屋世界不创建战斗权威，装备直接来自账号档案
+            // （见 ResolveCommandLoadout）。以前这里的 m_Combat 守卫正是"安全屋命令通道建不起来"的一环。
+            if (m_InventoryRouters.ContainsKey(playerId))
             {
                 return;
             }
 
-            if (!m_Combat.TryGetLoadout(playerId, out var loadout) || loadout == null)
+            var loadout = ResolveCommandLoadout(playerId);
+            if (loadout == null)
             {
                 m_Session?.Log.Warning($"[服务器] 玩家 {playerId} 还没有随身装备，背包命令通道未建立。");
                 return;
@@ -70,6 +73,30 @@ namespace RaidDemo.Bootstrap
             m_InventoryRouters[playerId] = router;
 
             m_Session?.Log.Info($"[服务器] 玩家 {playerId} 的背包命令通道已建立。");
+        }
+
+        /// <summary>
+        /// 取玩家在背包命令通道里使用的随身装备。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>战局里</b>用参战时交给 CombatWorld 的那一份；<b>安全屋里</b>玩家没有参战
+        /// （<c>AddPlayerToCombat</c> 在安全屋世界传 null），直接回退到账号档案里的那一份——
+        /// 两者本来就是同一个对象（战局参战传入的就是 <c>profile.Loadout</c>）。</para>
+        ///
+        /// <para><b>为什么必须回退（负责人反馈的"第二把空手"）：</b>命令通道原先只在战局里建立，
+        /// 安全屋里的装备 / 整理命令被服务器丢弃——客户端"本地先执行"让界面看起来换好了，
+        /// 但服务器档案里还是"上一把撤离后清空"的装备，于是下一局进图空手。</para>
+        /// </remarks>
+        private RaidDemo.Inventory.PlayerLoadout ResolveCommandLoadout(int playerId)
+        {
+            if (m_Combat != null
+                && m_Combat.TryGetLoadout(playerId, out var combatLoadout)
+                && combatLoadout != null)
+            {
+                return combatLoadout;
+            }
+
+            return ResolveProfileForPlayer(playerId)?.Loadout;
         }
 
         /// <summary>玩家断开时撤掉他的命令路由与随身容器。</summary>
@@ -146,6 +173,13 @@ namespace RaidDemo.Bootstrap
                     $"[服务器] 玩家 {playerId} 背包命令（种类 {message.Kind}）："
                     + $"{message.SourceContainerId}->{message.TargetContainerId}"
                     + $" 结果={result.Success}（{result.Code}）");
+            }
+
+            if (result.Success)
+            {
+                // 背包 / 装备是账号档案的一部分：成功后标脏，按节流写盘——
+                // 漏掉这一步时"整理完就关服"会把改动丢掉（下一次登录装备就回去了）。
+                MarkProfilesDirty();
             }
 
             // 不论成败都回发一次：成功时客户端要看到新内容，
@@ -291,6 +325,9 @@ namespace RaidDemo.Bootstrap
             // 射程、伤害、口径、换弹来源全按"当前武器"算，漏了这一步会出现
             // "客户端拿着手枪、服务器按步枪结算"。
             m_Combat?.SyncWeaponFromLoadout(playerId);
+
+            // 装备变化要落档：节流写盘（否则"换好装备就关服"会让变更丢失）。
+            MarkProfilesDirty();
 
             if (m_Session != null && m_Session.Log.IsEnabled(RaidDemo.Kernel.LogLevel.Verbose))
             {

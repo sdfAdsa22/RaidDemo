@@ -27,10 +27,10 @@ namespace RaidDemo.Bootstrap
         {
             message = default;
 
-            if (m_Combat == null
-                || !m_Combat.TryGetLoadout(playerId, out var loadout)
-                || loadout == null
-                || loadout.Equipment == null)
+            // 与背包命令通道取同一份随身装备：安全屋里玩家没有参战，这里同样回退到
+            // 账号档案（否则安全屋下发的批次里没有装备镜像，客户端切换场景后装备显示会缺失）。
+            var loadout = ResolveCommandLoadout(playerId);
+            if (loadout == null || loadout.Equipment == null)
             {
                 return false;
             }

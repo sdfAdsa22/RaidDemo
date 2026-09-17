@@ -143,6 +143,26 @@ namespace RaidDemo.Bootstrap
         /// <summary>启动参数。仅当 <see cref="IsActive"/> 为 true 时有效。</summary>
         public static LaunchOptions Options { get; private set; }
 
+        /// <summary>
+        /// 是否正在执行"主动退出联机"流程（返回主菜单 / 退出桌面）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么需要它（跨场景的静态标记）：</b>主动退出会先发 LeaveRoom 并等确认；
+        /// 服务器处理离房时若战局随之收尾，会广播"回屋"——客户端收到后立刻加载安全屋场景，
+        /// 把等待中的退出协程连同宿主对象一起销毁，后续的"断开 + 回主菜单/退进程"永远不执行。
+        /// 表现就是负责人反馈的"点返回主界面/返回桌面没有效果"。</para>
+        ///
+        /// <para>放在 <see cref="ClientMode"/> 而不是流程控制器：流程控制器是场景对象，
+        /// 场景一变它就重建了，标记必须在整个退出窗口里都有效。</para>
+        /// </remarks>
+        public static bool IsExitTransitionActive { get; private set; }
+
+        /// <summary>进入"主动退出联机"流程：期间忽略被动的回屋/切场景广播。</summary>
+        public static void BeginExitTransition()
+        {
+            IsExitTransitionActive = true;
+        }
+
         /// <summary>由启动入口激活联机客户端模式。</summary>
         /// <remarks>
         /// 公开给编辑器菜单使用：在编辑器里模拟一个联机客户端（<c>RaidDemo/M9/</c> 菜单），
@@ -172,6 +192,7 @@ namespace RaidDemo.Bootstrap
         {
             IsActive = false;
             Address = null;
+            IsExitTransitionActive = false;
         }
     }
 

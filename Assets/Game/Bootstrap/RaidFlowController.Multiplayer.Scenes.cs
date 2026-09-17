@@ -59,6 +59,15 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private void OnRaidEnding(string sceneName)
         {
+            // 玩家正在主动退出（返回主菜单 / 退出桌面）时，"回屋"只是他离房的副作用：
+            // 这里绝不能抢先加载场景——那会销毁等待中的退出协程，玩家被留在安全屋、
+            // 主菜单永远不出现（负责人反馈的"点返回主界面没有效果"）。
+            if (ClientMode.IsExitTransitionActive)
+            {
+                Debug.Log("[联机] 主动退出进行中，忽略服务器的回屋广播。");
+                return;
+            }
+
             var target = string.IsNullOrEmpty(sceneName) ? GameScenes.SafeHouse : sceneName;
 
             m_MultiplayerScreen.SetVisible(false);
