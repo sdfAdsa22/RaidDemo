@@ -174,11 +174,12 @@ namespace RaidDemo.Bootstrap
         /// <summary>点「连接」：建立会话并登录。</summary>
         private void OnMultiplayerConnect(string address, int port, string nickname, string passphrase)
         {
-            // 地址框显示"已隐藏"占位符时，用启动器预填的真实地址连接——
+            // 隐藏源：地址框留空（只显示"已隐藏"占位提示）时，用启动器预填的真实地址连接——
             // 玩家没有改过这一格，他不该因为"看不见地址"而连不上。
-            // 他一旦手动改写这一格（内容不再是占位符），就按他输入的内容走。
+            // 他一旦手动输入内容，就按他输入的内容走。
+            // 注意：不能拿"已隐藏"这个字符串当判据——输入框只收 ASCII，中文占位符根本进不了值（U-99）。
             if (m_ServerAddressHidden
-                && string.Equals(address?.Trim(), HiddenAddressPlaceholder, System.StringComparison.Ordinal)
+                && string.IsNullOrWhiteSpace(address)
                 && !string.IsNullOrEmpty(m_HintedServerAddress))
             {
                 address = m_HintedServerAddress;
@@ -190,7 +191,11 @@ namespace RaidDemo.Bootstrap
             session.AutoRoom = false;
 
             m_MultiplayerScreen.SetBusy(true);
-            m_MultiplayerScreen.SetStatus($"正在连接 {address}:{port} …", false);
+            m_MultiplayerScreen.SetStatus(
+                m_ServerAddressHidden
+                    ? $"正在连接云主机（地址已隐藏），端口 {port} …"
+                    : $"正在连接 {address}:{port} …",
+                false);
 
             if (!session.Connect(address, port, nickname, passphrase))
             {
@@ -274,7 +279,14 @@ namespace RaidDemo.Bootstrap
             // 跨场景标记：告诉"被动路径"（服务器的回屋广播等）在退出窗口里让路，
             // 否则它们加载场景会销毁下面这个等待协程，退出动作永远走不完。
             ClientMode.BeginExitTransition();
-            LeaveRoomThen(continuation);
+            LeaveRoomThen(() =>
+            {
+                // 闸门只覆盖"退出进行中"的窗口：退出动作一开始执行就放行。
+                // 不放行的话，第二次「返回主菜单 / 返回桌面」会被静默吞掉——界面全隐、按键无反应
+                // （U-99 实机复现；流程控制器是 DontDestroyOnLoad，这个字段会跨场景一直活着）。
+                m_ExitTransitionActive = false;
+                continuation();
+            });
         }
 
         /// <summary>

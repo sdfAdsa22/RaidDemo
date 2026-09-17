@@ -85,6 +85,9 @@ namespace RaidDemo.UI
         /// <summary>扫描结果最多显示几行。</summary>
         private const int ScanRowCount = 6;
 
+        /// <summary>地址框的默认占位提示（也是"本机测试"的示例地址）。</summary>
+        private const string AddressPlaceholder = "127.0.0.1";
+
         private RectTransform m_Root;
         private TextMeshProUGUI m_StatusLabel;
         private TextMeshProUGUI m_RoomListLabel;
@@ -103,6 +106,12 @@ namespace RaidDemo.UI
 
         /// <summary>「云主机」按钮：启动器提供了预填地址时才显示。</summary>
         private UiButton m_CloudServerButton;
+
+        /// <summary>
+        /// 地址框是否处于"隐藏源"模式：此时地址允许留空，连接时用启动器预填的真实地址。
+        /// </summary>
+        private bool m_AddressHiddenMode;
+
         private IReadOnlyList<MultiplayerMenuRoom> m_Rooms = Array.Empty<MultiplayerMenuRoom>();
         private Keyboard m_SubscribedKeyboard;
         private bool m_IsVisible;
@@ -155,7 +164,11 @@ namespace RaidDemo.UI
             {
                 m_NicknameInput.SetValue(nickname);
             }
-            else if (m_NicknameInput.Model.IsEmpty)
+
+            // 输入框只收 ASCII：像"测试员"这类用 -nickname 传进来的中文昵称会被过滤成空字符串，
+            // 留下一个通不过校验的空格子（U-99 的同类问题）。空就补一个建议值兜底——
+            // 想用中文名仍可走启动参数。
+            if (m_NicknameInput.Model.IsEmpty)
             {
                 m_NicknameInput.SetValue(LobbyText.SuggestNickname());
             }
@@ -261,6 +274,37 @@ namespace RaidDemo.UI
             if (!string.IsNullOrEmpty(address))
             {
                 m_AddressInput.SetValue(address);
+            }
+
+            if (port > 0)
+            {
+                m_PortInput.SetValue(port.ToString());
+            }
+        }
+
+        /// <summary>
+        /// 切换地址框的"隐藏源"模式。
+        /// </summary>
+        /// <param name="hidden">true = 隐藏源：值留空、用占位提示表示"已隐藏"，连接时用内存里的真实地址。</param>
+        /// <param name="placeholder">隐藏时显示的占位提示（可以含中文——占位符不经过字符白名单）。</param>
+        /// <param name="port">要一并填入的端口；非正值时不动端口输入框。</param>
+        /// <remarks>
+        /// <b>为什么把"已隐藏"放进占位符而不是值里（U-99）：</b>输入框只收 ASCII
+        /// （见 <see cref="UiTextEditModel.IsAllowedCharacter"/>），把中文写进值里会被过滤成空字符串——
+        /// 玩家看到的是一格空白，连接校验还会报"请先填写服务器地址"。占位符不经过过滤，正好放这类提示。
+        /// </remarks>
+        public void SetAddressHidden(bool hidden, string placeholder, int port = 0)
+        {
+            m_AddressHiddenMode = hidden;
+
+            if (hidden)
+            {
+                m_AddressInput.SetValue(string.Empty);
+                m_AddressInput.SetPlaceholder(placeholder);
+            }
+            else
+            {
+                m_AddressInput.SetPlaceholder(AddressPlaceholder);
             }
 
             if (port > 0)

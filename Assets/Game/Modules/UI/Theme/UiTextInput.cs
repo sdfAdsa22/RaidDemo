@@ -24,7 +24,7 @@ namespace RaidDemo.UI
 
         private readonly Image m_Background;
         private readonly TextMeshProUGUI m_Text;
-        private readonly string m_Placeholder;
+        private string m_Placeholder;
         private readonly bool m_Masked;
         private bool m_Focused;
         private bool m_Hovered;
@@ -192,6 +192,19 @@ namespace RaidDemo.UI
         public void SetValue(string value)
         {
             Model.SetValue(value);
+            Refresh();
+        }
+
+        /// <summary>
+        /// 替换占位提示（值为空且未聚焦时显示）。
+        /// </summary>
+        /// <remarks>
+        /// <b>占位符不经过字符白名单：</b>输入值只收 ASCII（见 <see cref="UiTextEditModel.IsAllowedCharacter"/>），
+        /// 而"已隐藏"这类中文提示只能放进占位符——写进值里会被过滤成空字符串（U-99 的实机问题）。
+        /// </remarks>
+        public void SetPlaceholder(string placeholder)
+        {
+            m_Placeholder = placeholder ?? string.Empty;
             Refresh();
         }
 

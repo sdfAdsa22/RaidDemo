@@ -30,7 +30,7 @@ namespace RaidDemo.Bootstrap
                     m_LobbyScreen.SetVisible(false);
                     m_MultiplayerScreen.SetVisible(true);
                     m_MultiplayerScreen.SetBusy(true);
-                    m_MultiplayerScreen.SetStatus(m_Session.StatusText, false);
+                    m_MultiplayerScreen.SetStatus(MaskHiddenAddress(m_Session.StatusText), false);
                     break;
 
                 case MultiplayerClientPhase.Reconnecting:
@@ -41,7 +41,7 @@ namespace RaidDemo.Bootstrap
                         m_LobbyScreen.SetVisible(false);
                         m_MultiplayerScreen.SetVisible(true);
                         m_MultiplayerScreen.SetBusy(true);
-                        m_MultiplayerScreen.SetStatus(m_Session.StatusText, false);
+                        m_MultiplayerScreen.SetStatus(MaskHiddenAddress(m_Session.StatusText), false);
                     }
 
                     break;
@@ -114,8 +114,10 @@ namespace RaidDemo.Bootstrap
             m_MultiplayerScreen.SetDefaults(
                 nickname,
                 DefaultPassphrase,
-                m_ServerAddressHidden ? HiddenAddressPlaceholder : address,
+                m_ServerAddressHidden ? string.Empty : address,
                 port);
+            // 隐藏源：值留空、"已隐藏"放进占位提示——输入框只收 ASCII，中文进不了值（U-99）。
+            m_MultiplayerScreen.SetAddressHidden(m_ServerAddressHidden, HiddenAddressPlaceholder);
             m_MultiplayerScreen.SetBusy(false);
             m_MultiplayerScreen.SetScanning(false);
             // 「云主机」一键填入只在启动器提供了地址预填时出现（见 OnMultiplayerSelectCloudServer）。
@@ -153,14 +155,37 @@ namespace RaidDemo.Bootstrap
             }
 
             m_ServerAddressHidden = LaunchOptions.Current != null && LaunchOptions.Current.HideServerAddress;
-            m_MultiplayerScreen.SetAddress(
-                m_ServerAddressHidden ? HiddenAddressPlaceholder : m_HintedServerAddress,
-                m_HintedServerPort);
+
+            if (m_ServerAddressHidden)
+            {
+                // 地址不上屏：值留空、占位提示"已隐藏"；连接时用内存里的真实地址（见 OnMultiplayerConnect）。
+                m_MultiplayerScreen.SetAddressHidden(true, HiddenAddressPlaceholder, m_HintedServerPort);
+                m_MultiplayerScreen.SetStatus("已选择云主机（地址已隐藏），点「连接并进入大厅」。", false);
+                return;
+            }
+
+            m_MultiplayerScreen.SetAddressHidden(false, HiddenAddressPlaceholder);
+            m_MultiplayerScreen.SetAddress(m_HintedServerAddress, m_HintedServerPort);
             m_MultiplayerScreen.SetStatus(
-                m_ServerAddressHidden
-                    ? "已选择云主机（地址已隐藏），点「连接并进入大厅」。"
-                    : $"已选择云主机 {m_HintedServerAddress}:{m_HintedServerPort}。",
+                $"已选择云主机 {m_HintedServerAddress}:{m_HintedServerPort}。",
                 false);
+        }
+
+        /// <summary>
+        /// 隐藏源时把状态文本里的真实地址替换掉。
+        /// </summary>
+        /// <remarks>
+        /// 会话的 <c>StatusText</c> 会带 "host:port"（连接中 / 暂时无法连接两种文案），
+        /// 隐藏源下这些文本也要挡一层，否则状态行会把云主机地址漏出去。
+        /// </remarks>
+        private string MaskHiddenAddress(string text)
+        {
+            if (!m_ServerAddressHidden || string.IsNullOrEmpty(m_HintedServerAddress) || string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            return text.Replace(m_HintedServerAddress, "已隐藏");
         }
 
         /// <summary>
