@@ -35,6 +35,7 @@
   <ItemGroup>
     <!-- 与 Unity 侧共用同一份协议实现（只读链接，不产生副本）。 -->
     <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateManifest.cs" Link="Shared\UpdateManifest.cs" />
+    <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateManifestValidation.cs" Link="Shared\UpdateManifestValidation.cs" />
     <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateManifestDiff.cs" Link="Shared\UpdateManifestDiff.cs" />
     <Compile Include="..\..\Assets\Game\Kernel\Pure\Updates\UpdateFileHash.cs" Link="Shared\UpdateFileHash.cs" />
   </ItemGroup>

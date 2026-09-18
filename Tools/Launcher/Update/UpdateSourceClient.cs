@@ -88,6 +88,14 @@ namespace RaidDemo.Launcher.Update
                     $"{manifest?.schemaVersion.ToString() ?? "null"}");
             }
 
+            // M13-02 / M13-06：路径越界与"缺层清单"都必须在下载任何字节之前拒绝。
+            // 否则最坏情况是拿着伪造路径去写安装根之外，或者把空清单当成"已是最新"。
+            var validationError = UpdateManifestValidation.Validate(manifest, requireBodyLayer: true);
+            if (validationError != null)
+            {
+                throw new InvalidOperationException($"清单校验失败：{validationError}（{source}）");
+            }
+
             return manifest;
         }
 
@@ -125,7 +133,11 @@ namespace RaidDemo.Launcher.Update
             string destinationPath,
             Action<long> onBytes)
         {
-            var relativePath = ManifestFileEntry.NormalizePath(entry.path);
+            if (!ManifestFileEntry.TryNormalizeSafePath(entry.path, out var relativePath, out var reason))
+            {
+                throw new InvalidOperationException($"清单路径不安全（{entry.path}）：{reason}。");
+            }
+
             var directory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrEmpty(directory))
             {

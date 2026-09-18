@@ -64,7 +64,7 @@ namespace RaidDemo.Launcher
             AppendLog(result.Summary);
             SetBusy(false);
             RefreshLocalVersion();
-            m_StatusLabel.Text = result.Summary;
+            m_StatusLabel.Text = ShortenStatus(result.Summary);
 
             if (!result.Success)
             {
@@ -77,6 +77,25 @@ namespace RaidDemo.Launcher
             {
                 LaunchGame(source);
             }
+        }
+
+        /// <summary>
+        /// 状态行只放得下一行：去掉末尾括号里的版本明细。
+        /// </summary>
+        /// <remarks>
+        /// M13-09：完整摘要（含资源版本哈希）在 312 像素宽的状态行里必然被裁掉后半截。
+        /// 完整文本仍然写进日志、失败时也原样进弹窗，这里只影响主界面那一行。
+        /// 版本本身在主界面右下角的版本标签里另有显示。
+        /// </remarks>
+        private static string ShortenStatus(string summary)
+        {
+            if (string.IsNullOrEmpty(summary))
+            {
+                return summary;
+            }
+
+            var index = summary.IndexOf('（');
+            return index > 0 ? summary.Substring(0, index) : summary;
         }
 
         /// <summary>进度回调（已在 UI 线程）。</summary>

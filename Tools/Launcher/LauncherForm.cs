@@ -142,9 +142,10 @@ namespace RaidDemo.Launcher
                 return;
             }
 
-            // 隐藏地址的档案（通常是云主机：公网 IP 不该出现在演示视频与截图里）只把输入框留空；
-            // 连接用的地址始终来自档案本身，所以隐藏不影响更新与联机。
-            m_SourceText.Text = profile.HideAddress ? string.Empty : profile.ManifestSource;
+            // 隐藏地址的档案（通常是云主机：公网 IP 不该出现在演示视频与截图里）显示占位符，
+            // 与"游戏服务器"那一行的口径一致（M13-08：地址框空白会让人以为配置丢了）。
+            // 连接用的地址始终来自档案本身，因此显示占位符不影响更新与联机；输入框同时是只读的。
+            m_SourceText.Text = profile.HideAddress ? "（已隐藏）" : profile.ManifestSource;
             m_SourceText.ReadOnly = !profile.Editable;
             m_ServerValueLabel.Text = profile.HideAddress
                 ? "(已隐藏)"

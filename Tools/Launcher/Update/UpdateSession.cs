@@ -120,6 +120,10 @@ namespace RaidDemo.Launcher.Update
         /// <summary>日志写入器（可为 null）。</summary>
         private readonly Action<string> m_OnLog;
 
+        /// <summary>本次更新会话的暂存目录标识（时间戳 + 短随机，便于人工定位又不会撞车）。</summary>
+        private readonly string m_SessionId =
+            DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
         /// <summary>创建会话。</summary>
         /// <param name="installRoot">安装根目录。</param>
         /// <param name="source">更新源地址。</param>
@@ -144,91 +148,139 @@ namespace RaidDemo.Launcher.Update
         /// <returns>执行结果。</returns>
         public UpdateResult Run(bool applyChanges)
         {
-            try
+            // M13-01：互斥粒度是"同一安装根"。第二个进程立即失败并给中文提示，
+            // 而不是与第一个进程共用 staging、互相清空后再报出原始英文 IO 错误。
+            using (var processLock = UpdateProcessLock.TryAcquire(m_InstallRoot, out var busyReason))
             {
-                Directory.CreateDirectory(m_InstallRoot);
-
-                Report(UpdatePhase.FetchingManifest, "正在获取更新清单…");
-                using (var client = new UpdateSourceClient())
+                if (processLock == null)
                 {
-                    var remote = client.FetchManifest(m_Source);
-                    var local = UpdateApplier.LoadLocalManifest(m_InstallRoot);
+                    Report(UpdatePhase.Failed, busyReason);
+                    return new UpdateResult { Success = false, FailureReason = busyReason, Summary = busyReason };
+                }
 
-                    Report(UpdatePhase.Comparing, "正在比对版本…");
-                    var changes = UpdateManifestDiff.CompareLayer(
-                        local?.body?.files ?? new List<ManifestFileEntry>(),
-                        remote.body?.files ?? new List<ManifestFileEntry>());
-                    var downloadBytes = UpdateManifestDiff.SumDownloadBytes(changes);
+                try
+                {
+                    return RunCore(applyChanges);
+                }
+                catch (Exception exception)
+                {
+                    var message = DescribeFailure(exception);
+                    Report(UpdatePhase.Failed, "更新失败：" + message);
+                    return new UpdateResult { Success = false, FailureReason = message, Summary = "更新失败：" + message };
+                }
+                finally
+                {
+                    // M13-07：失败/中断路径也要清掉本次会话的暂存，不能留到下次启动才处理。
+                    UpdateApplier.ClearStaging(m_InstallRoot, m_SessionId);
+                }
+            }
+        }
 
-                    var result = new UpdateResult
-                    {
-                        RemoteManifest = remote,
-                        HasChanges = changes.Count > 0,
-                        ChangeCount = changes.Count,
-                        DownloadBytes = downloadBytes,
-                        Success = true,
-                    };
+        /// <summary>互斥保护内的实际更新流程。</summary>
+        private UpdateResult RunCore(bool applyChanges)
+        {
+            Directory.CreateDirectory(m_InstallRoot);
+            UpdateApplier.ClearStaleStaging(m_InstallRoot, m_SessionId);
 
-                    if (changes.Count == 0)
-                    {
-                        // 本体没变化不等于资源层就位：第一次安装或上次资源层装失败时，
-                        // 这里补装一次，玩家点"开始游戏"就直接能进图。
-                        if (applyChanges && !ContentCacheInstaller.TryInstall(client, m_Source, remote, Log, out var contentFailure))
-                        {
-                            result.Success = false;
-                            result.FailureReason = contentFailure;
-                            result.Summary = "资源层安装失败：" + contentFailure;
-                            Report(UpdatePhase.Failed, result.Summary);
-                            return result;
-                        }
+            Report(UpdatePhase.FetchingManifest, "正在获取更新清单…");
+            using (var client = new UpdateSourceClient())
+            {
+                var remote = client.FetchManifest(m_Source);
+                var local = UpdateApplier.LoadLocalManifest(m_InstallRoot);
 
-                        result.Summary = $"已是最新版本（{DescribeVersion(remote)}）。";
-                        Report(UpdatePhase.Completed, result.Summary);
-                        return result;
-                    }
+                Report(UpdatePhase.Comparing, "正在比对版本…");
+                var changes = UpdateManifestDiff.CompareLayer(
+                    local?.body?.files ?? new List<ManifestFileEntry>(),
+                    remote.body?.files ?? new List<ManifestFileEntry>());
+                var downloadBytes = UpdateManifestDiff.SumDownloadBytes(changes);
 
-                    result.Summary =
-                        $"发现更新：{changes.Count} 个文件 / {FormatBytes(downloadBytes)}（远端 {DescribeVersion(remote)}）。";
-                    Log(result.Summary);
+                var result = new UpdateResult
+                {
+                    RemoteManifest = remote,
+                    HasChanges = changes.Count > 0,
+                    ChangeCount = changes.Count,
+                    DownloadBytes = downloadBytes,
+                    Success = true,
+                };
 
-                    if (!applyChanges)
-                    {
-                        Report(UpdatePhase.Completed, result.Summary + "（仅检查，未下载）");
-                        return result;
-                    }
-
-                    if (!DownloadLayer(client, changes, out var failureReason))
+                if (changes.Count == 0)
+                {
+                    // 本体没变化不等于资源层就位：第一次安装或上次资源层装失败时，
+                    // 这里补装一次，玩家点"开始游戏"就直接能进图。
+                    if (applyChanges && !ContentCacheInstaller.TryInstall(client, m_Source, remote, Log, out var contentFailure))
                     {
                         result.Success = false;
-                        result.FailureReason = failureReason;
-                        result.Summary = "更新失败：" + failureReason;
+                        result.FailureReason = contentFailure;
+                        result.Summary = "资源层安装失败：" + contentFailure;
                         Report(UpdatePhase.Failed, result.Summary);
                         return result;
                     }
 
-                    ApplyLayer(changes, remote);
-
-                    // 资源层不落在安装目录里，而是装进游戏的内容缓存（见安装器的类型注释）。
-                    if (!ContentCacheInstaller.TryInstall(client, m_Source, remote, Log, out var contentFailureReason))
-                    {
-                        result.Success = false;
-                        result.FailureReason = contentFailureReason;
-                        result.Summary = "资源层安装失败：" + contentFailureReason;
-                        Report(UpdatePhase.Failed, result.Summary);
-                        return result;
-                    }
-
-                    result.Summary = $"更新完成：{changes.Count} 个文件（{DescribeVersion(remote)}）。";
+                    result.Summary = $"已是最新版本（{DescribeVersion(remote)}）。";
                     Report(UpdatePhase.Completed, result.Summary);
                     return result;
                 }
-            }
-            catch (Exception exception)
+
+                result.Summary =
+                    $"发现更新：{changes.Count} 个文件 / {FormatBytes(downloadBytes)}（远端 {DescribeVersion(remote)}）。";
+
+                if (!applyChanges)
+                {
+                    Report(UpdatePhase.Completed, result.Summary + "（仅检查，未下载）");
+                    return result;
+                }
+
+                if (!DownloadLayer(client, changes, out var failureReason))
+                {
+                    result.Success = false;
+                    result.FailureReason = failureReason;
+                    result.Summary = "更新失败：" + failureReason;
+                    Report(UpdatePhase.Failed, result.Summary);
+                    return result;
+                }
+
+                ApplyLayer(changes, remote);
+
+                // 资源层不落在安装目录里，而是装进游戏的内容缓存（见安装器的类型注释）。
+                if (!ContentCacheInstaller.TryInstall(client, m_Source, remote, Log, out var contentFailureReason))
+                {
+                    result.Success = false;
+                    result.FailureReason = contentFailureReason;
+                    result.Summary = "资源层安装失败：" + contentFailureReason;
+                    Report(UpdatePhase.Failed, result.Summary);
+                    return result;
+                }
+
+                result.Summary = $"更新完成：{changes.Count} 个文件（{DescribeVersion(remote)}）。";
+                Report(UpdatePhase.Completed, result.Summary);
+                return result;
+                }
+        }
+
+        /// <summary>把异常翻译成"中文 + 下一步怎么办"的失败原因（M13-05）。</summary>
+        private static string DescribeFailure(Exception exception)
+        {
+            if (exception is UnauthorizedAccessException)
             {
-                var message = exception.Message;
-                Report(UpdatePhase.Failed, "更新失败：" + message);
-                return new UpdateResult { Success = false, FailureReason = message, Summary = "更新失败：" + message };
+                return "没有写入权限：请用管理员身份运行启动器，或把游戏安装到当前用户可写的目录。";
             }
+
+            if (exception is PathTooLongException)
+            {
+                return "路径太长：请把游戏安装到更短的目录（例如 D:\\RaidDemo）后重试。";
+            }
+
+            if (exception is IOException io)
+            {
+                if (io.Message.IndexOf("being used by another process", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return "文件被其他程序占用：请先退出游戏，等待杀毒软件扫描结束后重试。";
+                }
+
+                return "文件操作失败：" + io.Message + "。请确认安装目录可写、其中的文件没有被其它程序占用。";
+            }
+
+            return exception.Message;
         }
 
         /// <summary>下载全部变更文件到暂存区并逐个校验。</summary>
@@ -246,7 +298,7 @@ namespace RaidDemo.Launcher.Update
 
             // 暂存区每次从干净状态开始：残留的 .part 只对"同一版本的重复下载"有意义，
             // 而版本已经变化时旧残留只会带来"大小对不上"的困惑。
-            UpdateApplier.ClearStagingLayer(m_InstallRoot, UpdateSourceClient.BodyLayerDirectoryName);
+            UpdateApplier.ClearStagingLayer(m_InstallRoot, m_SessionId, UpdateSourceClient.BodyLayerDirectoryName);
 
             foreach (var change in changes)
             {
@@ -265,6 +317,7 @@ namespace RaidDemo.Launcher.Update
 
                 var stagedPath = UpdateApplier.GetStagingPath(
                     m_InstallRoot,
+                    m_SessionId,
                     UpdateSourceClient.BodyLayerDirectoryName,
                     change.Path);
 
@@ -330,9 +383,8 @@ namespace RaidDemo.Launcher.Update
             {
                 foreach (var change in changes)
                 {
-                    var targetPath = Path.Combine(
-                        m_InstallRoot,
-                        change.Path.Replace('/', Path.DirectorySeparatorChar));
+                    // M13-02 纵深防御：目标路径必须由守卫解析，禁止 Path.Combine 直接拼接清单路径。
+                    var targetPath = InstallPathGuard.ResolveInsideRoot(m_InstallRoot, change.Path);
 
                     Report(UpdatePhase.Applying, $"应用 {change.Path}", change.Path, done, changes.Count, 0, 0);
 
@@ -340,6 +392,7 @@ namespace RaidDemo.Launcher.Update
                     {
                         var stagedPath = UpdateApplier.GetStagingPath(
                             m_InstallRoot,
+                            m_SessionId,
                             UpdateSourceClient.BodyLayerDirectoryName,
                             change.Path);
                         transaction.PutFile(UpdateSourceClient.BodyLayerDirectoryName, change.Path, stagedPath, targetPath);
@@ -360,7 +413,7 @@ namespace RaidDemo.Launcher.Update
             }
 
             UpdateApplier.SaveLocalManifest(m_InstallRoot, remote);
-            UpdateApplier.ClearStaging(m_InstallRoot);
+            UpdateApplier.ClearStaging(m_InstallRoot, m_SessionId);
             UpdateApplier.PruneBackups(m_InstallRoot);
             Log($"已写入本地清单快照：{DescribeVersion(remote)}");
         }

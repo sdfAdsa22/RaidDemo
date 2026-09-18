@@ -284,8 +284,26 @@ namespace RaidDemo.Launcher
             return Path.Combine(trimmed, DefaultGameFolderName);
         }
 
+        /// <summary>
+        /// 把当前配置恢复成内置默认值（仍然只改内存，落盘由"保存设置"决定）。
+        /// </summary>
+        /// <remarks>
+        /// M13-19 的根因是"恢复默认"用 <c>Load(string.Empty)</c> 取默认值，
+        /// 空路径按当前工作目录解析，恰好把启动器目录里的 local 配置又读了一遍——
+        /// 等于"恢复成当前值"。这里直接复制内置默认，绕开文件系统。
+        /// </remarks>
+        public void ResetToDefault()
+        {
+            var defaults = CreateDefault();
+            InstallRoot = defaults.InstallRoot;
+            GameExecutable = defaults.GameExecutable;
+            SelectedSource = defaults.SelectedSource;
+            Sources = defaults.Sources;
+            ExtraGameArguments = defaults.ExtraGameArguments;
+        }
+
         /// <summary>生成内置默认配置（占位地址，可直接被 local 覆盖）。</summary>
-        private static LauncherConfig CreateDefault()
+        public static LauncherConfig CreateDefault()
         {
             return new LauncherConfig
             {

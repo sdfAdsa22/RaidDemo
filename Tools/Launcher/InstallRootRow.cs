@@ -76,7 +76,10 @@ namespace RaidDemo.Launcher
             m_Text.ForeColor = LauncherTheme.Ink;
             m_Text.Font = LauncherTheme.BodyFont;
             // 失焦时才校验：打字途中每敲一个字符就弹一次错没法用。
-            m_Text.Leave += (_, __) => Apply(m_Text.Text);
+            m_Text.Leave += (sender, args) => Apply(m_Text.Text, out _, showDialog: true);
+            // 双保险：Validated 在"因校验而失焦"的路径上同样触发，
+            // 而 M13-03 的根因正是"自绘按钮不抢焦点、Leave 不触发"。
+            m_Text.Validated += (sender, args) => Apply(m_Text.Text, out _, showDialog: true);
 
             m_Browse.Text = "浏览…";
             m_Browse.Font = LauncherTheme.SecondaryButtonFont;
@@ -108,6 +111,21 @@ namespace RaidDemo.Launcher
             m_Text.ReadOnly = busy;
         }
 
+        /// <summary>
+        /// 把输入框里尚未失焦的内容立刻生效。
+        /// </summary>
+        /// <returns>提交后界面与配置一致返回 <c>true</c>；输入无效返回 <c>false</c>（已弹提示并回退文本）。</returns>
+        /// <remarks>
+        /// M13-03：玩家手输路径后直接点"保存设置"，自绘按钮不会让输入框失焦，
+        /// Leave 永远不触发，于是界面显示新路径、配置却还是旧值。
+        /// 保存前显式调用本方法，把"输入框内容"归入保存流程。
+        /// </remarks>
+        public bool TryCommitPendingInput(out string error)
+        {
+            // 静默提交：保存流程自己会把原因显示在同一个提示框里，避免连弹两次。
+            return Apply(m_Text.Text, out error, showDialog: false);
+        }
+
         /// <summary>弹出文件夹选择框。</summary>
         /// <remarks>
         /// <para><b>起始位置用"当前安装根"：</b>想换目录的玩家多半只是换一个盘，
@@ -126,7 +144,7 @@ namespace RaidDemo.Launcher
 
                 if (dialog.ShowDialog(m_Owner) == DialogResult.OK)
                 {
-                    Apply(dialog.SelectedPath);
+                    Apply(dialog.SelectedPath, out _, showDialog: true);
                 }
             }
         }
@@ -149,33 +167,35 @@ namespace RaidDemo.Launcher
         /// <c>C:\Program Files</c>）这类错误提前到切换的这一刻报出来，
         /// 而不是让玩家等下载了几十兆之后才失败。空目录的创建是幂等的，没有副作用。</para>
         /// </remarks>
-        private void Apply(string candidate)
+        private bool Apply(string candidate, out string error, bool showDialog)
         {
+            error = null;
             if (m_Text.ReadOnly)
             {
                 // 忙碌中（更新途中）：直接把文本退回当前值，避免"改了一半的安装根"混进下载流程。
                 m_Text.Text = m_Current;
-                return;
+                return true;
             }
 
             var gameDirectory = LauncherConfig.EnsureGameFolder(candidate);
-            if (!m_Config.TrySetInstallRoot(gameDirectory, AppContext.BaseDirectory, out var resolved, out var error))
+            if (!m_Config.TrySetInstallRoot(gameDirectory, AppContext.BaseDirectory, out var resolved, out error))
             {
-                Report("安装目录无效", error);
-                return;
+                Report("安装目录无效", error, showDialog);
+                return false;
             }
 
             if (string.Equals(resolved, m_Current, StringComparison.OrdinalIgnoreCase))
             {
                 // 没变（含"手工把相对路径写成等价的绝对路径"）：只把文本刷成规范形态。
                 m_Text.Text = m_Current;
-                return;
+                return true;
             }
 
             if (!TryCreateDirectory(resolved, out var createError))
             {
-                Report("安装目录不可用", "无法在该位置创建安装目录：" + createError);
-                return;
+                error = "无法在该位置创建安装目录：" + createError;
+                Report("安装目录不可用", error, showDialog);
+                return false;
             }
 
             m_Current = resolved;
@@ -183,6 +203,7 @@ namespace RaidDemo.Launcher
             m_Log?.Invoke("安装目录已切换为：" + resolved);
             SaveConfig();
             Changed?.Invoke(resolved);
+            return true;
         }
 
         /// <summary>尝试创建目录。</summary>
@@ -225,10 +246,14 @@ namespace RaidDemo.Launcher
         /// <summary>弹提示 + 记日志 + 把文本框退回当前值。</summary>
         /// <param name="title">提示标题。</param>
         /// <param name="message">提示内容。</param>
-        private void Report(string title, string message)
+        private void Report(string title, string message, bool showDialog)
         {
             m_Log?.Invoke(title + "：" + message);
-            MessageBox.Show(m_Owner, message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            if (showDialog)
+            {
+                MessageBox.Show(m_Owner, message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
             m_Text.Text = m_Current;
         }
     }

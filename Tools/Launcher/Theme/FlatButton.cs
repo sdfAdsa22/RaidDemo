@@ -166,16 +166,23 @@ namespace RaidDemo.Launcher.Theme
 
             if (Style == FlatButtonStyle.Primary)
             {
+                // M13-10：忙碌时按钮功能已禁用，但主按钮仍是满色高亮，玩家看不出来。
+                // 禁用态整体向灰白靠：亮部提浅、暗部提亮，文字同时降透明度。
+                var disabled = !Enabled;
                 using var fill = new LinearGradientBrush(
                     body,
-                    m_Hover ? ControlPaint.Light(LauncherTheme.TealLight, 0.08f) : LauncherTheme.TealLight,
-                    m_Hover ? LauncherTheme.Teal : LauncherTheme.TealDeep,
+                    disabled
+                        ? ControlPaint.Light(LauncherTheme.TealLight, 0.6f)
+                        : (m_Hover ? ControlPaint.Light(LauncherTheme.TealLight, 0.08f) : LauncherTheme.TealLight),
+                    disabled
+                        ? ControlPaint.Light(LauncherTheme.TealDeep, 0.5f)
+                        : (m_Hover ? LauncherTheme.Teal : LauncherTheme.TealDeep),
                     LinearGradientMode.Vertical);
                 g.FillPath(fill, path);
             }
             else
             {
-                var alpha = m_Hover ? 150 : 105;
+                var alpha = !Enabled ? 55 : (m_Hover ? 150 : 105);
                 using var fill = new SolidBrush(Color.FromArgb(alpha, LauncherTheme.Pine));
                 g.FillPath(fill, path);
             }
@@ -188,7 +195,7 @@ namespace RaidDemo.Launcher.Theme
             g.DrawPath(outline, path);
 
             var color = Style == FlatButtonStyle.Primary
-                ? LauncherTheme.OnTeal
+                ? (Enabled ? LauncherTheme.OnTeal : Color.FromArgb(140, LauncherTheme.OnTeal))
                 : (Enabled ? LauncherTheme.TextOnArt : Color.FromArgb(120, LauncherTheme.TextOnArt));
 
             using var textBrush = new SolidBrush(color);
@@ -206,27 +213,31 @@ namespace RaidDemo.Launcher.Theme
             var bounds = new RectangleF(1f, 1f, Width - 2f, Height - 2f);
             using var path = LauncherTheme.RoundedRect(bounds, IconCornerRadius);
 
-            var background = m_Hover
-                ? (IsCloseAction ? Color.FromArgb(215, 190, 74, 66) : Color.FromArgb(205, LauncherTheme.Pine))
-                : Color.FromArgb(120, LauncherTheme.Pine);
+            var disabled = !Enabled;
+            var background = disabled
+                ? Color.FromArgb(55, LauncherTheme.Pine)
+                : (m_Hover
+                    ? (IsCloseAction ? Color.FromArgb(215, 190, 74, 66) : Color.FromArgb(205, LauncherTheme.Pine))
+                    : Color.FromArgb(120, LauncherTheme.Pine));
             using (var fill = new SolidBrush(background))
             {
                 g.FillPath(fill, path);
             }
 
-            using (var outline = new Pen(Color.FromArgb(150, LauncherTheme.Cream), 1.6f))
+            using (var outline = new Pen(Color.FromArgb(disabled ? 70 : 150, LauncherTheme.Cream), 1.6f))
             {
                 g.DrawPath(outline, path);
             }
 
-            PaintGlyph(g, bounds);
+            PaintGlyph(g, bounds, disabled ? 110 : 255);
         }
 
         /// <summary>画图标本体（几何图形，跟随按钮尺寸缩放）。</summary>
-        private void PaintGlyph(Graphics g, RectangleF bounds)
+        private void PaintGlyph(Graphics g, RectangleF bounds, int alpha)
         {
-            using var pen = new Pen(LauncherTheme.Cream, 1.9f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using var brush = new SolidBrush(LauncherTheme.Cream);
+            var ink = Color.FromArgb(alpha, LauncherTheme.Cream);
+            using var pen = new Pen(ink, 1.9f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using var brush = new SolidBrush(ink);
 
             var cx = bounds.Left + bounds.Width / 2f;
             var cy = bounds.Top + bounds.Height / 2f;

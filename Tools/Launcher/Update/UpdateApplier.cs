@@ -24,7 +24,7 @@ namespace RaidDemo.Launcher.Update
     /// &lt;安装根&gt;/.raiddemo/
     ///     manifest.json                  ← 本地清单快照（"我现在是什么版本"的唯一依据）
     ///     launcher.log                   ← 启动器日志
-    ///     staging/&lt;层&gt;/&lt;相对路径&gt;       ← 下载暂存区（未校验通过前不参与比对）
+    ///     staging/&lt;会话id&gt;/&lt;层&gt;/&lt;相对路径&gt; ← 下载暂存区（按会话隔离，未校验前不参与比对）
     ///     backup/&lt;时间戳&gt;/&lt;层&gt;/…        ← 替换前的旧文件（回滚用；保留最近两份）
     /// </code>
     /// </remarks>
@@ -73,14 +73,18 @@ namespace RaidDemo.Launcher.Update
             return Path.Combine(GetMetadataDirectory(installRoot), LocalManifestFileName);
         }
 
-        /// <summary>取暂存区路径（某一层里的某个文件）。</summary>
-        public static string GetStagingPath(string installRoot, string layer, string relativePath)
+        /// <summary>
+        /// 取暂存区路径（某次会话的某一层里的某个文件）。
+        /// </summary>
+        /// <remarks>
+        /// 暂存目录按会话隔离（M13-01）：并发更新即使绕过互斥，也只会踩到自己的会话目录，
+        /// 而不是像旧实现那样每个进程都清空同一个 <c>staging/body</c>。
+        /// </remarks>
+        public static string GetStagingPath(string installRoot, string sessionId, string layer, string relativePath)
         {
-            return Path.Combine(
-                GetMetadataDirectory(installRoot),
-                StagingDirectoryName,
-                layer,
-                relativePath.Replace('/', Path.DirectorySeparatorChar));
+            var relative = $"{MetadataDirectoryName}/{StagingDirectoryName}/" +
+                           $"{RequireSafeSegment(sessionId, "会话标识")}/{RequireSafeSegment(layer, "层名")}/{relativePath}";
+            return InstallPathGuard.ResolveInsideRoot(installRoot, relative);
         }
 
         /// <summary>
@@ -116,9 +120,12 @@ namespace RaidDemo.Launcher.Update
             var directory = GetMetadataDirectory(installRoot);
             Directory.CreateDirectory(directory);
 
-            File.WriteAllText(
-                GetLocalManifestPath(installRoot),
-                JsonSerializer.Serialize(manifest, ManifestWriteOptions));
+            var path = GetLocalManifestPath(installRoot);
+            var temporaryPath = path + ".tmp";
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(manifest, ManifestWriteOptions));
+
+            // 临时文件 + 原子替换：断电或崩溃时最坏留下一个 .tmp，而不是半截 JSON 快照。
+            File.Move(temporaryPath, path, overwrite: true);
         }
 
         /// <summary>写入清单时的 JSON 选项（缩进 + 中文不转义，便于人工核对）。</summary>
@@ -162,24 +169,87 @@ namespace RaidDemo.Launcher.Update
             return true;
         }
 
-        /// <summary>清空某一层的暂存目录（重试下载前调用）。</summary>
-        public static void ClearStagingLayer(string installRoot, string layer)
+        /// <summary>清空本次会话某一层的暂存目录（重试下载前调用）。</summary>
+        public static void ClearStagingLayer(string installRoot, string sessionId, string layer)
         {
-            var path = Path.Combine(GetMetadataDirectory(installRoot), StagingDirectoryName, layer);
+            var path = GetStagingLayerDirectory(installRoot, sessionId, layer);
             if (Directory.Exists(path))
             {
                 Directory.Delete(path, true);
             }
         }
 
-        /// <summary>清理暂存区（更新成功后调用）。</summary>
-        public static void ClearStaging(string installRoot)
+        /// <summary>清理本次会话的暂存区（成功或失败路径都调用）。</summary>
+        public static void ClearStaging(string installRoot, string sessionId)
         {
-            var path = Path.Combine(GetMetadataDirectory(installRoot), StagingDirectoryName);
+            var path = GetStagingSessionDirectory(installRoot, sessionId);
             if (Directory.Exists(path))
             {
                 Directory.Delete(path, true);
             }
+        }
+
+        /// <summary>
+        /// 回收本安装根下其它会话的陈旧暂存目录（本次更新开始时调用）。
+        /// </summary>
+        /// <remarks>
+        /// 调用前提是已持有 <see cref="UpdateProcessLock"/>：同一安装根同时只允许一个更新进程，
+        /// 因此此刻除自己以外的会话目录都已失去主人，可以安全删除。
+        /// 旧版本遗留的 <c>staging/body</c> 也属于这一类，会被一并回收。
+        /// </remarks>
+        public static void ClearStaleStaging(string installRoot, string sessionId)
+        {
+            var stagingRoot = Path.Combine(GetMetadataDirectory(installRoot), StagingDirectoryName);
+            if (!Directory.Exists(stagingRoot))
+            {
+                return;
+            }
+
+            foreach (var directory in Directory.GetDirectories(stagingRoot))
+            {
+                if (string.Equals(Path.GetFileName(directory), sessionId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    Directory.Delete(directory, true);
+                }
+                catch (Exception)
+                {
+                    // 清理失败不阻塞本次更新：下次启动还会再试一次。
+                }
+            }
+        }
+
+        /// <summary>取某次会话的暂存根目录。</summary>
+        private static string GetStagingSessionDirectory(string installRoot, string sessionId)
+        {
+            var relative = $"{MetadataDirectoryName}/{StagingDirectoryName}/{RequireSafeSegment(sessionId, "会话标识")}";
+            return InstallPathGuard.ResolveInsideRoot(installRoot, relative);
+        }
+
+        /// <summary>取某次会话中某一层的暂存目录。</summary>
+        private static string GetStagingLayerDirectory(string installRoot, string sessionId, string layer)
+        {
+            var relative = $"{MetadataDirectoryName}/{StagingDirectoryName}/" +
+                           $"{RequireSafeSegment(sessionId, "会话标识")}/{RequireSafeSegment(layer, "层名")}";
+            return InstallPathGuard.ResolveInsideRoot(installRoot, relative);
+        }
+
+        /// <summary>校验一个目录名片段（不允许路径分隔符，防止构造出越界路径）。</summary>
+        private static string RequireSafeSegment(string value, string label)
+        {
+            if (string.IsNullOrEmpty(value) ||
+                value.IndexOf('/') >= 0 ||
+                value.IndexOf('\\') >= 0 ||
+                !ManifestFileEntry.IsSafeRelativePath(value))
+            {
+                throw new InvalidOperationException($"{label}不安全：{value}");
+            }
+
+            return value;
         }
 
         /// <summary>创建一次替换事务（负责备份与回滚）。</summary>

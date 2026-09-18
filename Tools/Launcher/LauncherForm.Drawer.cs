@@ -56,6 +56,7 @@ namespace RaidDemo.Launcher
 
             var close = CreateSecondaryButton("收起", new Size(84, 32));
             close.Location = new Point(DrawerWidth - DrawerPadding - 84, 20);
+            close.AccessibleName = "收起设置";
             close.Click += (_, __) => ToggleDrawer();
 
             var sourceLabel = CreateFieldLabel("更新源", 76);
@@ -152,6 +153,9 @@ namespace RaidDemo.Launcher
         {
             m_DrawerOpen = !m_DrawerOpen;
             SetMainChromeVisible(!m_DrawerOpen);
+            // M13-11：打开日志窗口后再展开抽屉时，主界面的重绘可能把 chrome 图标又画上来。
+            // 每次切换都显式把抽屉压到最前，保证"收起"按钮永远不会被图标盖住。
+            m_Drawer.BringToFront();
             m_DrawerTimer ??= CreateDrawerTimer();
             m_DrawerTimer.Start();
         }
@@ -196,6 +200,8 @@ namespace RaidDemo.Launcher
             {
                 m_Drawer.Left = target;
                 m_DrawerTimer.Stop();
+                // 动画到位的这一刻再同步一次：抽屉开着时主界面图标必须始终隐藏（M13-11）。
+                SetMainChromeVisible(!m_DrawerOpen);
                 return;
             }
 
@@ -220,6 +226,15 @@ namespace RaidDemo.Launcher
         private bool TrySaveSettings(out string message)
         {
             message = "设置已保存";
+
+            // M13-03：先提交"安装目录"输入框，否则界面显示新路径、落盘还是旧值。
+            if (m_InstallRow != null && !m_InstallRow.TryCommitPendingInput(out var installError))
+            {
+                message = "安装目录修改没有生效，设置未保存：" + installError;
+                AppendLog(message);
+                return false;
+            }
+
             try
             {
                 m_Config.Save(AppContext.BaseDirectory);
@@ -237,15 +252,21 @@ namespace RaidDemo.Launcher
         /// <summary>恢复默认值（只改界面，点保存或开始更新时才落盘）。</summary>
         private void OnRestoreDefaults()
         {
-            var defaults = LauncherConfig.Load(string.Empty);
+            // M13-19：直接复制内置默认值，不再走 Load("")——空路径会按 cwd 解析，
+            // 恰好又读到启动器目录里的 local 配置（等于"恢复成当前值"）。
+            m_Config.ResetToDefault();
+
             m_SourceCombo.Items.Clear();
-            foreach (var profile in defaults.Sources)
+            foreach (var profile in m_Config.Sources)
             {
                 m_SourceCombo.Items.Add(profile.Name);
             }
 
-            var index = m_SourceCombo.Items.IndexOf(defaults.SelectedSource);
+            var index = m_SourceCombo.Items.IndexOf(m_Config.SelectedSource);
             m_SourceCombo.SelectedIndex = index >= 0 ? index : 0;
+            // 显式刷新一次：SelectedIndex 没变化时 SelectedIndexChanged 不会触发，
+            // 地址框与服务器行就会留着旧值（M13-19 的界面表现）。
+            OnProfileChanged();
             m_InstallRow?.ShowCurrent(m_Config.GetInstallRootPath(AppContext.BaseDirectory));
             // 文案要短到放得下：状态行可视宽度 312 像素、13pt 正文约每字 17 像素，
             // 原来那句 18 个字（≈310px）必然被裁到最后一个字。

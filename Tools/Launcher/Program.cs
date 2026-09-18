@@ -71,7 +71,19 @@ namespace RaidDemo.Launcher
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new LauncherForm());
+
+            using (var guard = SingleInstanceGuard.TryAcquire())
+            {
+                if (guard == null)
+                {
+                    // M13-01：第二个实例不新开窗口，激活已有窗口后退出。
+                    SingleInstanceGuard.ActivateExistingWindow();
+                    return 0;
+                }
+
+                Application.Run(new LauncherForm());
+            }
+
             return 0;
         }
 
@@ -116,6 +128,10 @@ namespace RaidDemo.Launcher
             var result = session.Run(applyChanges: !options.CheckOnly);
             Console.WriteLine();
             Console.WriteLine(result.Summary);
+
+            // 摘要由调用方落盘：UpdateSession 只在有变化时打摘要，而"已是最新"
+            // 与失败路径同样需要留在日志里（M13-17 的双写要去掉，日志内容不能一起丢）。
+            log.Write(result.Summary);
 
             if (!result.Success)
             {
@@ -210,6 +226,7 @@ namespace RaidDemo.Launcher
             Console.WriteLine("参数：");
             Console.WriteLine("  --source <地址>  更新源（http(s)://… 或本地目录）；缺省用配置里选中的档案");
             Console.WriteLine("  --root <路径>    安装根目录；缺省用配置里的 InstallRoot");
+            Console.WriteLine("                   相对路径按当前工作目录解析（图形界面的默认安装根按 exe 所在目录解析）");
             Console.WriteLine("  --check          只检查并打印计划，不下载");
             Console.WriteLine("  --update         下载并应用更新");
             Console.WriteLine("  --launch         更新成功后启动游戏");

@@ -260,6 +260,11 @@ namespace RaidDemo.Launcher
                 Glyph = glyph,
                 IsCloseAction = isClose,
                 Size = new Size(IconButtonSize, IconButtonSize),
+                // 图标按钮不绘制 Text（PaintIcon 只画几何图形），但 WinForms 的
+                // 无障碍名称会回退到 Text：M13-18 实测 AccessibleName 在 UIA 桥里不生效，
+                // 因此把说明写进 Text，让屏幕阅读器能看到"关闭/最小化/设置/日志"。
+                Text = tooltip,
+                AccessibleName = tooltip,
             };
             m_ToolTip.SetToolTip(button, tooltip);
             return button;

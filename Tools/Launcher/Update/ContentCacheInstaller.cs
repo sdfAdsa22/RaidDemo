@@ -116,15 +116,35 @@ namespace RaidDemo.Launcher.Update
 
             if (content.catalog != null && !string.IsNullOrEmpty(content.catalog.path))
             {
-                var catalogPath = ManifestFileEntry.NormalizePath(content.catalog.path);
+                if (!ManifestFileEntry.TryNormalizeSafePath(content.catalog.path, out var catalogPath, out var catalogReason))
+                {
+                    throw new InvalidOperationException($"资源层 catalog 路径不安全（{content.catalog.path}）：{catalogReason}。");
+                }
+
                 if (!entries.Exists(entry => string.Equals(
-                        ManifestFileEntry.NormalizePath(entry.path), catalogPath, StringComparison.OrdinalIgnoreCase)))
+                        NormalizeOrFail(entry.path), catalogPath, StringComparison.OrdinalIgnoreCase)))
                 {
                     entries.Add(content.catalog);
                 }
             }
 
+            for (var index = 0; index < entries.Count; index++)
+            {
+                NormalizeOrFail(entries[index].path);
+            }
+
             return entries;
+        }
+
+        /// <summary>规范化资源层路径；不安全时直接失败，绝不带着可疑路径去拼落点。</summary>
+        private static string NormalizeOrFail(string path)
+        {
+            if (!ManifestFileEntry.TryNormalizeSafePath(path, out var normalized, out var reason))
+            {
+                throw new InvalidOperationException($"资源层路径不安全（{path}）：{reason}。");
+            }
+
+            return normalized;
         }
 
         /// <summary>文件已在位且大小一致时跳过下载——这让"检查更新"保持秒级。</summary>
@@ -156,9 +176,13 @@ namespace RaidDemo.Launcher.Update
             };
 
             Directory.CreateDirectory(cacheRoot);
-            File.WriteAllText(
-                Path.Combine(cacheRoot, StateFileName),
-                JsonSerializer.Serialize(state, StateJsonOptions));
+
+            // 临时文件 + 原子替换：游戏启动时读到一半的状态文件会误判"内容未就绪"
+            // 并触发一次多余的重新下载，甚至会放弃已装好的 cache。
+            var statePath = Path.Combine(cacheRoot, StateFileName);
+            var temporaryPath = statePath + ".tmp";
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(state, StateJsonOptions));
+            File.Move(temporaryPath, statePath, overwrite: true);
         }
 
         /// <summary>游戏内容缓存的根目录（不含 <c>content</c> 这一级）。</summary>

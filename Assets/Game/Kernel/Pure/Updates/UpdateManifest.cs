@@ -178,5 +178,104 @@ namespace RaidDemo.Kernel.Updates
 
             return normalized.TrimStart('/');
         }
+
+        /// <summary>
+        /// 把路径规范化并检查它是否是"安装根内的安全相对路径"。
+        /// </summary>
+        /// <param name="path">任意来源的路径。</param>
+        /// <param name="normalized">规范化后的相对路径（失败时为空字符串）。</param>
+        /// <param name="reason">失败原因（中文，可直接展示给玩家）。</param>
+        /// <returns>安全返回 <c>true</c>。</returns>
+        /// <remarks>
+        /// <para><b>为什么必须在消费端校验而不是只信任发布端：</b>更新源是可以被替换的
+        /// （玩家能改地址、局域网里也可能有人伪造），而消费端拿到的路径会直接参与
+        /// <c>Path.Combine</c> 与文件删除。一条 <c>..\..\Windows\...</c> 或盘符绝对路径
+        /// 就能把"更新"变成任意写/任意删——这是安全边界，不是输入美化。</para>
+        ///
+        /// <para>校验规则：非空、不是绝对路径、不含盘符或 UNC 前缀、按 <c>/</c> 分段后
+        /// 每段都非空且不是 <c>.</c> / <c>..</c>、不含 Windows 非法字符，
+        /// 且不以点或空格结尾（Windows 会在落盘时静默改写这种名字，导致"清单路径"
+        /// 与"实际文件"对不上）。</para>
+        /// </remarks>
+        public static bool TryNormalizeSafePath(string path, out string normalized, out string reason)
+        {
+            normalized = NormalizePath(path);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                reason = "路径为空";
+                return false;
+            }
+
+            if (!IsSafeRelativePath(normalized))
+            {
+                reason = "路径必须是安装根内的相对路径（不允许 ..、盘符、UNC 或非法字符）";
+                return false;
+            }
+
+            reason = null;
+            return true;
+        }
+
+        /// <summary>
+        /// 判断一条**已规范化**的路径是否安全（不含 <c>..</c>、盘符、绝对路径等）。
+        /// </summary>
+        /// <param name="normalizedPath">已经过 <see cref="NormalizePath"/> 的路径。</param>
+        public static bool IsSafeRelativePath(string normalizedPath)
+        {
+            if (string.IsNullOrEmpty(normalizedPath))
+            {
+                return false;
+            }
+
+            // 开头是分隔符 = 绝对路径；含冒号 = 盘符（C:）或 NTFS 数据流（a:b）。
+            if (normalizedPath[0] == '/' || normalizedPath.IndexOf(':') >= 0)
+            {
+                return false;
+            }
+
+            var segments = normalizedPath.Split('/');
+            for (var index = 0; index < segments.Length; index++)
+            {
+                var segment = segments[index];
+                if (segment.Length == 0 || segment == "." || segment == "..")
+                {
+                    return false;
+                }
+
+                if (!IsSafeSegment(segment))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>单段路径的 Windows 合法性检查。</summary>
+        private static bool IsSafeSegment(string segment)
+        {
+            var last = segment[segment.Length - 1];
+            if (last == '.' || last == ' ')
+            {
+                return false;
+            }
+
+            for (var index = 0; index < segment.Length; index++)
+            {
+                var character = segment[index];
+                if (character < 32 ||
+                    character == '"' ||
+                    character == '<' ||
+                    character == '>' ||
+                    character == '|' ||
+                    character == '?' ||
+                    character == '*')
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 }
