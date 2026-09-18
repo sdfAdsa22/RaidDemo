@@ -75,6 +75,31 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>
+        /// 联机进程进入安全屋：正常直接进入；若结算面板仍打开，则保留面板等玩家自己关。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>为什么不能无条件直接进入：</b>P4.5-b 战后回屋是"服务器先广播本局结束并切场景，
+        /// 玩家再关结算面板"（见 <c>RaidFlowController.Multiplayer.Scenes.OnRaidEnding</c>）。
+        /// 结算面板挂在跨场景的流程控制器上，本来能活过场景加载；但这里若照旧调用
+        /// <c>EnterSafeHouseDirectly</c>，它内部的 <c>HideScreens</c> 会把面板一并隐藏——
+        /// 表现就是"撤离结算一闪而过、人已经站在安全屋"（负责人 2026-09-18 反馈）。</para>
+        ///
+        /// <para>Result 状态下保留面板与鼠标；玩家点「回到安全屋」走 <c>GoToSafeHouse</c> 收尾，
+        /// 那时场景已经是安全屋，不会二次加载。</para>
+        /// </remarks>
+        private void EnterSafeHouseAsMultiplayer(RaidFlowController flow)
+        {
+            if (flow.State == RaidFlowController.FlowState.Result)
+            {
+                Debug.Log("[联机] 回屋广播到达时结算面板仍打开：保留结算状态，等待玩家关闭面板。");
+                return;
+            }
+
+            flow.EnterSafeHouseDirectly();
+            m_InputCollector?.SetCursorLock(true);
+        }
+
+        /// <summary>
         /// 若本进程是联机客户端，则把安全屋接进大厅会话。
         /// </summary>
         /// <returns>接管成功（即处于联机模式）返回 true；单机返回 false。</returns>

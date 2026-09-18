@@ -136,8 +136,7 @@ namespace RaidDemo.Bootstrap
             // 自动进房、移动链路全都依赖时间推进（第一次联调就卡在这里）。
             if (IsMultiplayerProcess)
             {
-                flow.EnterSafeHouseDirectly();
-                m_InputCollector?.SetCursorLock(true);
+                EnterSafeHouseAsMultiplayer(flow);
             }
             else if (flow.State == RaidFlowController.FlowState.MainMenu)
             {

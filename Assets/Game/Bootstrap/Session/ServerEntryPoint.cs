@@ -218,6 +218,14 @@ namespace RaidDemo.Bootstrap
         /// </remarks>
         private const int ServerFrameRate = 60;
 
+        /// <summary>客户端帧率上限（Hz）。</summary>
+        /// <remarks>
+        /// 桌面端默认不锁帧，高端显卡会把占用顶到 80% 以上（负责人用 4060 实测）。
+        /// 这款斜俯视玩法 60 帧足够，且与服务器 60Hz 步长、演示录制帧率一致；
+        /// 需要更高帧率时只改这一处。
+        /// </remarks>
+        private const int ClientFrameRate = 60;
+
         /// <summary>
         /// 场景加载前：解析命令行，决定本进程的角色。
         /// </summary>
@@ -249,12 +257,18 @@ namespace RaidDemo.Bootstrap
 
             if (!options.IsServerRequested)
             {
+                // 客户端帧率上限：vSyncCount 必须一起清零——只设 targetFrameRate 会被
+                // 垂直同步覆盖，限帧行为随显示器刷新率漂移（60Hz 屏与 144Hz 屏表现不一致）。
+                QualitySettings.vSyncCount = 0;
+                Application.targetFrameRate = ClientFrameRate;
+
                 if (options.Mode == AppLaunchMode.Client)
                 {
                     ClientMode.Activate(options);
                     Debug.Log($"[启动] 以联机客户端运行 ｜ 连接 {options.ConnectAddress}");
                 }
 
+                Debug.Log($"[启动] 客户端帧率上限 {ClientFrameRate}Hz（垂直同步关闭）。");
                 return;
             }
 
