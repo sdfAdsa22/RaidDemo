@@ -80,6 +80,15 @@ RAIDDEMO_CHROOT=/root/ubuntu-2204 ./server.sh start
 （`/raid-demo` 是服务器目录的 bind mount，日志与存档仍写在宿主同一位置）。
 bind mount 在重启后会消失，但 `server.sh start` 每次都会自动补挂，不需要手工维护。
 
+> **更新服务端时的坑（2026-09-18 实机踩到）**：不要用
+> `mv 新目录 /root/raid-demo` 的方式整体替换目录——chroot 里的 bind mount 指向的是
+> **旧目录的 inode**，替换路径后 chroot 仍然挂着旧内容，进程会继续跑旧版本
+> （状态页显示旧版本号，而宿主机上 `ls` 看到的是新文件）。
+> 正确做法二选一：
+> 1) 把新包内容**覆盖复制进原目录**（`cp -a 新包/. /root/raid-demo/`，注意恢复 `server.config.json`）；
+> 2) 先 `RAIDDEMO_CHROOT=… ./server.sh stop`，再 `umount /root/ubuntu-2204/raid-demo`，
+>    替换目录后 `./server.sh start`（它会按新路径重新挂载）。
+
 ## 4. 启动 / 停止
 
 ```bash
