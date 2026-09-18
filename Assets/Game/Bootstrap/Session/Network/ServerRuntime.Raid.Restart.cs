@@ -128,8 +128,9 @@ namespace RaidDemo.Bootstrap
 
         /// <summary>按玩家标识排布出生点（验收模式下改到撤离区）。</summary>
         /// <remarks>
-        /// 每个人都叠在同一个点会让第一帧看起来像只有一个角色，因此按 1.6 米的间距
-        /// 在基准点**往东北方向**排成小网格（往东北是为了不把玩家推出谷底西南角的空地边界）。
+        /// 排布规则本身在 <see cref="PlayerSpawnLayout"/>：客户端接管连接前会用同一份规则预置出生位置，
+        /// 否则第一帧快照就会把站在基准点上的玩家硬拉走（M13-22 的可见回滚）。
+        /// 这里只负责选基准点与"验收模式改到撤离区"这两个服务器独有的分支。
         /// </remarks>
         private Vector2F SpawnPositionFor(int playerId)
         {
@@ -152,10 +153,7 @@ namespace RaidDemo.Bootstrap
                 }
             }
 
-            var index = playerId < 0 ? 0 : playerId;
-            return new Vector2F(
-                SpawnBase.X + ((index % 4) * SpawnSpacing),
-                SpawnBase.Y + ((index / 4) * SpawnSpacing));
+            return PlayerSpawnLayout.RaidPosition(SpawnBase, playerId);
         }
     }
 }

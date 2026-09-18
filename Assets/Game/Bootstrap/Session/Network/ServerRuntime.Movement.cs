@@ -24,9 +24,6 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public sealed partial class ServerRuntime
     {
-        /// <summary>相邻出生点的间距（米），避免所有人叠在同一格。</summary>
-        private const float SpawnSpacing = 1.6f;
-
         /// <summary>移动体高度（米）。与场景生成器里的胶囊保持一致。</summary>
         private const float BodyHeight = 1.8f;
 

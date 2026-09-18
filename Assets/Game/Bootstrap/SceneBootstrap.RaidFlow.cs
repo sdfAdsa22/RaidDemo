@@ -120,6 +120,9 @@ namespace RaidDemo.Bootstrap
             var missing = ResolveMissingHealth();
             if (missing <= 0f)
             {
+                // M13-21：满血是"不能用"的合法原因，但静默返回会让玩家分不清
+                // "满血"与"功能坏了"——必须给一条可见提示。
+                m_CombatHud?.ShowHint("生命值已满，不需要使用医疗物品。", false);
                 return;
             }
 
@@ -148,15 +151,26 @@ namespace RaidDemo.Bootstrap
         }
 
         /// <summary>还差多少生命才满血。已经满血或读不到状态时返回 0。</summary>
+        /// <remarks>
+        /// M13-21：联机客户端读服务器权威镜像（<c>m_AuthoritativeHealth</c>），
+        /// 单机读本地战斗世界。判据本身在 <see cref="MedicalUseRules"/>，由 EditMode 用例钉住。
+        /// </remarks>
         private float ResolveMissingHealth()
         {
-            if (m_CombatWorld == null || !m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
+            var hasLocalState = false;
+            var localHealth = 0f;
+            if (m_CombatWorld != null && m_CombatWorld.TryGet(m_PlayerCombatantId, out var state))
             {
-                return 0f;
+                hasLocalState = true;
+                localHealth = state.Health;
             }
 
-            var missing = PlayerMaxHealth - state.Health;
-            return missing > 0f ? missing : 0f;
+            return MedicalUseRules.MissingHealth(
+                PlayerMaxHealth,
+                m_AuthoritativeHealth >= 0f,
+                m_AuthoritativeHealth,
+                hasLocalState,
+                localHealth);
         }
 
         /// <summary>从背包与弹药挂里挑一件最合适的医疗品。</summary>

@@ -28,6 +28,16 @@ namespace RaidDemo.Bootstrap
         private bool m_TriggerPressLogged;
 
         /// <summary>
+        /// 服务器最近一次下发的权威生命值；负数表示"还没有拿到"（刚连接或单机进程）。
+        /// </summary>
+        /// <remarks>
+        /// M13-21：联机客户端没有本地战斗世界，生命只存在于 HUD 与服务端。医疗使用的判据
+        /// （<see cref="ResolveMissingHealth"/>）需要一个可读的权威镜像——只写 HUD 就会
+        /// 让"能不能用药"永远按满血算，请求根本不上行。
+        /// </remarks>
+        private float m_AuthoritativeHealth = -1f;
+
+        /// <summary>
         /// 采集本帧的战斗意图，供下一步上行。
         /// </summary>
         /// <remarks>
@@ -267,6 +277,7 @@ namespace RaidDemo.Bootstrap
         private void ApplyLocalHealthFromServer(float remainingHealth, bool isAlive)
         {
             var max = ServerCombatCoordinator.DefaultMaxHealth;
+            m_AuthoritativeHealth = remainingHealth;
             m_CombatHud?.SetHealth(remainingHealth, max, isAlive);
 
             // 留一条可见痕迹：联机里"我的血条是不是服务器说了算"没法从画面上验证（无头验收没有画面），

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using RaidDemo.Presentation;
+using RaidDemo.Shared;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -214,7 +215,39 @@ namespace RaidDemo.Bootstrap
         private void AttachToServer(int playerId)
         {
             Debug.Log($"[联机] 已连接，玩家标识 {playerId}。");
+            AlignLocalSpawnToServerLayout(playerId);
             m_MovementLink?.Attach(m_NetworkClient, playerId);
+        }
+
+        /// <summary>
+        /// 接管连接前，把本地预测的出生位置对齐到服务器将要采用的排布。
+        /// </summary>
+        /// <remarks>
+        /// 服务器会按玩家编号把出生点错开，而场景里只有一个基准出生点。客户端若站在基准点上
+        /// 等第一帧快照，就会与权威位置差 0.7~4.8 米，对账必然硬吸附——玩家看到的是
+        /// "一进图被拉了一下"（M13-22）。规则与服务器共用 <see cref="PlayerSpawnLayout"/>，
+        /// 因此这里算出来的位置就是服务器即将下发的位置，快照到达时无需再修正。
+        /// </remarks>
+        private void AlignLocalSpawnToServerLayout(int playerId)
+        {
+            if (m_MoveHandler == null || m_PlayerMotor == null)
+            {
+                return;
+            }
+
+            var spawn = PlayerSpawnLayout.RaidPosition(
+                new Vector2F(m_PlayerSpawnPosition.x, m_PlayerSpawnPosition.y),
+                playerId);
+
+            var snapshot = m_MoveHandler.Simulator.CaptureSnapshot();
+            snapshot.State.Position = spawn;
+            m_MoveHandler.Simulator.RestoreSnapshot(snapshot);
+
+            var facing = new Vector2(snapshot.State.Facing.X, snapshot.State.Facing.Y);
+            m_PlayerMotor.SnapTo(new Vector2(spawn.X, spawn.Y), facing);
+
+            // 相机只做平滑跟随：载体瞬移后不重新吸附，这段位移会以"相机慢半拍"的形式留在画面上。
+            m_CameraController?.SetTarget(m_PlayerMotor.transform, snap: true);
         }
 
         /// <summary>

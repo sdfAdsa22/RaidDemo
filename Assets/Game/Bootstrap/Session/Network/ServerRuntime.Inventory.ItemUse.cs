@@ -36,11 +36,16 @@ namespace RaidDemo.Bootstrap
             var containerId = TranslateContainerId(playerId, message.ContainerId);
             if (m_Containers == null || !m_Containers.TryGetGrid(containerId, out var grid))
             {
+                m_Session?.Log.Warning(
+                    $"[服务器] 玩家 {playerId} 的使用请求指向未知容器 {message.ContainerId}，已忽略。");
                 return;
             }
 
             if (!TryResolveItemAt(grid, message.CellX, message.CellY, out var item))
             {
+                m_Session?.Log.Warning(
+                    $"[服务器] 玩家 {playerId} 的使用请求在容器 {message.ContainerId} 的格子 " +
+                    $"({message.CellX},{message.CellY}) 找不到物品，已忽略。");
                 return;
             }
 

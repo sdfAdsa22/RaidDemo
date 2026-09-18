@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using RaidDemo.Shared;
 
 namespace RaidDemo.Bootstrap
 {
@@ -168,9 +169,38 @@ namespace RaidDemo.Bootstrap
         private void AttachSafeHouseToServer(int playerId)
         {
             Debug.Log($"[联机] 安全屋已接管连接，玩家标识 {playerId}。");
+            AlignSafeHouseSpawnToServerLayout(playerId);
             m_MovementLink?.Attach(m_NetworkClient, playerId);
             m_ContainerLink?.Attach(m_NetworkClient);
             m_MerchantLink?.Attach(m_NetworkClient);
+        }
+
+        /// <summary>
+        /// 进屋前把本地预测位置对齐到服务器将要采用的安全屋出生排布。
+        /// </summary>
+        /// <remarks>
+        /// 与战局是同一条规则、同一类缺陷（M13-22）：四个人在服务器上以 1.4 米间距左右摊开，
+        /// 客户端若从场景的单点出生等快照，就会有 0.7~2.1 米的可见硬吸附。
+        /// </remarks>
+        private void AlignSafeHouseSpawnToServerLayout(int playerId)
+        {
+            if (m_MoveHandler == null || m_PlayerMotor == null)
+            {
+                return;
+            }
+
+            var spawn = PlayerSpawnLayout.SafeHousePosition(
+                new Vector2F(m_PlayerSpawnPosition.x, m_PlayerSpawnPosition.y),
+                playerId,
+                LobbyLimits.MaxPlayers);
+
+            var snapshot = m_MoveHandler.Simulator.CaptureSnapshot();
+            snapshot.State.Position = spawn;
+            m_MoveHandler.Simulator.RestoreSnapshot(snapshot);
+
+            var facing = new Vector2(snapshot.State.Facing.X, snapshot.State.Facing.Y);
+            m_PlayerMotor.SnapTo(new Vector2(spawn.X, spawn.Y), facing);
+            m_CameraController?.SetTarget(m_PlayerMotor.transform, snap: true);
         }
 
         /// <summary>与服务器断开：清掉远端玩家，避免留下不会动的假队友。</summary>

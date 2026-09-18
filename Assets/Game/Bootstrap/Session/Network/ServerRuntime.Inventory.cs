@@ -84,6 +84,9 @@ namespace RaidDemo.Bootstrap
         private void BuildContainers(ItemCatalog catalog)
         {
             var spawnPoints = Object.FindObjectsByType<LootSpawnPoint>(FindObjectsSortMode.None);
+            // M13-23：FindObjectsByType 不保证跨进程顺序一致，必须先按坐标排序再编号，
+            // 否则"第 i 个箱子"在服务器与客户端可能指向不同的箱子（容量与内容都会错位）。
+            LootSpawnPointOrder.Sort(spawnPoints);
             var roller = new LootRoller(
                 catalog,
                 new DeterministicRandom(DefaultLootSeed),
@@ -109,8 +112,8 @@ namespace RaidDemo.Bootstrap
                     definition.GridSize.Height,
                     definition.DisplayName);
 
-                // 编号用与客户端同一套约定（起始值 + 生成顺序）：
-                // 两端读的是同一张地图，因此第 i 个箱子在两端是同一个编号。
+                // 编号用与客户端同一套约定（起始值 + 排序后的顺序）：
+                // 两端读的是同一张地图、用同一份排序规则，因此第 i 个箱子在两端是同一个编号。
                 var containerId = m_Containers.Register(
                     grid, ContainerKind.Loot, ContainerIds.SceneContainer(i));
                 if (containerId == 0)

@@ -27,12 +27,15 @@ namespace RaidDemo.Bootstrap.Editor
         /// 因此它们和 <c>Modules/UI</c> 一样是"界面文案的来源"。此前它们不在扫描范围里，
         /// 字符是否齐全纯靠巧合——<c>BuildIdentity</c> 的握手文案就撞上了一个没烘进图集的字（致）。</para>
         ///
+        /// <para><c>Modules/Raid</c> 是 M13-20 补进来的：容器名（如"武器架"）来自战局模块，漏扫会"烘焙成功但运行时缺字"。</para>
+        ///
         /// <para>只跳过注释的原则不变：字符串字面量照收，注释里的汉字不进来。</para>
         /// </remarks>
         private static readonly string[] CodeScanFolders =
         {
             "Assets/Game/Modules/UI",
             "Assets/Game/Modules/Meta",
+            "Assets/Game/Modules/Raid",
             "Assets/Game/Modules/Data/Content",
             "Assets/Game/Bootstrap/Session/Lobby",
             "Assets/Game/Bootstrap/Session/Network",

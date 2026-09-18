@@ -170,8 +170,15 @@ namespace RaidDemo.Bootstrap
 
             var item = grid.GetAt(cellX, cellY);
             var medical = ResolveMedical(item);
-            if (medical == null || ResolveMissingHealth() <= 0f)
+            if (medical == null)
             {
+                return;
+            }
+
+            if (ResolveMissingHealth() <= 0f)
+            {
+                // 与 H 键同一条判据、同一条提示：两条入口不能出现"一个能用一个没反应"（M13-21）。
+                m_CombatHud?.ShowHint("生命值已满，不需要使用医疗物品。", false);
                 return;
             }
 

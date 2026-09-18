@@ -45,9 +45,6 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public sealed partial class ServerRuntime
     {
-        /// <summary>安全屋里的玩家间距（米）：避免几名玩家叠在同一格上。</summary>
-        private const float SafeHouseSpawnSpacing = 1.4f;
-
         /// <summary>当前托管的世界种类。</summary>
         private ServerWorldKind m_WorldKind = ServerWorldKind.None;
 
@@ -330,18 +327,15 @@ namespace RaidDemo.Bootstrap
         /// 不需要在这里抄一个坐标常量（抄一次就会在下次改场景时对不上）。</para>
         ///
         /// <para>横向排开而不是叠在同一点：四个人叠在一起时，移动扫掠会把彼此挤开，
-        /// 表现是"一进屋就被弹到墙角"。间距取 1.4 米，比玩家胶囊直径（0.8 米）宽、又塞得下四个人。</para>
+        /// 表现是"一进屋就被弹到墙角"。规则在 <see cref="PlayerSpawnLayout"/>，
+        /// 客户端接管连接前会用同一份规则预置自己的位置——两边分头算会导致进屋瞬间被硬拉一次（M13-22）。</para>
         /// </remarks>
         private static Vector2F SafeHouseSpawnPositionFor(int playerId)
         {
-            var basePosition = ServerMode.SafeHouseSpawnPosition;
-            var index = Mathf.Clamp(playerId, 0, LobbyLimits.MaxPlayers - 1);
-
-            // 以出生点为中轴左右摊开：0..3 → -2.1 / -0.7 / +0.7 / +2.1 米。
-            var center = (LobbyLimits.MaxPlayers - 1) * 0.5f;
-            var offset = (index - center) * SafeHouseSpawnSpacing;
-
-            return new Vector2F(basePosition.X + offset, basePosition.Y);
+            return PlayerSpawnLayout.SafeHousePosition(
+                ServerMode.SafeHouseSpawnPosition,
+                playerId,
+                LobbyLimits.MaxPlayers);
         }
 
         /// <summary>世界的中文名（日志与状态页共用）。</summary>
