@@ -14,7 +14,7 @@ namespace RaidDemo.Kernel
     ///
     /// <para><b>本类刻意不引用 UnityEngine：</b>该文件所在程序集（RaidDemo.Kernel.Pure）禁止引用引擎类型，
     /// 目的是让同一份事件机制既能在客户端使用，也能在服务端（无渲染环境）使用，
-    /// 同时保证单元测试不需要启动 Unity。详见 Docs/Decisions/ADR-001。</para>
+    /// 同时保证单元测试不需要启动 Unity。详见 Docs/04_技术决策/ADR-001。</para>
     ///
     /// <para><b>订阅与退订必须成对：</b>典型用法是在 MonoBehaviour 的 OnEnable 中订阅、
     /// 在 OnDisable 中退订。忘记退订会导致对象已销毁却仍被事件总线持有，形成内存泄漏——

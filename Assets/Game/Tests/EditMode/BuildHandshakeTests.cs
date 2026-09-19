@@ -11,7 +11,7 @@ namespace RaidDemo.Tests.EditMode
     /// <remarks>
     /// <para><b>为什么这块必须单测：</b>真机上复现一次"版本不一致"要准备两个不同版本的构建，
     /// 代价高到没人会为每次改动重跑。而它的规则（怎么拼、什么算一致、缺失怎么办）是纯字符串逻辑，
-    /// 放在 EditMode 里可以逐条钉死。真机演练（<c>Docs/M10_复现与演示指南.md</c> 第 4 节第 7 条）
+    /// 放在 EditMode 里可以逐条钉死。真机演练（版本握手验收脚本，见 <c>Tools/UpdateSource/README.md</c>）
     /// 只需要验证"这条规则确实接进了联机链路"。</para>
     ///
     /// <para><b>协议那两条同理：</b>"加了字段但忘了写进 <c>NetworkSerialize</c>"不会报错，

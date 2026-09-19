@@ -39,7 +39,7 @@ namespace RaidDemo.Bootstrap
     /// </remarks>
     public sealed partial class LaunchOptions
     {
-        /// <summary>默认监听端口。与 <c>Docs/Modules/10_联机.md</c> 第 15.2 节的端口规划一致。</summary>
+        /// <summary>默认监听端口。与 <c>Docs/03_模块设计/10_联机.md</c> 第 15.2 节的端口规划一致。</summary>
         public const int DefaultPort = 7777;
 
         /// <summary>默认房间名。房主创建房间时可以覆盖。</summary>

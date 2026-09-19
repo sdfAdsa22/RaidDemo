@@ -5,8 +5,8 @@ Windows 玩家开服用的图形界面：改 `server.config.json` → 一键启�
 Linux 云主机上的对应物是 [`deploy/server.sh`](../../deploy/server.sh)（随 Linux 包分发、云主机同款）：
 **两边共用同一份配置格式**
 （`server.config.json`）与同一套启动参数。背景见
-[`Docs/Modules/10_联机.md`](../../Docs/Modules/10_联机.md) 与
-[`ADR-001`](../../Docs/Decisions/ADR-001-服务端权威架构与Netcode选型.md)（为什么是专用服务器）。
+[`Docs/03_模块设计/10_联机.md`](../../Docs/03_模块设计/10_联机.md) 与
+[`ADR-001`](../../Docs/04_技术决策/ADR-001-服务端权威架构与Netcode选型.md)（为什么是专用服务器）。
 
 ## 1. 为什么它是独立程序
 

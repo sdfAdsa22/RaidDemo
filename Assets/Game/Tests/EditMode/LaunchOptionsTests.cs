@@ -99,12 +99,12 @@ namespace RaidDemo.Tests.EditMode
         public void 服务器预填参数生效且不激活联机模式()
         {
             var ok = LaunchOptions.TryParse(
-                new[] { "-serverhost", "47.104.210.207:7777", "-hideserver" },
+                new[] { "-serverhost", "203.0.113.10:7777", "-hideserver" },
                 out var options,
                 out var error);
 
             Assert.IsTrue(ok, error);
-            Assert.AreEqual("47.104.210.207:7777", options.ServerHostHint);
+            Assert.AreEqual("203.0.113.10:7777", options.ServerHostHint);
             Assert.IsTrue(options.HideServerAddress);
             Assert.IsFalse(options.IsServerRequested, "预填不是服务器模式。");
             Assert.IsNull(options.ConnectAddress, "预填不应激活自动连接——-connect 才有那个语义。");

@@ -13,7 +13,7 @@ namespace RaidDemo.Bootstrap.Editor
     /// <list type="number">
     /// <item><description>物品表是一份可以被评审、被 diff 的数据。手工填的资产在代码评审里是二进制块，看不出改了什么。</description></item>
     /// <item><description>数值调整只需改这张表再重新生成，不会漏掉某个资产。</description></item>
-    /// <item><description>这份表本身就是设计文档的一部分，与 <c>Docs/Modules/02_Inventory.md</c> 一一对应。</description></item>
+    /// <item><description>这份表本身就是设计文档的一部分，与 <c>Docs/03_模块设计/02_Inventory.md</c> 一一对应。</description></item>
     /// </list>
     /// <para><b>重新生成会覆盖同名资产</b>，因此不要在生成出来的资产上手工改数值——
     /// 要改数值请改这张表。</para>

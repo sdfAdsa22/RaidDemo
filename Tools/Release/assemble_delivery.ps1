@@ -229,7 +229,7 @@ RaidDemo $Version 交付说明
 启动器/           RaidDemo.Launcher.exe（自包含单文件，目标机器无需装 .NET）
   双击 → 选更新源 → 检查更新 → 更新并启动。
   更新源地址在 launcher.config.json 里；本机更新源需要先起
-  Tools/UpdateSource/RaidDemo.UpdateSource.exe（见 Docs/M10_复现与演示指南.md）。
+  Tools/UpdateSource/RaidDemo.UpdateSource.exe（见 Tools/UpdateSource/README.md）。
 
 怎么和别人一起玩
   1) 开服的人在服务端面板点「启动服务器」，再点「复制连接信息」；
